@@ -1,0 +1,283 @@
+import contextlib
+import hashlib
+import logging
+import os
+import threading
+import urlparse
+
+import apsw
+import requests
+from tvaf import plex as tvaf_plex
+
+
+def log():
+    """Gets a module-level logger."""
+    return logging.getLogger(__name__)
+
+
+class Syncer(object):
+
+    @classmethod
+    def _create_schema(cls, db):
+        with db:
+            db.cursor().execute(
+                "create table if not exists tvaf_metadata ("
+                "id integer primary key, "
+                "tracker text, "
+                "torrent_id integer, "
+                "first_file_index integer, "
+                "offset integer)")
+            db.cursor().execute(
+                "create index if not exists tvaf_metadata_on_tracker_tid_idx "
+                "on tvaf_metadata (tracker, torrent_id, first_file_index)")
+
+    def __init__(self, path, plex_host=None, library_section_name=None,
+                 yatfs_path=None):
+        self.path = path
+        self.plex_host = plex_host
+        self.library_section_name = library_section_name
+        self.yatfs_path = yatfs_path.encode()
+
+        self._local = threading.local()
+        self._any_deleted = False
+        self._refresh_metadata = set()
+        self._session = requests.Session()
+        self._library_section_id = None
+
+    @property
+    def library_section_id(self):
+        if self._library_section_id is not None:
+            return self._library_section_id
+        r = self.db.cursor().execute(
+            "select id from library_sections where name = ?",
+            (self.library_section_name,)).fetchone()
+        assert r, "library section doesn't exist"
+        self._library_section_id = r[0]
+        return self._library_section_id
+
+    def finalize(self):
+        if self._any_deleted:
+            self.http_put(
+                "/library/sections/%d/emptyTrash" % self.library_section_id)
+            self.any_deleted = False
+        for id, type, guid in self._refresh_metadata:
+            self.http_get("/:/metadata/notify/changeItemState", params=dict(
+                librarySectionID=self.library_section_id, metadataItemID=id,
+                metadataType=type, state=3, metadataState="queued"))
+            self.http_get("/system/agents/update", params=dict(
+                mediaType=type, force=1, guid=guid, id=id))
+        self._refresh_metadata.clear()
+
+    def http_call(self, method, path, **kwargs):
+        uri = urlparse.urlunparse(
+            ("http", self.plex_host, path, None, None, None))
+        if "headers" not in kwargs:
+            kwargs["headers"] = {}
+        kwargs["headers"]["X-Plex-Token"] = tvaf_plex.get_token(self.path)
+        return method(uri, **kwargs)
+
+    def http_get(self, path, **kwargs):
+        return self.http_call(self._session.get, path, **kwargs)
+
+    def http_put(self, path, **kwargs):
+        return self.http_call(self._session.put, path, **kwargs)
+
+    @property
+    def db_path(self):
+        return os.path.join(self.path, tvaf_plex.LIBRARY_PATH)
+
+    @property
+    def db(self):
+        db = getattr(self._local, "db", None)
+        if db is not None:
+            return db
+        db = apsw.Connection(self.db_path)
+        db.setbusytimeout(120000)
+        self._local.db = db
+        with db:
+            Syncer._create_schema(db)
+        return db
+
+    @contextlib.contextmanager
+    def begin(self):
+        self.db.cursor().execute("begin immediate")
+        try:
+            yield
+        except:
+            self.db.cursor().execute("rollback")
+            raise
+        else:
+            self.db.cursor().execute("commit")
+
+    def refresh_metadata_later(self, id, item):
+        self._refresh_metadata.add((id, item.type, item.guid))
+
+    def sync_metadata_item(self, item):
+        if item is None:
+            return None
+        with self.db:
+            r = self.db.cursor().execute(
+                "select id from metadata_items where deleted_at is null and "
+                "library_section_id = ? and guid = ?",
+                (self.library_section_id, item.guid)).fetchone()
+            if r:
+                id, = r
+            else:
+                self.db.cursor().execute(
+                    "insert into metadata_items "
+                    "(library_section_id, guid, title) values (?, ?, ?)",
+                    (self.library_section_id, item.guid, item.default_title))
+                id = self.db.last_insert_rowid()
+                if item.parent is None:
+                    self.refresh_metadata_later(id, item)
+                log().debug("added metadata item %d for %s", id, item.guid)
+            params = [
+                ("metadata_type", item.type),
+                ("guid", item.guid),
+                ("parent_id", self.sync_metadata_item(item.parent)),
+                ("title", item.title),
+                ("\"index\"", item.index),
+                ("originally_available_at", item.originally_available_at),
+            ]
+            params = [(n, v) for n, v in params if v is not None]
+            if params:
+                self.db.cursor().execute(
+                    "update metadata_items set %s where id = ?" %
+                    ", ".join("%s = ?" % n for n, v in params),
+                    [v for n, v in params] + [id])
+            return id
+
+    def sync_media_item(self, item):
+        with self.db:
+            id = None
+            r = self.db.cursor().execute(
+                "select media_items.id from tvaf_metadata "
+                "inner join media_items "
+                "on media_items.id = tvaf_metadata.id "
+                "where "
+                "media_items.deleted_at is null and "
+                "media_items.library_section_id = ? and "
+                "tvaf_metadata.tracker = ? and "
+                "tvaf_metadata.torrent_id = ? and "
+                "tvaf_metadata.first_file_index = ? and "
+                "tvaf_metadata.offset is  ?",
+                (self.library_section_id, item.tracker,
+                    item.parts[0].torrent_id, item.parts[0].file_index,
+                    item.offset)).fetchone()
+            if r:
+                id, = r
+                # Plex doesn't support soft-delete of an individual media part.
+                # If any parts need to be changed, we need to soft-delete the
+                # whole item and create a new one.
+                expected_paths = [
+                    self.path_for_media_part(p) for p in item.parts]
+                rows = self.db.cursor().execute(
+                    "select cast(file as blob) from media_parts where "
+                    "media_item_id = ? and deleted_at is null "
+                    "order by \"index\"", (id,)).fetchall()
+                paths = [p for p, in rows]
+                if paths != expected_paths:
+                    log().debug("%s != %s", paths, expected_paths)
+                    self.delete_media_items(id)
+                    id = None
+            if id is None:
+                self.db.cursor().execute(
+                    "insert into media_items (library_section_id) values (?)",
+                    (self.library_section_id,))
+                id = self.db.last_insert_rowid()
+                self.db.cursor().execute(
+                    "insert or replace into tvaf_metadata "
+                    "(id, tracker, torrent_id, first_file_index, offset) "
+                    "values (?, ?, ?, ?, ?)",
+                    (id, item.tracker, item.parts[0].torrent_id,
+                        item.parts[0].file_index, item.offset))
+                log().debug(
+                    "added media item %d for %s:%s:%s:%s", id, item.tracker,
+                    item.parts[0].torrent_id, item.parts[0].file_index,
+                    item.offset)
+            self.db.cursor().execute(
+                "update media_items set metadata_item_id = ?, "
+                "display_offset = ? where id = ?",
+                (self.sync_metadata_item(item.metadata_item), item.offset, id))
+            for part in item.parts:
+                self.sync_media_part(id, part)
+            return id
+
+    def sync_torrent_exclusive(self, tracker, torrent_id, *items):
+        with self.db:
+            media_item_ids = [self.sync_media_item(i) for i in items]
+            rows = self.db.cursor().execute(
+                "select media_items.id from tvaf_metadata "
+                "inner join media_items on "
+                "tvaf_metadata.id = media_items.id "
+                "where media_items.library_section_id = ? and "
+                "tvaf_metadata.tracker = ? and "
+                "tvaf_metadata.torrent_id = ?",
+                (self.library_section_id, tracker, torrent_id)).fetchall()
+            all_media_item_ids = [id for id, in rows]
+            media_item_ids_to_delete = list(
+                set(all_media_item_ids) - set(media_item_ids))
+            self.delete_media_items(*media_item_ids_to_delete)
+
+    def sync_guid_exclusive(self, guid, *items):
+        with self.db:
+            media_item_ids = [self.sync_media_item(i) for i in items]
+            rows = self.db.cursor().execute(
+                "select media_items.id from metadata_items "
+                "inner join media_items on "
+                "media_items.metadata_item_id = metadata_items.id "
+                "where metadata_items.guid = ? "
+                "and metadata_items.library_section_id = ?",
+                (guid, self.library_section_id)).fetchall()
+            all_media_item_ids = [id for id, in rows]
+            media_item_ids_to_delete = list(
+                set(all_media_item_ids) - set(media_item_ids))
+            self.delete_media_items(*media_item_ids_to_delete)
+
+    def delete_media_items(self, *ids):
+        if not ids:
+            return
+        log().debug("deleting media items: %s", ids)
+        with self.db:
+            self.db.cursor().executemany(
+                "update media_items "
+                "set deleted_at = datetime('now', 'localtime') where id = ?",
+                [(id,) for id in ids])
+            self.db.cursor().executemany(
+                "delete from tvaf_metadata where id = ?",
+                [(id,) for id in ids])
+        self._any_deleted = True
+
+    def path_for_media_part(self, part):
+        return os.path.join(
+            self.yatfs_path, part.tracker.encode(), b"torrent", b"by-id",
+            b"%d" % part.torrent_id, b"data", b"by-path", part.path)
+
+    def sync_media_part(self, media_item_id, part):
+        path = self.path_for_media_part(part)
+        with self.db:
+            r = self.db.cursor().execute(
+                "select id from media_parts where deleted_at is null and "
+                "media_item_id = ? and "
+                "cast(file as blob) = ?", (media_item_id, path)).fetchone()
+            if r:
+                id, = r
+            else:
+                hash = hashlib.sha1(("%s:%s:%s" % (
+                    part.tracker, part.torrent_id,
+                    part.file_index)).encode()).hexdigest()
+                open_subtitle_hash = hash[:16]
+                self.db.cursor().execute(
+                    "insert into media_parts ("
+                    "media_item_id, file, hash, open_subtitle_hash, size, "
+                    "created_at, updated_at) "
+                    "values (?, ?, ?, ?, ?, datetime('now', 'localtime'), "
+                    "datetime(?, 'unixepoch', 'localtime'))",
+                    (media_item_id, path, hash, open_subtitle_hash,
+                        part.length, part.time))
+                id = self.db.last_insert_rowid()
+                log().debug("added media part %d for %s", id, path)
+            self.db.cursor().execute(
+                "update media_parts set \"index\" = ? where id = ?",
+                (part.index, id))
+            return id

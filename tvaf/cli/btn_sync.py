@@ -13,6 +13,7 @@ import tvaf.sync
 import tvaf.tracker.btn
 import tvaf.tracker.btn.scan
 import tvaf.tracker.btn.default_selectors
+import tvaf.tvdb
 
 
 def log():

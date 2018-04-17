@@ -10,7 +10,7 @@ import logging
 import sys
 import threading
 
-import futures_then
+import promise
 
 import btn
 import tvaf.sync
@@ -120,26 +120,23 @@ class Resolver(object):
         assert r.status_code in (200, 404), r.text
         return r.json()
 
-    def match_episode_by_date_future(self, series_id, date):
+    def match_episode_by_date_promise(self, series_id, date):
         key = (series_id, date)
         with self._lock:
             if key in self._cache:
                 return self._cache[key]
-            inner_f = self.thread_pool.submit(
+            f = self.thread_pool.submit(
                 self.match_episode_by_date, series_id, date)
-            # Weird boilerplate to make a base Future into a ThenableFuture
-            mid_f = futures_then.ThenableFuture()
-            f = mid_f.then(lambda _: inner_f)
-            mid_f.set_result(None)
-            self._cache[key] = f
-            return f
+            p = promise.Promise.cast(f)
+            self._cache[key] = p
+            return p
 
     def need_to_resolve(self, item):
         return bool(item.date and item.torrent_entry.group.series.tvdb_id)
 
-    def resolve_future(self, item):
+    def resolve_promise(self, item):
         tvdb_id = item.torrent_entry.group.series.tvdb_id
-        f = self.match_episode_by_date_future(tvdb_id, item.date)
+        p = self.match_episode_by_date_promise(tvdb_id, item.date)
         def got_response(response):
             episodes = response.get("data")
             if not episodes:
@@ -162,8 +159,8 @@ class Resolver(object):
                 item.torrent_entry, item.file_infos, episode=episode_number,
                 season=season_number, exact_season=season_number,
                 offset=item.offset)]
-        f = f.then(got_response)
-        return f
+        p = p.then(got_response)
+        return p
 
 
 def sync_series_torrent_ids(
@@ -171,7 +168,7 @@ def sync_series_torrent_ids(
     log().info("Syncing series %s", series_id)
 
     items = []
-    future_resolved_items = []
+    item_promises = []
 
     for torrent_id in torrent_ids:
         torrent_entry = api.getTorrentByIdCached(torrent_id)
@@ -183,12 +180,12 @@ def sync_series_torrent_ids(
             if args.list:
                 sys.stdout.write("  %s\n" % item)
             if resolver.need_to_resolve(item):
-                future_resolved_items.append(resolver.resolve_future(item))
+                item_promises.append(resolver.resolve_promise(item))
             else:
                 items.append(item)
 
-    for future in future_resolved_items:
-        for item in future.result():
+    for promise in item_promises:
+        for item in promise.get():
             items.append(item)
 
     guid_to_items = collections.defaultdict(list)

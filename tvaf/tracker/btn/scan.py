@@ -1,3 +1,6 @@
+# The author disclaims copyright to this source code. Please see the
+# accompanying UNLICENSE file.
+
 import logging
 import os
 import re
@@ -10,17 +13,6 @@ import tvaf.tracker.btn as tvaf_btn
 def log():
     """Gets a module-level logger."""
     return logging.getLogger(__name__)
-
-
-BTN_FULL_SEASON_REGEX = re.compile(r"Season (?P<season>\d+)$")
-BTN_EPISODE_REGEX = re.compile(r"S(?P<season>\d+)(?P<episodes>(E\d+)+)$")
-BTN_EPISODE_PART_REGEX = re.compile(r"E(?P<episode>\d+)")
-BTN_DATE_EPISODE_REGEX = re.compile(
-    r"(?P<y>\d{4})[\.-](?P<m>\d\d)[\.-](?P<d>\d\d)$")
-BTN_SEASON_PARTIAL_REGEXES = (
-    re.compile(r"Season (?P<season>\d+)"),
-    re.compile(r"(?P<season>\d{4})[\.-]\d\d[\.-]\d\d"),
-    re.compile(r"S(?P<season>\d+)(E\d+)+"))
 
 
 class Matcher(object):
@@ -50,6 +42,16 @@ class Matcher(object):
 
 
 class Scanner(object):
+
+    BTN_FULL_SEASON_REGEX = re.compile(r"Season (?P<season>\d+)$")
+    BTN_EPISODE_REGEX = re.compile(r"S(?P<season>\d+)(?P<episodes>(E\d+)+)$")
+    BTN_EPISODE_PART_REGEX = re.compile(r"E(?P<episode>\d+)")
+    BTN_DATE_EPISODE_REGEX = re.compile(
+        r"(?P<y>\d{4})[\.-](?P<m>\d\d)[\.-](?P<d>\d\d)$")
+    BTN_SEASON_PARTIAL_REGEXES = (
+        re.compile(r"Season (?P<season>\d+)"),
+        re.compile(r"(?P<season>\d{4})[\.-]\d\d[\.-]\d\d"),
+        re.compile(r"S(?P<season>\d+)(E\d+)+"))
 
     def __init__(self, torrent_entry, matcher, debug_scanner=False):
         self.torrent_entry = torrent_entry
@@ -111,21 +113,22 @@ class Scanner(object):
         if not fis:
             return
 
-        if self.torrent_entry.group.category == CATEGORY_EPISODE:
-            m = BTN_EPISODE_REGEX.match(self.torrent_entry.group.name)
+        if self.torrent_entry.group.category == tvaf_btn.CATEGORY_EPISODE:
+            m = self.BTN_EPISODE_REGEX.match(self.torrent_entry.group.name)
             if m:
                 s = int(m.group("season"))
                 episodes = m.group("episodes")
                 episodes = [
                     int(e)
-                    for e in BTN_EPISODE_PART_REGEX.findall(episodes)]
+                    for e in self.BTN_EPISODE_PART_REGEX.findall(episodes)]
                 if all(e != 0 for e in episodes):
                     for i, e in enumerate(episodes):
                         yield tvaf_btn.MediaItem(
                             self.torrent_entry, fis, episode=e, season=s,
                             exact_season=True, offset=i / len(episodes) * 100)
                     return
-            m = BTN_DATE_EPISODE_REGEX.match(self.torrent_entry.group.name)
+            m = self.BTN_DATE_EPISODE_REGEX.match(
+                self.torrent_entry.group.name)
             if m:
                 date = "%s-%s-%s" % (m.group("y"), m.group("m"), m.group("d"))
                 yield tvaf_btn.MediaItem(self.torrent_entry, fis, date=date)
@@ -133,7 +136,7 @@ class Scanner(object):
             yield tvaf_btn.MediaItem(self.torrent_entry, fis)
             return
 
-        if self.torrent_entry.group.category == CATEGORY_SEASON:
+        if self.torrent_entry.group.category == tvaf_btn.CATEGORY_SEASON:
             known_strings = [
                 self.torrent_entry.codec, self.torrent_entry.resolution,
                 self.torrent_entry.source]
@@ -150,7 +153,7 @@ class Scanner(object):
             if self.torrent_entry.source in ("WEB-DL", "WEBRip"):
                 known_strings.append("WEB")
 
-            for rx in BTN_SEASON_PARTIAL_REGEXES:
+            for rx in self.BTN_SEASON_PARTIAL_REGEXES:
                 m = rx.match(self.torrent_entry.group.name)
                 if m:
                     season = int(m.group("season"))
@@ -158,7 +161,7 @@ class Scanner(object):
             else:
                 season = None
 
-            exact_season = bool(BTN_FULL_SEASON_REGEX.match(
+            exact_season = bool(self.BTN_FULL_SEASON_REGEX.match(
                 self.torrent_entry.group.name))
 
             scanner = tvaf.scan.SeriesPathnameScanner(

@@ -1,3 +1,6 @@
+# The author disclaims copyright to this source code. Please see the
+# accompanying UNLICENSE file.
+
 class Tvdb(object):
 
     API_KEY = "0629B785CE550C8D"

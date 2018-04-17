@@ -1,6 +1,14 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
 
+import contextlib
+import json
+import threading
+import urllib.parse
+
+import requests
+
+
 class Tvdb(object):
 
     API_KEY = "0629B785CE550C8D"
@@ -48,16 +56,16 @@ class Tvdb(object):
                 with self._lock:
                     self.sessions.append(session)
 
-    def call_noauth(self, method, path, data=None, headers=None, qd=None):
+    def call_noauth(self, method, path, headers=None, **kwargs):
         headers = headers or {}
         headers["Accept"] = "application/json"
-        qs = urlparse.urlencode(qd or {})
-        url = urlparse.urlunparse(("https", self.HOST, path, None, qs, None))
+        url = urllib.parse.urlunparse(
+            ("https", self.HOST, path, None, None, None))
         with self.session() as session:
             for _ in range(self.max_retries):
                 try:
                     r = getattr(session, method)(
-                        url, data=data, headers=headers, timeout=5)
+                        url, headers=headers, timeout=5, **kwargs)
                 except (requests.exceptions.ConnectionError,
                         requests.exceptions.Timeout):
                     log().error("Got a connection error, retrying.")
@@ -69,26 +77,26 @@ class Tvdb(object):
                 assert False, "Retries exceeded"
             return r
 
-    def call(self, method, path, data=None, headers=None, qd=None):
+    def call(self, method, path, headers=None, **kwargs):
         headers = headers or {}
         headers["Authorization"] = "Bearer " + self.token
-        return self.call_noauth(
-            method, path, data=data, headers=headers, qd=qd)
+        return self.call_noauth(method, path, headers=headers, **kwargs)
 
-    def post(self, path, data, headers=None, qd=None):
+    def post(self, path, data, headers=None, **kwargs):
         headers = headers or {}
         headers["Content-Type"] = "application/json"
         return self.call(
-            "post", data=json.dumps(data or {}), headers=headers, qd=qd)
+            "post", data=json.dumps(data or {}), headers=headers, **kwargs)
 
-    def post_noauth(self, path, data, headers=None, qd=None):
+    def post_noauth(self, path, data, headers=None, **kwargs):
         headers = headers or {}
         headers["Content-Type"] = "application/json"
         return self.call_noauth(
-            "post", path, data=json.dumps(data or {}), headers=headers, qd=qd)
+            "post", path, data=json.dumps(data or {}), headers=headers,
+            **kwargs)
 
-    def get(self, path, headers=None, qd=None):
-        return self.call("get", path, headers=headers, qd=qd)
+    def get(self, path, **kwargs):
+        return self.call("get", path, **kwargs)
 
     @property
     def languages(self):

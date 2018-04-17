@@ -197,12 +197,10 @@ def sync_series_torrent_ids(
     for guid, items in list(guid_to_items.items()):
         guid_to_items[guid] = args.selector(items)
 
-    torrent_id_to_items = {}
+    torrent_id_to_items = {i: [] for i in torrent_ids}
     for items in guid_to_items.values():
         for item in items:
             torrent_id = item.torrent_entry.id
-            if torrent_id not in torrent_id_to_items:
-                torrent_id_to_items[torrent_id] = []
             torrent_id_to_items[torrent_id].append(item)
 
     for guid_items in chunks(sorted(guid_to_items.items()), 300):

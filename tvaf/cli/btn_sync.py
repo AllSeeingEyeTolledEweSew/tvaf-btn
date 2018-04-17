@@ -100,7 +100,7 @@ def get_series_id_to_torrents(api, parser, args):
     return series_id_to_torrents
 
 
-def sync_series_torrent_ids(args, api, syncer, series_id, torrent_ids):
+def sync_series_torrent_ids(args, api, matcher, syncer, series_id, torrent_ids):
     log().info("Syncing series %s", series_id)
 
     guid_to_items = {}
@@ -110,7 +110,7 @@ def sync_series_torrent_ids(args, api, syncer, series_id, torrent_ids):
         if args.list:
             sys.stdout.write("%s:\n" % torrent_entry)
         scanner = tvaf.tracker.btn.scan.Scanner(
-            torrent_entry, debug_scanner=args.debug_scanner)
+            torrent_entry, matcher, debug_scanner=args.debug_scanner)
         items = []
         for item in scanner.iter_media_items():
             items.append(item)
@@ -164,6 +164,7 @@ def main():
     parser.add_argument("--plex_host", default="127.0.0.1:32400")
     parser.add_argument("--plex_library_name")
     parser.add_argument("--yatfs_path")
+    parser.add_argument("--max_threads", type=int, default=64)
 
     mxg = parser.add_mutually_exclusive_group(required=True)
     mxg.add_argument("--all", action="store_true")
@@ -201,6 +202,13 @@ def main():
 
     api = btn.API.from_args(parser, args)
 
+    tvdb = tvaf.tvdb.Tvdb(max_connections=args.max_threads)
+
+    thread_pool = concurrent.futures.ThreadPoolExecutor(
+        max_workers=args.max_threads)
+
+    matcher = tvaf.tracker.btn.scan.Matcher(tvdb, thread_pool)
+
     if args.pretend:
         syncer = None
     else:
@@ -213,7 +221,8 @@ def main():
         series_id_to_torrents = get_series_id_to_torrents(api, parser, args)
 
         for series_id, torrent_ids in sorted(series_id_to_torrents.items()):
-            sync_series_torrent_ids(args, api, syncer, series_id, torrent_ids)
+            sync_series_torrent_ids(
+                args, api, matcher, syncer, series_id, torrent_ids)
 
     if not args.pretend:
         syncer.finalize()

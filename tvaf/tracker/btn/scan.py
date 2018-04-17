@@ -1,8 +1,15 @@
+import logging
 import os
 import re
+import threading
 
 import tvaf.scan
 import tvaf.tracker.btn as tvaf_btn
+
+
+def log():
+    """Gets a module-level logger."""
+    return logging.getLogger(__name__)
 
 
 BTN_FULL_SEASON_REGEX = re.compile(r"Season (?P<season>\d+)$")
@@ -16,13 +23,75 @@ BTN_SEASON_PARTIAL_REGEXES = (
     re.compile(r"S(?P<season>\d+)(E\d+)+"))
 
 
+class Matcher(object):
+
+    def __init__(self, tvdb, thread_pool):
+        self.tvdb = tvdb
+        self.thread_pool = thread_pool
+        self._lock = threading.RLock()
+        self._cache = {}
+
+    def match_episode_by_date(self, series_id, date):
+        r = self.tvdb.get(
+            "/series/%d/episodes/query" % series_id,
+            params={"firstAired": date})
+        assert r.status_code in (200, 404), r.text
+        return r.json()
+
+    def match_episode_by_date_request(self, series_id, date):
+        key = (series_id, date)
+        with self._lock:
+            if key in self._cache:
+                return self._cache[key]
+            f = self.thread_pool.submit(
+                self.match_episode_by_date, series_id, date)
+            self._cache[key] = f
+            return f
+
+
 class Scanner(object):
 
-    def __init__(self, torrent_entry, debug_scanner=False):
+    def __init__(self, torrent_entry, matcher, debug_scanner=False):
         self.torrent_entry = torrent_entry
+        self.matcher = matcher
         self.debug_scanner = debug_scanner
 
     def iter_media_items(self):
+        mi_futures = []
+        for mi in self.iter_media_items_inner():
+            tvdb_id = mi.torrent_entry.group.series.tvdb_id
+            if mi.date and tvdb_id:
+                f = self.matcher.match_episode_by_date_request(
+                    tvdb_id, mi.date)
+                mi_futures.append((mi, f))
+            else:
+                yield mi
+        for mi, f in mi_futures:
+            response = f.result()
+            episodes = response.get("data")
+            if not episodes:
+                log().error(
+                    "No match for series %s date %s",
+                    mi.torrent_entry.group.series.tvdb_id, mi.date)
+            else:
+                def episode_key(episode):
+                    s = episode["airedSeason"]
+                    e = episode["airedEpisodeNumber"]
+                    return (s != 0, s, e)
+                episodes = sorted(episodes, key=episode_key)
+                episode = episodes[0]
+                log().info(
+                    "Matched series %s date %s -> (%s, %s)",
+                    mi.torrent_entry.group.series.tvdb_id, mi.date,
+                    episode["airedSeason"], episode["airedEpisodeNumber"])
+                mi.date = None
+                mi.filename = None
+                mi.episode = episode["airedEpisodeNumber"]
+                mi.season = episode["airedSeason"]
+                mi.exact_season = episode["airedSeason"]
+                yield mi
+
+    def iter_media_items_inner(self):
         if self.torrent_entry.container in ("VOB", "M2TS", "ISO"):
             return
 

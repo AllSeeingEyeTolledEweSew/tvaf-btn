@@ -3,10 +3,15 @@
 
 import contextlib
 import json
+import logging
 import threading
 import urllib.parse
 
 import requests
+
+
+def log():
+    return logging.getLogger(__name__)
 
 
 class Tvdb(object):

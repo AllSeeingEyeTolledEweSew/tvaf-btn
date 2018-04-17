@@ -3,12 +3,15 @@
 
 import argparse
 import collections
+import contextlib
+import importlib
 import logging
 import sys
 
 import btn
 from tvaf import sync as tvaf_sync
 from tvaf.tracker import btn as tvaf_btn
+import tvaf.tracker.btn.default_selectors
 
 
 def log():
@@ -18,6 +21,20 @@ def log():
 def chunks(l, n):
     for i in xrange(0, len(l), n):
         yield l[i:i+n]
+
+
+def function(name):
+    split = name.rsplit(".", 1)
+    if len(split) < 2:
+        raise argparse.ArgumentTypeError("%r not a valid function name" % name)
+    module_name, function_name = split
+    try:
+        r = getattr(importlib.import_module(module_name), function_name)
+    except (ImportError, AttributeError) as e:
+        raise argparse.ArgumentTypeError("%r not found: %s" % (name, e))
+    if not callable(r):
+        raise argparse.ArgumentTypeError("%r is not callable" % r)
+    return r
 
 
 def get_series_id_to_torrents(api, parser, args):
@@ -85,8 +102,7 @@ def get_series_id_to_torrents(api, parser, args):
 def sync_series_torrent_ids(args, api, syncer, series_id, torrent_ids):
     log().info("Syncing series %s", series_id)
 
-    if args.one_per_guid:
-        guid_to_items = {}
+    guid_to_items = {}
 
     for torrent_id in torrent_ids:
         torrent_entry = api.getTorrentByIdCached(torrent_id)
@@ -99,38 +115,37 @@ def sync_series_torrent_ids(args, api, syncer, series_id, torrent_ids):
             items.append(item)
             if args.list:
                 sys.stdout.write("  %s\n" % item)
-            if args.one_per_guid:
-                guid = item.metadata_item.guid
-                if guid not in guid_to_items:
-                    guid_to_items[guid] = []
-                guid_to_items[guid].append(item)
+            guid = item.metadata_item.guid
+            if guid not in guid_to_items:
+                guid_to_items[guid] = []
+            guid_to_items[guid].append(item)
 
-        if not args.one_per_guid and not args.pretend:
-            with syncer.begin():
+    guid_to_items = {
+        guid: args.selector(items) for guid, items in guid_to_items.items()}
+
+    torrent_id_to_items = {}
+    for items in guid_to_items.values():
+        for item in items:
+            torrent_id = item.torrent_entry.id
+            if torrent_id not in torrent_id_to_items:
+                torrent_id_to_items[torrent_id] = []
+            torrent_id_to_items[torrent_id].append(item)
+
+    for guid_items in chunks(sorted(guid_to_items.items()), 300):
+        with contextlib.ExitStack() as stack:
+            if not args.pretend:
+                stack.enter_context(syncer.begin())
+            for guid, items in guid_items:
+                if args.list:
+                    sys.stdout.write("%s -> %s\n" % (guid, items))
+                if not args.pretend:
+                    syncer.sync_guid_exclusive(guid, *items)
+
+    if not args.pretend:
+        with syncer.begin():
+            for torrent_id, items in torrent_id_to_items.items():
                 syncer.sync_torrent_exclusive(
                     tvaf_btn.NAME, torrent_id, *items)
-
-    if args.one_per_guid:
-        torrent_id_to_items = {}
-        for guid_items in chunks(list(guid_to_items.items()), 300):
-            with syncer.begin():
-                for guid, items in guid_items:
-                    for item in items:
-                        torrent_id = item.torrent_entry.id
-                        if torrent_id not in torrent_id_to_items:
-                            torrent_id_to_items[torrent_id] = []
-                    item = sorted(
-                        items, key=lambda i: i.torrent_entry.seeders)[-1]
-                    torrent_id_to_items[item.torrent_entry.id].append(item)
-                    if args.list:
-                        sys.stdout.write("%s -> %s\n" % (guid, item))
-                    if not args.pretend:
-                        syncer.sync_guid_exclusive(guid, item)
-        if not args.pretend:
-            with syncer.begin():
-                for torrent_id, items in torrent_id_to_items.items():
-                    syncer.sync_torrent_exclusive(
-                        tvaf_btn.NAME, torrent_id, *items)
 
 
 def main():
@@ -138,9 +153,11 @@ def main():
     parser.add_argument("--verbose", "-v", action="count")
     parser.add_argument("--debug_scanner", action="store_true")
 
+    parser.add_argument(
+        "--selector", type=function,
+        default=tvaf.tracker.btn.default_selectors.best_with_heuristics)
     parser.add_argument("--pretend", action="store_true")
     parser.add_argument("--list", action="store_true")
-    parser.add_argument("--one_per_guid", action="store_true")
 
     parser.add_argument("--plex_path", default="/var/lib/plexmediaserver")
     parser.add_argument("--plex_host", default="127.0.0.1:32400")
@@ -176,11 +193,10 @@ def main():
             parser.error(
                 "--plex_library_name and --yatfs_path are required.")
 
-    if args.one_per_guid:
-        if not (args.all or args.series or args.series_id or args.tvdb_id):
-            parser.error(
-                "with --one_per_guid, you must select at least a full series "
-                "with --all, --series, --series_id or --tvdb_id")
+    if not (args.all or args.series or args.series_id or args.tvdb_id):
+        parser.error(
+            "you must select at least a full series with --all, --series, "
+            "--series_id or --tvdb_id")
 
     api = btn.API.from_args(parser, args)
 

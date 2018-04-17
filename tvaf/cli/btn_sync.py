@@ -9,8 +9,9 @@ import logging
 import sys
 
 import btn
-from tvaf import sync as tvaf_sync
-from tvaf.tracker import btn as tvaf_btn
+import tvaf.sync
+import tvaf.tracker.btn
+import tvaf.tracker.btn.scan
 import tvaf.tracker.btn.default_selectors
 
 
@@ -108,7 +109,7 @@ def sync_series_torrent_ids(args, api, syncer, series_id, torrent_ids):
         torrent_entry = api.getTorrentByIdCached(torrent_id)
         if args.list:
             sys.stdout.write("%s:\n" % torrent_entry)
-        scanner = tvaf_btn.Scanner(
+        scanner = tvaf.tracker.btn.scan.Scanner(
             torrent_entry, debug_scanner=args.debug_scanner)
         items = []
         for item in scanner.iter_media_items():
@@ -145,7 +146,7 @@ def sync_series_torrent_ids(args, api, syncer, series_id, torrent_ids):
         with syncer.begin():
             for torrent_id, items in torrent_id_to_items.items():
                 syncer.sync_torrent_exclusive(
-                    tvaf_btn.NAME, torrent_id, *items)
+                    tvaf.tracker.btn.NAME, torrent_id, *items)
 
 
 def main():
@@ -203,7 +204,7 @@ def main():
     if args.pretend:
         syncer = None
     else:
-        syncer = tvaf_sync.Syncer(
+        syncer = tvaf.sync.Syncer(
             args.plex_path, plex_host=args.plex_host,
             library_section_name=args.plex_library_name,
             yatfs_path=args.yatfs_path)

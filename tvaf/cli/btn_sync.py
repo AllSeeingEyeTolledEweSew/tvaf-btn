@@ -8,6 +8,9 @@ import contextlib
 import importlib
 import logging
 import sys
+import threading
+
+import futures_then
 
 import btn
 import tvaf.sync
@@ -102,29 +105,97 @@ def get_series_id_to_torrents(api, parser, args):
     return series_id_to_torrents
 
 
-def sync_series_torrent_ids(args, api, matcher, syncer, series_id, torrent_ids):
+class Resolver(object):
+
+    def __init__(self, tvdb, thread_pool):
+        self.tvdb = tvdb
+        self.thread_pool = thread_pool
+        self._lock = threading.RLock()
+        self._cache = {}
+
+    def match_episode_by_date(self, series_id, date):
+        r = self.tvdb.get(
+            "/series/%d/episodes/query" % series_id,
+            params={"firstAired": date})
+        assert r.status_code in (200, 404), r.text
+        return r.json()
+
+    def match_episode_by_date_future(self, series_id, date):
+        key = (series_id, date)
+        with self._lock:
+            if key in self._cache:
+                return self._cache[key]
+            inner_f = self.thread_pool.submit(
+                self.match_episode_by_date, series_id, date)
+            # Weird boilerplate to make a base Future into a ThenableFuture
+            mid_f = futures_then.ThenableFuture()
+            f = mid_f.then(lambda _: inner_f)
+            mid_f.set_result(None)
+            self._cache[key] = f
+            return f
+
+    def need_to_resolve(self, item):
+        return bool(item.date and item.torrent_entry.group.series.tvdb_id)
+
+    def resolve_future(self, item):
+        tvdb_id = item.torrent_entry.group.series.tvdb_id
+        f = self.match_episode_by_date_future(tvdb_id, item.date)
+        def got_response(response):
+            episodes = response.get("data")
+            if not episodes:
+                log().error(
+                    "No match for series %s date %s", tvdb_id, item.date)
+                return []
+
+            def episode_key(episode):
+                s = episode["airedSeason"]
+                e = episode["airedEpisodeNumber"]
+                return (s != 0, s, e)
+            episodes = sorted(episodes, key=episode_key)
+            episode = episodes[0]
+            episode_number = episode["airedEpisodeNumber"]
+            season_number = episode["airedSeason"]
+            log().info(
+                "Matched series %s date %s -> (%s, %s)",
+                tvdb_id, item.date, season_number, episode_number)
+            return [tvaf.tracker.btn.MediaItem(
+                item.torrent_entry, item.file_infos, episode=episode_number,
+                season=season_number, exact_season=season_number,
+                offset=item.offset)]
+        f = f.then(got_response)
+        return f
+
+
+def sync_series_torrent_ids(
+        args, api, resolver, syncer, series_id, torrent_ids):
     log().info("Syncing series %s", series_id)
 
-    guid_to_items = {}
+    items = []
+    future_resolved_items = []
 
     for torrent_id in torrent_ids:
         torrent_entry = api.getTorrentByIdCached(torrent_id)
         if args.list:
             sys.stdout.write("%s:\n" % torrent_entry)
         scanner = tvaf.tracker.btn.scan.Scanner(
-            torrent_entry, matcher, debug_scanner=args.debug_scanner)
-        items = []
+            torrent_entry, debug_scanner=args.debug_scanner)
         for item in scanner.iter_media_items():
-            items.append(item)
             if args.list:
                 sys.stdout.write("  %s\n" % item)
-            guid = item.metadata_item.guid
-            if guid not in guid_to_items:
-                guid_to_items[guid] = []
-            guid_to_items[guid].append(item)
+            if resolver.need_to_resolve(item):
+                future_resolved_items.append(resolver.resolve_future(item))
+            else:
+                items.append(item)
 
-    guid_to_items = {
-        guid: args.selector(items) for guid, items in guid_to_items.items()}
+    for future in future_resolved_items:
+        for item in future.result():
+            items.append(item)
+
+    guid_to_items = collections.defaultdict(list)
+    for item in items:
+        guid_to_items[item.metadata_item.guid].append(item)
+    for guid, items in list(guid_to_items.items()):
+        guid_to_items[guid] = args.selector(items)
 
     torrent_id_to_items = {}
     for items in guid_to_items.values():
@@ -209,7 +280,7 @@ def main():
     thread_pool = concurrent.futures.ThreadPoolExecutor(
         max_workers=args.max_threads)
 
-    matcher = tvaf.tracker.btn.scan.Matcher(tvdb, thread_pool)
+    resolver = Resolver(tvdb, thread_pool)
 
     if args.pretend:
         syncer = None
@@ -224,7 +295,7 @@ def main():
 
         for series_id, torrent_ids in sorted(series_id_to_torrents.items()):
             sync_series_torrent_ids(
-                args, api, matcher, syncer, series_id, torrent_ids)
+                args, api, resolver, syncer, series_id, torrent_ids)
 
     if not args.pretend:
         syncer.finalize()

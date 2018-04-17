@@ -24,6 +24,7 @@ setup(
     ],
     install_requires=[
         "btn>=0.1.2",
+        "futures_then>=0.1.1",
     ],
     entry_points={
         "console_scripts": [

@@ -52,7 +52,7 @@ class Tvdb(object):
         with self.sessions_semaphore:
             with self._lock:
                 if self.sessions:
-                    session = self.sessions.pop(0)
+                    session = self.sessions.pop()
                 else:
                     session = requests.Session()
             try:

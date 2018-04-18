@@ -26,9 +26,9 @@ class Scanner(object):
         re.compile(r"(?P<season>\d{4})[\.-]\d\d[\.-]\d\d"),
         re.compile(r"S(?P<season>\d+)(E\d+)+"))
 
-    def __init__(self, torrent_entry, debug_scanner=False):
+    def __init__(self, torrent_entry, debug=False):
         self.torrent_entry = torrent_entry
-        self.debug_scanner = debug_scanner
+        self.debug = debug
 
     def iter_media_items(self):
         if self.torrent_entry.container in ("VOB", "M2TS", "ISO"):
@@ -103,7 +103,7 @@ class Scanner(object):
 
             scanner = tvaf.scan.SeriesPathnameScanner(
                 fis, known_season=season, known_strings=known_strings,
-                debug=self.debug_scanner)
+                debug=self.debug)
 
             for mi in scanner.iter_media_items():
                 if season is not None and exact_season:

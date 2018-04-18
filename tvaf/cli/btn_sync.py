@@ -52,13 +52,12 @@ def get_series_ids(api, parser, args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", "-v", action="count")
-    parser.add_argument("--debug_scanner", action="store_true")
+    parser.add_argument("--debug", "-d", action="count")
 
     parser.add_argument(
         "--selector", type=function,
         default=tvaf.tracker.btn.default_selectors.best_with_heuristics)
     parser.add_argument("--pretend", action="store_true")
-    parser.add_argument("--list", action="store_true")
 
     parser.add_argument("--plex_path", default="/var/lib/plexmediaserver")
     parser.add_argument("--plex_host", default="127.0.0.1:32400")
@@ -107,7 +106,7 @@ def main():
         max_workers=args.max_threads)
 
     scanner = lambda te: tvaf.tracker.btn.scan.Scanner(
-        te, debug_scanner=args.debug_scanner).iter_media_items()
+        te, debug=args.debug).iter_media_items()
 
     if args.pretend:
         syncer = None
@@ -123,7 +122,7 @@ def main():
         for series_id in series_ids:
             picker = tvaf.tracker.btn.pick.WholeSeriesPicker(
                 series_id, api, scanner, args.selector, tvdb, thread_pool,
-                debug=args.list)
+                debug=args.debug)
             picker.pick()
             if not args.pretend:
                 syncer.sync_from_picker(picker)

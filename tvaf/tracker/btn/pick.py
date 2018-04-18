@@ -9,7 +9,6 @@ import threading
 import promise
 
 import tvaf.tracker.btn
-import tvaf.tracker.btn.scan
 
 
 def log():
@@ -53,7 +52,7 @@ class Resolver(object):
             if not episodes:
                 log().error(
                     "No match for series %s date %s", tvdb_id, item.date)
-                return [tvaf.tracker.btn.MediaItem(
+                return [item.__class__(
                     item.torrent_entry, item.file_infos, filename=item.date,
                     offset=item.offset)]
 
@@ -68,7 +67,7 @@ class Resolver(object):
             log().debug(
                 "Matched series %s date %s -> (%s, %s)",
                 tvdb_id, item.date, season_number, episode_number)
-            return [tvaf.tracker.btn.MediaItem(
+            return [item.__class__(
                 item.torrent_entry, item.file_infos, episode=episode_number,
                 season=season_number, exact_season=season_number,
                 offset=item.offset)]

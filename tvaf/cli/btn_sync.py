@@ -142,7 +142,9 @@ class Resolver(object):
             if not episodes:
                 log().error(
                     "No match for series %s date %s", tvdb_id, item.date)
-                return []
+                return [tvaf.tracker.btn.MediaItem(
+                    item.torrent_entry, item.file_infos, filename=item.date,
+                    offset=item.offset)]
 
             def episode_key(episode):
                 s = episode["airedSeason"]

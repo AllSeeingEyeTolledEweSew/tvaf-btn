@@ -12,6 +12,7 @@ import btn
 import tvaf.sync
 import tvaf.tracker.btn.default_selectors
 import tvaf.tracker.btn.pick
+import tvaf.tracker.btn.scan
 import tvaf.tvdb
 
 

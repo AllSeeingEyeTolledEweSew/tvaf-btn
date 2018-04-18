@@ -65,7 +65,7 @@ class Resolver(object):
             episode = episodes[0]
             episode_number = episode["airedEpisodeNumber"]
             season_number = episode["airedSeason"]
-            log().info(
+            log().debug(
                 "Matched series %s date %s -> (%s, %s)",
                 tvdb_id, item.date, season_number, episode_number)
             return [tvaf.tracker.btn.MediaItem(

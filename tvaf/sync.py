@@ -15,6 +15,11 @@ def log():
     return logging.getLogger(__name__)
 
 
+def chunks(l, n):
+    for i in xrange(0, len(l), n):
+        yield l[i:i + n]
+
+
 class Syncer(object):
 
     @classmethod
@@ -281,3 +286,14 @@ class Syncer(object):
                 "update media_parts set \"index\" = ? where id = ?",
                 (part.index, id))
             return id
+
+    def sync_from_picker(self, picker, chunk=300):
+        for guid_items in chunks(sorted(
+                picker.guid_to_items().items()), chunk):
+            with self.begin():
+                for guid, items in guid_items:
+                    self.sync_guid_exclusive(guid, *items)
+
+        with self.begin():
+            for torrent_id, items in picker.torrent_id_to_items().items():
+                self.sync_torrent_exclusive(picker.name(), torrent_id, *items)

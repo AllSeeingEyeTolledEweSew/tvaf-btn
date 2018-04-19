@@ -9,6 +9,7 @@ import sys
 import threading
 
 import btn
+import tvaf.plex
 import tvaf.sync
 import tvaf.tracker.btn.default_selectors
 import tvaf.tracker.btn.pick
@@ -112,9 +113,11 @@ def main():
     if args.pretend:
         syncer = None
     else:
+        db = tvaf.plex.PlexDatabase(args.plex_path)
+        library_section = tvaf.plex.LibrarySection(
+            db, name=args.plex_library_name)
         syncer = tvaf.sync.Syncer(
-            args.plex_path, plex_host=args.plex_host,
-            library_section_name=args.plex_library_name,
+            library_section, plex_host=args.plex_host,
             yatfs_path=args.yatfs_path)
 
     with api.db:

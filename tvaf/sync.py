@@ -230,13 +230,11 @@ class Syncer(object):
                 (part.index, id))
             return id
 
-    def sync_from_picker(self, picker, chunk=300):
-        for guid_items in chunks(sorted(
-                picker.guid_to_items().items()), chunk):
-            with self.db.begin():
-                for guid, items in guid_items:
-                    self.sync_guid_exclusive(guid, *items)
-
+    def sync_from_picker(self, picker):
         with self.db.begin():
-            for torrent_id, items in picker.torrent_id_to_items().items():
-                self.sync_torrent_exclusive(picker.name(), torrent_id, *items)
+            with picker.checkpoint(self.library_section):
+                for guid, items in picker.guid_to_items():
+                    self.sync_guid_exclusive(guid, *items)
+                for torrent_id, items in picker.torrent_id_to_items().items():
+                    self.sync_torrent_exclusive(
+                        picker.name(), torrent_id, *items)

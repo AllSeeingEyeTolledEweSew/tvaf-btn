@@ -15,17 +15,15 @@ import tvaf.tracker.btn.default_selectors
 import tvaf.tracker.btn.pick
 import tvaf.tracker.btn.scan
 import tvaf.tvdb
+import tvaf.util
 
 
 def function(name):
-    split = name.rsplit(".", 1)
-    if len(split) < 2:
-        raise argparse.ArgumentTypeError("%r not a valid function name" % name)
-    module_name, function_name = split
     try:
-        r = getattr(importlib.import_module(module_name), function_name)
-    except (ImportError, AttributeError) as e:
-        raise argparse.ArgumentTypeError("%r not found: %s" % (name, e))
+        r = tvaf.util.name_to_global(name)
+    except (ValueError, ImportError, AttributeError) as e:
+        raise argparse.ArgumentTypeError(
+            "bad global function %r: %s" % (name, e))
     if not callable(r):
         raise argparse.ArgumentTypeError("%r is not callable" % r)
     return r

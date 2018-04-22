@@ -231,10 +231,9 @@ class Syncer(object):
             return id
 
     def sync_from_picker(self, picker):
-        with self.db.begin():
-            with picker.checkpoint(self.library_section):
-                for guid, items in picker.guid_to_items():
-                    self.sync_guid_exclusive(guid, *items)
-                for torrent_id, items in picker.torrent_id_to_items().items():
-                    self.sync_torrent_exclusive(
-                        picker.name(), torrent_id, *items)
+        assert not self.db.conn.getautocommit()
+        for guid, items in picker.guid_to_items().items():
+            self.sync_guid_exclusive(guid, *items)
+        for torrent_id, items in picker.torrent_id_to_items().items():
+            self.sync_torrent_exclusive(
+                picker.name(), torrent_id, *items)

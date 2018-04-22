@@ -29,6 +29,7 @@ setup(
     entry_points={
         "console_scripts": [
             "tvaf_btn_sync = tvaf.cli.btn_sync:main",
+            "tvaf_btn_config = tvaf.cli.btn_config:main",
             "tvaf_plex_media_scanner_shim_wrapper = tvaf.cli.plex_media_scanner_shim_wrapper:main",
             "tvaf_plex_media_scanner_shim = tvaf.cli.plex_media_scanner_shim:main",
         ],

@@ -1,11 +1,16 @@
 import hashlib
+import json
 import logging
 import os
 import re
 import struct
+import threading
 import urlparse
 
+import btn
+
 import tvaf.plex
+import tvaf.util
 
 
 NAME = "btn"
@@ -268,3 +273,89 @@ class MediaPart(tvaf.plex.MediaPart):
     @property
     def length(self):
         return self.file_info.length
+
+
+class Config(object):
+
+    def __init__(self, filter_name=None, yatfs_path=None, btn_cache_path=None,
+                 **kwargs):
+        self.filter_name = filter_name
+        self.yatfs_path = yatfs_path
+        self.btn_cache_path = btn_cache_path
+
+        self._lock = threading.RLock()
+        self._filter_name_cache = None
+        self._filter = None
+        self._btn_cache_path_cache = None
+        self._api = None
+
+    @property
+    def filter(self):
+        with self._lock:
+            if self._filter_name_cache == self.filter_name:
+                return self._filter
+            self._filter = tvaf.util.name_to_global(self.filter_name)
+            self._filter_name_cache = self.filter_name
+            return self._filter
+
+    @property
+    def api(self):
+        with self._lock:
+            if self._btn_cache_path_cache == self.btn_cache_path:
+                return self._api
+            self._api = btn.API(cache_path=self.btn_cache_path)
+            self._btn_cache_path_cache = self.btn_cache_path
+            return self._api
+
+    def __eq__(self, o):
+        if type(o) is not type(self):
+            return False
+        return (
+            self.filter_name == o.filter_name and
+            self.yatfs_path == o.yatfs_path and
+            self.btn_cache_path == o.btn_cache_path)
+
+    def __repr__(self):
+        return "%s.%s(%s)" % (
+            self.__class__.__module__, self.__class__.__name__,
+            ", ".join("%s=%r" % (k, v) for k, v in self.to_dict().items()))
+
+    def to_dict(self):
+        return dict(
+            filter_name=self.filter_name, yatfs_path=self.yatfs_path,
+            btn_cache_path=self.btn_cache_path)
+
+
+class LibrarySection(object):
+
+    KEY_CONFIG = "tvaf_btn_etl_config"
+    KEY_SEQUENCE = "tvaf_btn_etl_sequence"
+
+    def __init__(self, library_section):
+        self.library_section = library_section
+
+        self._lock = threading.RLock()
+        self._config_data_cache = None
+        self._config = None
+
+    def get_config(self):
+        data = self.library_section.get_setting(self.KEY_CONFIG)
+        if not data:
+            return None
+        data = json.loads(data)
+        with self._lock:
+            if self._config_data_cache != data:
+                self._config = Config(**data)
+                self._config_data_cache = data
+            return self._config
+
+    def set_config(self, config):
+        self.library_section.set_setting(
+            self.KEY_CONFIG, json.dumps(config.to_dict()))
+
+    def get_sequence(self):
+        sequence = self.library_section.get_setting(self.KEY_SEQUENCE)
+        return int(sequence) if sequence is not None else None
+
+    def set_sequence(self, sequence):
+        self.library_section.set_setting(self.KEY_SEQUENCE, sequence)

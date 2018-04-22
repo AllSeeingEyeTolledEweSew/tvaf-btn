@@ -9,6 +9,7 @@ import threading
 import promise
 
 import tvaf.tracker.btn
+import tvaf.tracker.btn.scan
 
 
 def log():
@@ -77,12 +78,9 @@ class Resolver(object):
 
 class WholeSeriesPicker(object):
 
-    def __init__(self, series_id, api, scanner, selector, tvdb, thread_pool,
-                 debug=False):
-        self.series_id = series_id
-        self.api = api
-        self.scanner = scanner
-        self.selector = selector
+    def __init__(self, batch, config, tvdb, thread_pool, debug=False):
+        self.batch = batch
+        self.config = config
         self.resolver = Resolver(tvdb, thread_pool)
         self.debug = debug
 
@@ -98,33 +96,35 @@ class WholeSeriesPicker(object):
     def torrent_id_to_items(self):
         return self._torrent_id_to_items
 
-    def pick(self):
-        log().info("Picking series %s", self.series_id)
+    def scan(self, torrent_entry):
+        return tvaf.tracker.btn.scan.Scanner(
+            torrent_entry, debug=self.debug).iter_media_items()
 
-        rows = self.api.db.cursor().execute(
-            "select torrent_entry.id from torrent_entry "
-            "inner join torrent_entry_group on "
-            "torrent_entry.group_id = torrent_entry_group.id "
-            "inner join series on "
-            "torrent_entry_group.series_id = series.id "
-            "where (not torrent_entry.deleted) and "
-            "series.id = ?", (self.series_id,)).fetchall()
-        torrent_ids = [r[0] for r in rows]
+    def pick(self):
+        log().info(
+            "Picking batch with %s series",
+            len(self.batch.series_id_to_torrents))
 
         items = []
         item_promises = []
 
-        for torrent_id in torrent_ids:
-            torrent_entry = self.api.getTorrentByIdCached(torrent_id)
-            if self.debug:
-                log().debug("%s:", torrent_entry)
-            for item in self.scanner(torrent_entry):
+        self._torrent_id_to_items = {}
+        for series_id, torrent_entries in (
+                self.batch.series_id_to_torrents.items()):
+            log().info("Picking series %s: %s episodes", series_id,
+                    len(torrent_entries))
+            for torrent_entry in torrent_entries:
+                self._torrent_id_to_items[torrent_entry.id] = []
                 if self.debug:
-                    log().debug("    %s", item)
-                if self.resolver.need_to_resolve(item):
-                    item_promises.append(self.resolver.resolve_promise(item))
-                else:
-                    items.append(item)
+                    log().debug("%s:", torrent_entry)
+                for item in self.scan(torrent_entry):
+                    if self.debug:
+                        log().debug("    %s", item)
+                    if self.resolver.need_to_resolve(item):
+                        item_promises.append(
+                            self.resolver.resolve_promise(item))
+                    else:
+                        items.append(item)
 
         for promise in item_promises:
             for item in promise.get():
@@ -134,13 +134,12 @@ class WholeSeriesPicker(object):
         for item in items:
             self._guid_to_items[item.metadata_item.guid].append(item)
         for guid, items in list(self._guid_to_items.items()):
-            self._guid_to_items[guid] = self.selector(items)
+            self._guid_to_items[guid] = self.config.filter(items)
 
         if self.debug:
             for guid, items in sorted(self._guid_to_items.items()):
                 log().debug("%s -> %s", guid, items)
 
-        self._torrent_id_to_items = {i: [] for i in torrent_ids}
         for items in self._guid_to_items.values():
             for item in items:
                 torrent_id = item.torrent_entry.id

@@ -11,42 +11,9 @@ import threading
 import btn
 import tvaf.plex
 import tvaf.sync
-import tvaf.tracker.btn.default_selectors
-import tvaf.tracker.btn.pick
-import tvaf.tracker.btn.scan
+import tvaf.tracker.btn.pipe
 import tvaf.tvdb
 import tvaf.util
-
-
-def function(name):
-    try:
-        r = tvaf.util.name_to_global(name)
-    except (ValueError, ImportError, AttributeError) as e:
-        raise argparse.ArgumentTypeError(
-            "bad global function %r: %s" % (name, e))
-    if not callable(r):
-        raise argparse.ArgumentTypeError("%r is not callable" % r)
-    return r
-
-
-def get_series_ids(api, parser, args):
-    if args.series:
-        rows = api.db.cursor().execute(
-            "select id from series where name = ?", (args.series,)).fetchall()
-
-    elif args.series_id:
-        rows = [(args.series_id,)]
-
-    elif args.tvdb_id:
-        rows = api.db.cursor().execute(
-            "select id from series where tvdb_id = ?",
-            (args.tvdb_id,)).fetchall()
-
-    elif args.all:
-        rows = api.db.cursor().execute(
-            "select id from series where not deleted").fetchall()
-
-    return [r[0] for r in rows]
 
 
 def main():
@@ -54,15 +21,15 @@ def main():
     parser.add_argument("--verbose", "-v", action="count")
     parser.add_argument("--debug", "-d", action="count")
 
-    parser.add_argument(
-        "--selector", type=function,
-        default=tvaf.tracker.btn.default_selectors.best_with_heuristics)
     parser.add_argument("--pretend", action="store_true")
 
     parser.add_argument("--plex_path", default="/var/lib/plexmediaserver")
     parser.add_argument("--plex_host", default="127.0.0.1:32400")
-    parser.add_argument("--plex_library_name")
-    parser.add_argument("--yatfs_path")
+
+    mxg = parser.add_mutually_exclusive_group(required=True)
+    mxg.add_argument("--library_section_name")
+    mxg.add_argument("--library_section_id")
+
     parser.add_argument("--max_threads", type=int, default=64)
 
     mxg = parser.add_mutually_exclusive_group(required=True)
@@ -70,8 +37,6 @@ def main():
     mxg.add_argument("--series")
     mxg.add_argument("--series_id", type=int)
     mxg.add_argument("--tvdb_id", type=int)
-
-    btn.add_arguments(parser, create_group=True)
 
     args = parser.parse_args()
 
@@ -85,49 +50,31 @@ def main():
         format="%(asctime)s %(levelname)s %(threadName)s "
         "%(filename)s:%(lineno)d %(message)s")
 
-    if args.pretend and (args.plex_library_name or args.yatfs_path):
-        parser.error(
-            "--pretend not allowed with --plex_library_name or --yatfs_path")
-    if not args.pretend:
-        if not args.plex_library_name or not args.yatfs_path:
-            parser.error(
-                "--plex_library_name and --yatfs_path are required.")
-
-    if not (args.all or args.series or args.series_id or args.tvdb_id):
-        parser.error(
-            "you must select at least a full series with --all, --series, "
-            "--series_id or --tvdb_id")
-
-    api = btn.API.from_args(parser, args)
+    db = tvaf.plex.PlexDatabase(args.plex_path)
+    library_section = tvaf.plex.LibrarySection(
+        db, name=args.library_section_name, id=args.library_section_id)
+    btn_library = tvaf.tracker.btn.LibrarySection(library_section)
 
     tvdb = tvaf.tvdb.Tvdb(max_connections=args.max_threads)
 
     thread_pool = concurrent.futures.ThreadPoolExecutor(
         max_workers=args.max_threads)
 
-    scanner = lambda te: tvaf.tracker.btn.scan.Scanner(
-        te, debug=args.debug).iter_media_items()
-
     if args.pretend:
         syncer = None
     else:
-        db = tvaf.plex.PlexDatabase(args.plex_path)
-        library_section = tvaf.plex.LibrarySection(
-            db, name=args.plex_library_name)
         syncer = tvaf.sync.Syncer(
             library_section, plex_host=args.plex_host,
-            yatfs_path=args.yatfs_path)
+            yatfs_path=btn_library.get_config().yatfs_path)
 
-    with api.db:
-        series_ids = get_series_ids(api, parser, args)
+    if args.all:
+        pipe = tvaf.tracker.btn.pipe.ContinuousIncrementalPipe(
+            btn_library, syncer, tvdb=tvdb, thread_pool=thread_pool,
+            debug=args.debug)
+    else:
+        pipe = tvaf.btn.tracker.pipe.OneshotPipe(
+            btn_library, syncer, tvdb=tvdb, thread_pool=thread_pool,
+            debug=args.debug, series=args.series, series_id=args.series_id,
+            tvdb_id=args.tvdb_id)
 
-        for series_id in series_ids:
-            picker = tvaf.tracker.btn.pick.WholeSeriesPicker(
-                series_id, api, scanner, args.selector, tvdb, thread_pool,
-                debug=args.debug)
-            picker.pick()
-            if not args.pretend:
-                syncer.sync_from_picker(picker)
-
-    if not args.pretend:
-        syncer.finalize()
+    pipe.run()

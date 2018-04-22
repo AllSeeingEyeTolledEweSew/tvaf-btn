@@ -205,6 +205,9 @@ class LibrarySection(object):
         self._name = r[0]
         return self._name
 
+    def __str__(self):
+        return "<LibrarySection %d \"%s\">" % (self.id, self.name)
+
     def get_setting(self, name):
         row = self.db.conn.cursor().execute(
             "select value from tvaf_library_section_settings where id = ? and "

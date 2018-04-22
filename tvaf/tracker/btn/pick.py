@@ -78,8 +78,8 @@ class Resolver(object):
 
 class WholeSeriesPicker(object):
 
-    def __init__(self, batch, config, tvdb, thread_pool, debug=False):
-        self.batch = batch
+    def __init__(self, torrents, config, tvdb, thread_pool, debug=False):
+        self.torrents = torrents
         self.config = config
         self.resolver = Resolver(tvdb, thread_pool)
         self.debug = debug
@@ -101,30 +101,24 @@ class WholeSeriesPicker(object):
             torrent_entry, debug=self.debug).iter_media_items()
 
     def pick(self):
-        log().info(
-            "Picking batch with %s series",
-            len(self.batch.series_id_to_torrents))
+        log().info("Picking batch with %s torrents", len(self.torrents))
 
         items = []
         item_promises = []
 
         self._torrent_id_to_items = {}
-        for series_id, torrent_entries in (
-                self.batch.series_id_to_torrents.items()):
-            log().info("Picking series %s: %s episodes", series_id,
-                    len(torrent_entries))
-            for torrent_entry in torrent_entries:
-                self._torrent_id_to_items[torrent_entry.id] = []
+        for torrent_entry in self.torrents:
+            self._torrent_id_to_items[torrent_entry.id] = []
+            if self.debug:
+                log().debug("%s:", torrent_entry)
+            for item in self.scan(torrent_entry):
                 if self.debug:
-                    log().debug("%s:", torrent_entry)
-                for item in self.scan(torrent_entry):
-                    if self.debug:
-                        log().debug("    %s", item)
-                    if self.resolver.need_to_resolve(item):
-                        item_promises.append(
-                            self.resolver.resolve_promise(item))
-                    else:
-                        items.append(item)
+                    log().debug("    %s", item)
+                if self.resolver.need_to_resolve(item):
+                    item_promises.append(
+                        self.resolver.resolve_promise(item))
+                else:
+                    items.append(item)
 
         for promise in item_promises:
             for item in promise.get():

@@ -28,9 +28,15 @@ class Tvdb(object):
         self._lock = threading.RLock()
         self._token = None
         self._languages = None
-        self.sessions = []
-        self.sessions_semaphore = threading.Semaphore(max_connections)
-        self.max_retries = max_retries
+        self.session = requests.Session()
+        retries= requests.packages.urllib3.util.retry.Retry(
+            total=None, connect=max_retries, read=max_retries,
+            backoff_factor=0.1, status_forcelist=(500, 502, 503, 504))
+        adapter = requests.adapters.HTTPAdapter(
+            max_retries=retries, pool_connections=max_connections,
+            pool_maxsize=max_connections)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
 
     @property
     def token(self):
@@ -47,40 +53,13 @@ class Tvdb(object):
             self._token = r.json()["token"]
             return self._token
 
-    @contextlib.contextmanager
-    def session(self):
-        with self.sessions_semaphore:
-            with self._lock:
-                if self.sessions:
-                    session = self.sessions.pop()
-                else:
-                    session = requests.Session()
-            try:
-                yield session
-            finally:
-                with self._lock:
-                    self.sessions.append(session)
-
     def call_noauth(self, method, path, headers=None, **kwargs):
         headers = headers or {}
         headers["Accept"] = "application/json"
         url = urllib.parse.urlunparse(
             ("https", self.HOST, path, None, None, None))
-        with self.session() as session:
-            for _ in range(self.max_retries):
-                try:
-                    r = getattr(session, method)(
-                        url, headers=headers, timeout=5, **kwargs)
-                except (requests.exceptions.ConnectionError,
-                        requests.exceptions.Timeout):
-                    log().error("Got a connection error, retrying.")
-                    continue
-                if r.status_code != 502:
-                    break
-                log().error("Got a 502, retrying.")
-            else:
-                assert False, "Retries exceeded"
-            return r
+        return getattr(self.session, method)(
+            url, headers=headers, timeout=5, **kwargs)
 
     def call(self, method, path, headers=None, **kwargs):
         headers = headers or {}

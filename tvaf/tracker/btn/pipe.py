@@ -94,7 +94,9 @@ class ContinuousIncrementalPipe(object):
         start = time.time()
         items = picker.pick()
         end = time.time()
-        log().debug("Pick took %.3fs", end - start)
+        log().debug(
+            "Picked %s torrents -> %s items in %.3fs", len(torrents),
+            len(items), end - start)
         return items
 
     def sync(self, items, deleted_torrent_ids, from_changestamp,
@@ -102,7 +104,9 @@ class ContinuousIncrementalPipe(object):
         if not self.syncer:
             return
 
-        log().debug("Syncing %s items", len(items))
+        log().debug(
+            "Syncing %s -> %s: %s items", from_changestamp, to_changestamp,
+            len(items))
 
         delta = tvaf.checkpoint.SourceDelta(from_changestamp, to_changestamp)
         changes = tvaf.sync.Changes.from_exclusive_items(items)
@@ -127,8 +131,16 @@ class ContinuousIncrementalPipe(object):
             txn_items = []
             txn_deleted_torrent_ids = []
             to_changestamp = None
+            log().debug("Extracting from %s", from_changestamp)
             for torrents, deleted_torrent_ids, delta in self.extract(
                     from_changestamp):
+                if log().isEnabledFor(logging.INFO):
+                    log().info(
+                        "Extracted batch %s -> %s: %s deleted; series %s",
+                        delta.from_sequence, delta.to_sequence,
+                        len(deleted_torrent_ids), sorted(set(
+                            (te.group.series.id, te.group.series.name)
+                            for te in torrents)))
                 assert (not to_changestamp) or (
                         delta.from_sequence == to_changestamp), (
                                 delta.from_sequence, to_changestamp)

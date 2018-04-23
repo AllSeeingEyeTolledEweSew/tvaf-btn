@@ -2,6 +2,7 @@ import contextlib
 import logging
 import os
 import threading
+import time
 import urlparse
 import xml.etree.ElementTree as ElementTree
 
@@ -165,14 +166,29 @@ class PlexDatabase(object):
 
     @contextlib.contextmanager
     def begin(self):
+        start = time.time()
         self.conn.cursor().execute("begin immediate")
+        end = time.time()
+        delta = (end - start) * 1000
+        if delta > 100:
+            log().debug("BEGIN IMMEDIATE took %dms", delta)
         try:
             yield
         except:
+            start = time.time()
             self.conn.cursor().execute("rollback")
+            end = time.time()
+            delta = (end - start) * 1000
+            if delta > 100:
+                log().debug("ROLLBACK took %dms", delta)
             raise
         else:
+            start = time.time()
             self.conn.cursor().execute("commit")
+            end = time.time()
+            delta = (end - start) * 1000
+            if delta > 100:
+                log().debug("COMMIT took %dms", delta)
 
 
 class LibrarySection(object):

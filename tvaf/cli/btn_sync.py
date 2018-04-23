@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--debug", "-d", action="count")
 
     parser.add_argument("--pretend", action="store_true")
+    parser.add_argument("--reset", action="store_true")
 
     parser.add_argument("--plex_path", default="/var/lib/plexmediaserver")
     parser.add_argument("--plex_host", default="127.0.0.1:32400")
@@ -31,6 +32,7 @@ def main():
     mxg.add_argument("--library_section_id")
 
     parser.add_argument("--max_threads", type=int, default=64)
+    parser.add_argument("--transaction_size", type=int, default=1000)
 
     mxg = parser.add_mutually_exclusive_group(required=True)
     mxg.add_argument("--all", action="store_true")
@@ -70,7 +72,8 @@ def main():
     if args.all:
         pipe = tvaf.tracker.btn.pipe.ContinuousIncrementalPipe(
             btn_library, syncer, tvdb=tvdb, thread_pool=thread_pool,
-            debug=args.debug)
+            debug=args.debug, reset=args.reset,
+            transaction_size=args.transaction_size)
     else:
         pipe = tvaf.btn.tracker.pipe.OneshotPipe(
             btn_library, syncer, tvdb=tvdb, thread_pool=thread_pool,

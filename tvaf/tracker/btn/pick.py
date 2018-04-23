@@ -3,6 +3,7 @@
 
 import collections
 import contextlib
+import itertools
 import logging
 import threading
 
@@ -84,18 +85,6 @@ class WholeSeriesPicker(object):
         self.resolver = Resolver(tvdb, thread_pool)
         self.debug = debug
 
-        self._guid_to_items = {}
-        self._torrent_id_to_items = {}
-
-    def name(self):
-        return tvaf.tracker.btn.NAME
-
-    def guid_to_items(self):
-        return self._guid_to_items
-
-    def torrent_id_to_items(self):
-        return self._torrent_id_to_items
-
     def scan(self, torrent_entry):
         return tvaf.tracker.btn.scan.Scanner(
             torrent_entry, debug=self.debug).iter_media_items()
@@ -106,9 +95,7 @@ class WholeSeriesPicker(object):
         items = []
         item_promises = []
 
-        self._torrent_id_to_items = {}
         for torrent_entry in self.torrents:
-            self._torrent_id_to_items[torrent_entry.id] = []
             if self.debug:
                 log().debug("%s:", torrent_entry)
             for item in self.scan(torrent_entry):
@@ -124,17 +111,14 @@ class WholeSeriesPicker(object):
             for item in promise.get():
                 items.append(item)
 
-        self._guid_to_items = collections.defaultdict(list)
+        guid_to_items = collections.defaultdict(list)
         for item in items:
-            self._guid_to_items[item.metadata_item.guid].append(item)
-        for guid, items in list(self._guid_to_items.items()):
-            self._guid_to_items[guid] = self.config.filter(items)
+            guid_to_items[item.metadata_item.guid].append(item)
+        for guid, items in list(guid_to_items.items()):
+            guid_to_items[guid] = self.config.filter(items)
 
         if self.debug:
-            for guid, items in sorted(self._guid_to_items.items()):
+            for guid, items in sorted(guid_to_items.items()):
                 log().debug("%s -> %s", guid, items)
 
-        for items in self._guid_to_items.values():
-            for item in items:
-                torrent_id = item.torrent_entry.id
-                self._torrent_id_to_items[torrent_id].append(item)
+        return list(itertools.chain.from_iterable(guid_to_items.values()))

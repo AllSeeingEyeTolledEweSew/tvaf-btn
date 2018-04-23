@@ -13,7 +13,7 @@ def log():
 class ContinuousIncrementalPipe(object):
 
     def __init__(self, btn_library, syncer, tvdb=None, thread_pool=None,
-                 debug=False, reset=False):
+                 debug=False, reset=False, transaction_size=None):
         self.btn_library = btn_library
         self.config = self.btn_library.get_config()
         self.syncer = syncer
@@ -21,6 +21,7 @@ class ContinuousIncrementalPipe(object):
         self.thread_pool = thread_pool
         self.debug = debug
         self.reset = reset
+        self.transaction_size = transaction_size
 
     def get_series_torrents(self, series_id):
         c = self.config.api.db.cursor()
@@ -86,39 +87,67 @@ class ContinuousIncrementalPipe(object):
         if to_changestamp is not None:
             yield make_result(torrents, from_changestamp, to_changestamp)
 
-    def run_batch(self, torrents, deleted_torrent_ids, delta):
-        log().debug(
-            "Running batch: %s -> %s", delta.from_sequence, delta.to_sequence)
+    def pick(self, torrents):
         picker = tvaf.tracker.btn.pick.WholeSeriesPicker(
             torrents, self.config, self.tvdb, self.thread_pool,
             debug=self.debug)
         start = time.time()
-        picker.pick()
+        items = picker.pick()
         end = time.time()
         log().debug("Pick took %.3fs", end - start)
+        return items
 
-        if self.syncer:
+    def sync(self, items, deleted_torrent_ids, from_changestamp,
+             to_changestamp):
+        if not self.syncer:
+            return
+
+        log().debug("Syncing %s items", len(items))
+
+        delta = tvaf.checkpoint.SourceDelta(from_changestamp, to_changestamp)
+        changes = tvaf.sync.Changes.from_exclusive_items(items)
+        changes.tracker_torrent_id_to_items.update({
+            (tvaf.tracker.btn.NAME, i): [] for i in deleted_torrent_ids})
+
+        with self.btn_library.library_section.db.begin():
             start = time.time()
-            with self.btn_library.library_section.db.begin():
-                with tvaf.checkpoint.checkpoint(
-                        self.btn_library, self.config, delta):
-                    self.syncer.sync_from_picker(picker)
-                    for torrent_id in deleted_torrent_ids:
-                        log().info("Deleting torrent_id %s", torrent_id)
-                        self.syncer.sync_torrent_exclusive(
-                            tvaf.tracker.btn.NAME, torrent_id)
+            with tvaf.checkpoint.checkpoint(
+                    self.btn_library, self.config, delta):
+                self.syncer.sync_changes(changes)
             end = time.time()
-            log().debug("Batch sync took %.3fs", end - start)
+        log().debug("Batch sync took %dms", (end - start) * 1000)
 
     def run(self):
         with self.config.api.db:
+            if self.reset:
+                self.btn_library.set_sequence(None)
+
             from_changestamp = self.btn_library.get_sequence()
 
-            if self.reset:
-                from_changestamp = None
-
-            for batch in self.extract(from_changestamp):
-                self.run_batch(*batch)
+            txn_items = []
+            txn_deleted_torrent_ids = []
+            to_changestamp = None
+            for torrents, deleted_torrent_ids, delta in self.extract(
+                    from_changestamp):
+                assert (not to_changestamp) or (
+                        delta.from_sequence == to_changestamp), (
+                                delta.from_sequence, to_changestamp)
+                items = self.pick(torrents)
+                if txn_items and (
+                        len(txn_items) + len(items) > self.transaction_size):
+                    self.sync(
+                        txn_items, txn_deleted_torrent_ids, from_changestamp,
+                        to_changestamp)
+                    txn_items = []
+                    txn_deleted_torrent_ids = []
+                    from_changestamp = to_changestamp
+                txn_items.extend(items)
+                txn_deleted_torrent_ids.extend(deleted_torrent_ids)
+                to_changestamp = delta.to_sequence
+            if to_changestamp:
+                self.sync(
+                    txn_items, txn_deleted_torrent_ids, from_changestamp,
+                    to_changestamp)
 
             if self.syncer:
                 self.syncer.finalize()

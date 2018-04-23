@@ -17,6 +17,34 @@ def chunks(l, n):
         yield l[i:i + n]
 
 
+class Changes(object):
+
+    @classmethod
+    def from_exclusive_items(cls, items):
+        guid_to_items = {}
+        tracker_torrent_id_to_items = {}
+        for item in items:
+            guid = item.metadata_item.guid
+            if guid not in guid_to_items:
+                guid_to_items[guid] = []
+            guid_to_items[guid].append(item)
+
+            tracker = item.tracker
+            torrent_id = item.parts[0].torrent_id
+            key = (tracker, torrent_id)
+            if key not in tracker_torrent_id_to_items:
+                tracker_torrent_id_to_items[key] = []
+            tracker_torrent_id_to_items[key].append(item)
+
+        return cls(
+            guid_to_items=guid_to_items,
+            tracker_torrent_id_to_items=tracker_torrent_id_to_items)
+
+    def __init__(self, guid_to_items=None, tracker_torrent_id_to_items=None):
+        self.guid_to_items = guid_to_items or {}
+        self.tracker_torrent_id_to_items = tracker_torrent_id_to_items or {}
+
+
 class Syncer(object):
 
     def __init__(self, library_section, plex_host=None, yatfs_path=None):
@@ -230,10 +258,9 @@ class Syncer(object):
                 (part.index, id))
             return id
 
-    def sync_from_picker(self, picker):
-        assert not self.db.conn.getautocommit()
-        for guid, items in picker.guid_to_items().items():
+    def sync_changes(self, changes):
+        for guid, items in changes.guid_to_items.items():
             self.sync_guid_exclusive(guid, *items)
-        for torrent_id, items in picker.torrent_id_to_items().items():
-            self.sync_torrent_exclusive(
-                picker.name(), torrent_id, *items)
+        for (tracker_name, torrent_id), items in (
+                changes.tracker_torrent_id_to_items.items()):
+            self.sync_torrent_exclusive(tracker_name, torrent_id, *items)

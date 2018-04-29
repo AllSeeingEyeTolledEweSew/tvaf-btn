@@ -3,17 +3,12 @@
 
 import argparse
 import concurrent.futures
-import importlib
 import logging
 import sys
-import threading
 
-import btn
 import tvaf.plex
-import tvaf.sync
 import tvaf.tracker.btn.pipe
 import tvaf.tvdb
-import tvaf.util
 
 
 def main():
@@ -62,21 +57,14 @@ def main():
     thread_pool = concurrent.futures.ThreadPoolExecutor(
         max_workers=args.max_threads)
 
-    if args.pretend:
-        syncer = None
-    else:
-        syncer = tvaf.sync.Syncer(
-            library_section, plex_host=args.plex_host,
-            yatfs_path=btn_library.get_config().yatfs_path)
-
     if args.all:
         pipe = tvaf.tracker.btn.pipe.ContinuousIncrementalPipe(
-            btn_library, syncer, tvdb=tvdb, thread_pool=thread_pool,
-            debug=args.debug, reset=args.reset,
-            transaction_size=args.transaction_size)
+            btn_library, tvdb=tvdb, thread_pool=thread_pool,
+            pretend=args.pretend, debug=args.debug, reset=args.reset,
+            transaction_size=args.transaction_size, plex_host=args.plex_host)
     else:
         pipe = tvaf.btn.tracker.pipe.OneshotPipe(
-            btn_library, syncer, tvdb=tvdb, thread_pool=thread_pool,
+            btn_library, tvdb=tvdb, thread_pool=thread_pool,
             debug=args.debug, series=args.series, series_id=args.series_id,
             tvdb_id=args.tvdb_id)
 

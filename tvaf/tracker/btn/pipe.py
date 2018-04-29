@@ -2,6 +2,7 @@ import logging
 import time
 
 import tvaf.checkpoint
+import tvaf.sync
 import tvaf.tracker.btn
 import tvaf.tracker.btn.pick
 
@@ -12,16 +13,19 @@ def log():
 
 class ContinuousIncrementalPipe(object):
 
-    def __init__(self, btn_library, syncer, tvdb=None, thread_pool=None,
-                 debug=False, reset=False, transaction_size=None):
+    def __init__(self, btn_library, tvdb=None, thread_pool=None, debug=False,
+                 reset=False, transaction_size=None, pretend=False,
+                 plex_host=None):
         self.btn_library = btn_library
+        self.library_section = btn_library.library_section
         self.config = self.btn_library.get_config()
-        self.syncer = syncer
         self.tvdb = tvdb
         self.thread_pool = thread_pool
         self.debug = debug
         self.reset = reset
         self.transaction_size = transaction_size
+        self.pretend = pretend
+        self.plex_host = plex_host
 
     def get_series_torrents(self, series_id):
         c = self.config.api.db.cursor()
@@ -101,8 +105,12 @@ class ContinuousIncrementalPipe(object):
 
     def sync(self, items, deleted_torrent_ids, from_changestamp,
              to_changestamp):
-        if not self.syncer:
+        if self.pretend:
             return
+
+        syncer = tvaf.sync.Syncer(
+            self.library_section, plex_host=self.plex_host,
+            yatfs_path=self.config.yatfs_path)
 
         log().debug(
             "Syncing %s -> %s: %s items", from_changestamp, to_changestamp,
@@ -113,13 +121,15 @@ class ContinuousIncrementalPipe(object):
         changes.tracker_torrent_id_to_items.update({
             (tvaf.tracker.btn.NAME, i): [] for i in deleted_torrent_ids})
 
-        with self.btn_library.library_section.db.begin():
+        with self.library_section.db.begin():
             start = time.time()
             with tvaf.checkpoint.checkpoint(
                     self.btn_library, self.config, delta):
-                self.syncer.sync_changes(changes)
+                syncer.sync_changes(changes)
             end = time.time()
         log().debug("Batch sync took %dms", (end - start) * 1000)
+
+        #syncer.finalize()
 
     def run(self):
         with self.config.api.db:
@@ -160,9 +170,6 @@ class ContinuousIncrementalPipe(object):
                 self.sync(
                     txn_items, txn_deleted_torrent_ids, from_changestamp,
                     to_changestamp)
-
-            if self.syncer:
-                self.syncer.finalize()
 
 
 class OneShotPipe(object):

@@ -129,7 +129,7 @@ class ContinuousIncrementalPipe(object):
             end = time.time()
         log().debug("Batch sync took %dms", (end - start) * 1000)
 
-        #syncer.finalize()
+        syncer.finalize()
 
     def run(self):
         with self.config.api.db:

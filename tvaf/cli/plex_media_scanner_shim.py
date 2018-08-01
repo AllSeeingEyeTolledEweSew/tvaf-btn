@@ -21,7 +21,8 @@ def get_passthrough_env():
 
 
 def passthrough_exec(args):
-    path = os.path.join(os.environ["HOME"], "Plex Media Scanner.real")
+    path = os.path.join(
+        os.environ["PLEX_MEDIA_SERVER_HOME"], "Plex Media Scanner.real")
     os.execve(path, args, get_passthrough_env())
 
 

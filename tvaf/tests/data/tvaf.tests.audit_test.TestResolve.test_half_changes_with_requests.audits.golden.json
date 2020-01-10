@@ -1,0 +1,10 @@
+[
+    {
+        "atime": 12345678,
+        "generation": 1,
+        "infohash": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+        "num_bytes": 524288,
+        "origin": "normal",
+        "tracker": "foo"
+    }
+]

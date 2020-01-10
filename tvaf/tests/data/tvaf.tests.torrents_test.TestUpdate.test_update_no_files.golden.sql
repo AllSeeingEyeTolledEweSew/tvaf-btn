@@ -1,0 +1,2 @@
+INSERT INTO torrent_meta VALUES('8d532e88704b4f747b3e1083c2e6fd7dc53fdacf',1,0,0);
+INSERT INTO torrent_status VALUES('8d532e88704b4f747b3e1083c2e6fd7dc53fdacf','foo',X'0000',65536,1048576,1,0,'ok');

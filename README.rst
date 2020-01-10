@@ -2,7 +2,7 @@
 tvaf
 ===
 -------------------------------------------
-tools for filling a Plex server with private tracker metadata
+A video-on-demand system for private torrent trackers
 -------------------------------------------
 
 

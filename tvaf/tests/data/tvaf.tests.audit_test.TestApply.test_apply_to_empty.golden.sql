@@ -1,0 +1,1 @@
+INSERT INTO audit VALUES('some_user','foo','da39a3ee5e6b4b0d3255bfef95601890afd80709',1,1,12345678);

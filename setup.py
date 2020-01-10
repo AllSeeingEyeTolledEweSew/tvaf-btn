@@ -1,39 +1,83 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
 
-from __future__ import with_statement
+import distutils.cmd
+import setuptools
+import subprocess
 
-from setuptools import setup, find_packages
+
+class FormatCommand(distutils.cmd.Command):
+
+    description = "Run autoflake and yapf on python source files"
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run_yapf(self):
+        subprocess.check_call(["yapf", "-i", "-r", "--style=google", "."])
+
+    def run_autoflake(self):
+        subprocess.check_call([
+            "autoflake", "-i", "-r", "--remove-all-unused-imports",
+            "--remove-duplicate-keys", "--remove-unused-variables", "."
+        ])
+
+    def run(self):
+        self.run_yapf()
+        self.run_autoflake()
+
+
+class LintCommand(distutils.cmd.Command):
+
+    description = "Run autoflake and yapf on python source files"
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run_yapf(self):
+        subprocess.check_call(["yapf", "-i", "-r", "--style=google", "."])
+
+    def run_autoflake(self):
+        subprocess.check_call([
+            "autoflake", "-i", "-r", "--remove-all-unused-imports",
+            "--remove-duplicate-keys", "--remove-unused-variables", "."
+        ])
+
+    def run(self):
+        self.run_yapf()
+        self.run_autoflake()
+
 
 with open("README") as readme:
     documentation = readme.read()
 
-setup(
+setuptools.setup(
     name="tvaf",
-    version="0.0.1",
-    description="Tools for filling a Plex server with private tracker metadata",
+    version="0.1.0",
+    description="A video-on-demand system for private torrent trackers",
     long_description=documentation,
     author="AllSeeingEyeTolledEweSew",
     author_email="allseeingeyetolledewesew@protonmail.com",
     url="http://github.com/AllSeeingEyeTolledEweSew/tvaf",
     license="Unlicense",
-    packages=find_packages(),
-    use_2to3=True,
-    use_2to3_exclude_fixers=[
-        "lib2to3.fixes.fix_import",
-    ],
-    install_requires=[
-        "btn>=0.1.2",
-        "promise>=2.1",
-    ],
-    entry_points={
-        "console_scripts": [
-            "tvaf_btn_sync = tvaf.cli.btn_sync:main",
-            "tvaf_btn_config = tvaf.cli.btn_config:main",
-            "tvaf_plex_media_scanner_shim_wrapper = tvaf.cli.plex_media_scanner_shim_wrapper:main",
-            "tvaf_plex_media_scanner_shim = tvaf.cli.plex_media_scanner_shim:main",
-        ],
+    packages=setuptools.find_packages(),
+    cmdclass={
+        "format": FormatCommand,
     },
+    test_suite="tvaf.tests",
+    python_requires=">=3.7",
+    install_requires=[
+        "intervaltree>=3.0.2",
+        "dataclasses-json>=0.3.7",
+    ],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: End Users/Desktop",

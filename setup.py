@@ -77,6 +77,7 @@ setuptools.setup(
     install_requires=[
         "intervaltree>=3.0.2",
         "dataclasses-json>=0.3.7",
+        "btn>=1.0.4",
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",

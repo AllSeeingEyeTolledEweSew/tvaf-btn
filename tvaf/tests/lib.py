@@ -12,20 +12,12 @@ import os
 import re
 import unittest
 import unittest.mock
-from typing import Iterable
-from typing import Dict
 from typing import Any
 from typing import ContextManager
 from typing import SupportsFloat
-from typing import Optional
 
 import apsw
 
-import tvaf.app as app_lib
-import tvaf.db as db_lib
-import tvaf.exceptions as exc_lib
-import tvaf.trackers as trackers_lib
-from tvaf.types import TorrentEntry
 from tvaf.types import Request
 from tvaf.types import TorrentMeta
 from tvaf.types import TorrentStatus
@@ -110,89 +102,42 @@ def mock_time(time: SupportsFloat,
     return TimeMocker(time, autoincrement=autoincrement)
 
 
-class MockDb(db_lib.Database):
-    """An in-memory version of db_lib.Database."""
-
-    def path(self) -> str:
-        return ":memory:"
-
-
-class MockTracker(trackers_lib.Tracker):
-    """A mock Tracker with an in-memory list of TorrentEntries."""
-
-    def __init__(
-            self,
-            app: app_lib.App,
-            name: str,
-            torrent_entries: Iterable[TorrentEntry] = ()) -> None:
-        super(MockTracker, self).__init__(app, name)
-        self._torrent_entries = torrent_entries
-
-    def get_torrent_entry(self,
-                          torrent_id: Optional[str] = None,
-                          infohash: Optional[str] = None) -> TorrentEntry:
-        """Returns a TorrentEntry given search parameters."""
-        for torrent_entry in self._torrent_entries:
-            if torrent_entry.torrent_id == torrent_id:
-                return torrent_entry
-            if torrent_entry.infohash == infohash:
-                return torrent_entry
-        raise exc_lib.TorrentEntryNotFound(torrent_id or infohash)
-
-
-def get_mock_app() -> app_lib.App:
-    """Returns a mock App with an in-memory database."""
-    app = app_lib.App()
-    app.db = MockDb(app)
-    return app
-
-
-def set_mock_trackers(app: app_lib.App,
-                      **name_to_data: Iterable[Dict[str, Any]]) -> None:
-    """Overwrite the Trackers of an App with fixture data."""
-    trackers = []
-    for name, data_dicts in name_to_data.items():
-        torrent_entries = [TorrentEntry(tracker=name, **d) for d in data_dicts]
-        print("set_mock_trackers", name, data_dicts, torrent_entries)
-        trackers.append(MockTracker(app, name, torrent_entries))
-    app.trackers = trackers_lib.TrackerService(app, trackers=trackers)
-
-
-def add_fixture_row(app: app_lib.App, table: str, **kwargs: Any) -> None:
-    """Adds a row to the database of the App.
+def add_fixture_row(conn: apsw.Connection, table: str, **kwargs: Any) -> None:
+    """Adds a row to a database.
 
     Args:
-        app: The app to modify.
+        conn: The database to modify.
         table: The name of the table to update.
         kwargs: A mapping from column names to binding values.
     """
     keys = sorted(kwargs.keys())
     columns = ",".join(keys)
     params = ",".join(":" + k for k in keys)
-    app.db.get().cursor().execute(
-        f"insert into {table} ({columns}) values ({params})", kwargs)
+    conn.cursor().execute(f"insert into {table} ({columns}) values ({params})",
+                          kwargs)
 
 
-def add_fixture_torrent_status(app: app_lib.App, status: TorrentStatus) -> None:
-    """Adds a TorrentStatus to the app's database."""
+def add_fixture_torrent_status(conn: apsw.Connection,
+                               status: TorrentStatus) -> None:
+    """Adds a TorrentStatus to the database."""
     status_dict = dataclasses.asdict(status)
     files_dicts = status_dict.pop("files")
-    add_fixture_row(app, "torrent_status", **status_dict)
+    add_fixture_row(conn, "torrent_status", **status_dict)
     for file_dict in files_dicts:
         file_dict["infohash"] = status_dict["infohash"]
-        add_fixture_row(app, "file", **file_dict)
+        add_fixture_row(conn, "file", **file_dict)
 
 
-def add_fixture_torrent_meta(app: app_lib.App, meta: TorrentMeta) -> None:
-    """Adds a TorrentMeta to the app's database."""
+def add_fixture_torrent_meta(conn: apsw.Connection, meta: TorrentMeta) -> None:
+    """Adds a TorrentMeta to the database."""
     meta_dict = dataclasses.asdict(meta)
-    add_fixture_row(app, "torrent_meta", **meta_dict)
+    add_fixture_row(conn, "torrent_meta", **meta_dict)
 
 
-def add_fixture_request(app: app_lib.App, request: Request) -> None:
-    """Adds a Request to th eapp's database."""
+def add_fixture_request(conn: apsw.Connection, request: Request) -> None:
+    """Adds a Request to the database."""
     request_dict = dataclasses.asdict(request)
-    add_fixture_row(app, "request", **request_dict)
+    add_fixture_row(conn, "request", **request_dict)
 
 
 class TestCase(unittest.TestCase):
@@ -268,16 +213,16 @@ class TestCase(unittest.TestCase):
         self.assert_golden(value_text, suffix=suffix)
 
     def assert_golden_db(self,
-                         app: app_lib.App,
+                         conn: apsw.Connection,
                          suffix: str = "golden.sql",
                          include_schema: bool = False) -> None:
-        """Like assert_golden for the contents of the app's database.
+        """Like assert_golden for the contents of the database.
 
         This internally uses apsw's ".dump" command. Comments and whitespace
         are stripped to ensure stable comparisons.
 
         Args:
-            app: An app whose database shall be checked.
+            conn: The database to check.
             suffix: A distinguishing suffix for the filename of the golden
                 data.
             include_schema: If True, all SQL statements will be included. If
@@ -288,7 +233,7 @@ class TestCase(unittest.TestCase):
                 and GOLDEN_MELD is unset.
         """
         output_file = io.StringIO()
-        shell = apsw.Shell(db=app.db.get(), stdout=output_file)
+        shell = apsw.Shell(db=conn, stdout=output_file)
         shell.process_command(".dump")
         output = output_file.getvalue()
         # Remove comments, which include unstable data like timestamps,

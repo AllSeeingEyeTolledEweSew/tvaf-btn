@@ -220,7 +220,7 @@ class GroupBrowseSubdir(fs.Dir):
             path = name
         path_bytes = path.encode("utf-8", "surrogateescape")
         row = self.db.cursor().execute(
-            "select file_info.id, file_info.start, file_info.stop, "
+            "select torrent_entry.info_hash, file_info.start, file_info.stop, "
             "torrent_entry.time "
             "from file_info "
             "inner join torrent_entry "
@@ -232,9 +232,9 @@ class GroupBrowseSubdir(fs.Dir):
                 path_bytes,
             )).fetchone()
         if row:
-            torrent_entry_id, start, stop, mtime = row
+            infohash, start, stop, mtime = row
             return fs.TorrentFile(tracker="btn",
-                                  torrent_id=str(torrent_entry_id),
+                                  infohash=infohash,
                                   start=start,
                                   stop=stop,
                                   mtime=mtime)

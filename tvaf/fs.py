@@ -32,14 +32,13 @@ class TorrentRef:
 
     Attributes:
         tracker: The well-known name of the tracker (e.g. "btn").
-        torrent_id: The unique id of the torrent in the tracker's local
-            namespace.
+        infohash: The infohash of the torrent.
         start: The offset of the first byte of the referenced data.
         stop: The offset of the last byte of the referenced data, plus one.
     """
 
     tracker: Optional[str] = None
-    torrent_id: Optional[str] = None
+    infohash: Optional[str] = None
     start: Optional[int] = None
     stop: Optional[int] = None
 
@@ -231,15 +230,14 @@ class TorrentFile(File):
 
     Attributes:
         tracker: The well-known name of the tracker (e.g. "btn").
-        torrent_id: The unique id of the torrent in the tracker's local
-            namespace.
+        infohash: The infohash of the torrent.
         start: The offset of the first byte of the referenced data.
         stop: The offset of the last byte of the referenced data, plus one.
     """
 
     def __init__(self,
                  tracker: Optional[str] = None,
-                 torrent_id: Optional[str] = None,
+                 infohash: Optional[str] = None,
                  start: Optional[int] = None,
                  stop: Optional[int] = None,
                  mtime: Optional[int] = None) -> None:
@@ -248,13 +246,13 @@ class TorrentFile(File):
             size = stop - start
         super().__init__(size=size, mtime=mtime)
         self.tracker = tracker
-        self.torrent_id = torrent_id
+        self.infohash = infohash
         self.start = start
         self.stop = stop
 
     def get_torrent_ref(self) -> Optional[TorrentRef]:
         """Returns a TorrentRef for this tracker data."""
         return TorrentRef(tracker=self.tracker,
-                          torrent_id=self.torrent_id,
+                          infohash=self.infohash,
                           start=self.start,
                           stop=self.stop)

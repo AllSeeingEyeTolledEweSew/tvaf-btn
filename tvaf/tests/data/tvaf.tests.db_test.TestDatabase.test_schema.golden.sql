@@ -12,7 +12,7 @@ CREATE TABLE file (infohash text not null collate nocase, file_index int not nul
 CREATE UNIQUE INDEX file_on_infohash_file_index on file (infohash, file_index);
 
 DROP TABLE IF EXISTS request;
-CREATE TABLE request (request_id integer primary key autoincrement, tracker text not null, torrent_id text not null, infohash text not null collate nocase, start int not null, stop int not null, origin text not null, random bool not null default 0, readahead bool not null default 0, priority int not null, time int not null, deactivated_at int);
+CREATE TABLE request (request_id integer primary key autoincrement, tracker text not null, infohash text not null collate nocase, start int not null, stop int not null, origin text not null, random bool not null default 0, readahead bool not null default 0, priority int not null, time int not null, deactivated_at int);
 CREATE INDEX request_on_infohash on request (infohash);
 
 DROP TABLE IF EXISTS torrent_meta;

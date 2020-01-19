@@ -1,10 +1,12 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
-"""Tests for the tvaf.audit module."""
+"""Tests for audit functions in the tvaf.dal module."""
 
 import dataclasses
 
-import tvaf.audit as audit_lib
+import apsw
+
+import tvaf.dal as dal
 import tvaf.const as const
 from tvaf.tests import lib
 from tvaf.types import Audit
@@ -13,10 +15,11 @@ from tvaf.types import Request
 
 
 class TestGet(lib.TestCase):
-    """Tests for tvaf.audit.AuditService.get()."""
+    """Tests for tvaf.dal.get_audits()."""
 
     def setUp(self) -> None:
-        self.app = lib.get_mock_app()
+        self.conn = apsw.Connection(":memory:")
+        dal.create_schema(self.conn)
 
         for i, infohash in enumerate([
                 "da39a3ee5e6b4b0d3255bfef95601890afd80709",
@@ -26,7 +29,7 @@ class TestGet(lib.TestCase):
                 for k, origin in enumerate(("user_a", "user_b")):
                     for generation in (1, 2):
                         atime = (12345678 + i + j * 2 + k * 4 + generation * 8)
-                        lib.add_fixture_row(self.app,
+                        lib.add_fixture_row(self.conn,
                                             "audit",
                                             infohash=infohash,
                                             tracker=tracker,
@@ -36,7 +39,7 @@ class TestGet(lib.TestCase):
                                             num_bytes=1)
 
     def test_no_grouping(self) -> None:
-        audits = list(self.app.audit.get())
+        audits = list(dal.get_audits(self.conn))
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -46,7 +49,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_group_by_infohash(self) -> None:
-        audits = list(self.app.audit.get(group_by=("infohash",)))
+        audits = list(dal.get_audits(self.conn, group_by=("infohash",)))
         self.assertEqual(len(audits), 2)
         self.assertNotEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -56,7 +59,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_group_by_tracker(self) -> None:
-        audits = list(self.app.audit.get(group_by=("tracker",)))
+        audits = list(dal.get_audits(self.conn, group_by=("tracker",)))
         self.assertEqual(len(audits), 2)
         self.assertEqual(audits[0].infohash, None)
         self.assertNotEqual(audits[0].tracker, None)
@@ -66,7 +69,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_group_by_origin(self) -> None:
-        audits = list(self.app.audit.get(group_by=("origin",)))
+        audits = list(dal.get_audits(self.conn, group_by=("origin",)))
         self.assertEqual(len(audits), 2)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -76,7 +79,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_group_by_generation(self) -> None:
-        audits = list(self.app.audit.get(group_by=("generation",)))
+        audits = list(dal.get_audits(self.conn, group_by=("generation",)))
         self.assertEqual(len(audits), 2)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -87,8 +90,9 @@ class TestGet(lib.TestCase):
 
     def test_group_by_everything(self) -> None:
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 16)
         self.assertNotEqual(audits[0].infohash, None)
         self.assertNotEqual(audits[0].tracker, None)
@@ -99,8 +103,8 @@ class TestGet(lib.TestCase):
 
     def test_filter_infohash(self) -> None:
         audits = list(
-            self.app.audit.get(
-                infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709"))
+            dal.get_audits(self.conn,
+                           infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709"))
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash,
                          "da39a3ee5e6b4b0d3255bfef95601890afd80709")
@@ -111,7 +115,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_filter_tracker(self) -> None:
-        audits = list(self.app.audit.get(tracker="foo"))
+        audits = list(dal.get_audits(self.conn, tracker="foo"))
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, "foo")
@@ -121,7 +125,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_filter_origin(self) -> None:
-        audits = list(self.app.audit.get(origin="user_a"))
+        audits = list(dal.get_audits(self.conn, origin="user_a"))
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -131,7 +135,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_filter_generation(self) -> None:
-        audits = list(self.app.audit.get(generation=1))
+        audits = list(dal.get_audits(self.conn, generation=1))
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -142,10 +146,11 @@ class TestGet(lib.TestCase):
 
 
 class TestApply(lib.TestCase):
-    """Tests for tvaf.audit.AuditService.apply()."""
+    """Tests for tvaf.dal.apply_audits()."""
 
     def setUp(self) -> None:
-        self.app = lib.get_mock_app()
+        self.conn = apsw.Connection(":memory:")
+        dal.create_schema(self.conn)
 
     def add_fixture_data(self) -> None:
         """Add some fixture data."""
@@ -157,7 +162,7 @@ class TestApply(lib.TestCase):
                 for k, origin in enumerate(("user_a", "user_b")):
                     for generation in (1, 2):
                         atime = (12345678 + i + j * 2 + k * 4 + generation * 8)
-                        lib.add_fixture_row(self.app,
+                        lib.add_fixture_row(self.conn,
                                             "audit",
                                             infohash=infohash,
                                             tracker=tracker,
@@ -167,21 +172,23 @@ class TestApply(lib.TestCase):
                                             num_bytes=1)
 
     def test_apply_to_empty(self) -> None:
-        self.app.audit.apply(
+        dal.apply_audits(
+            self.conn,
             Audit(infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
                   tracker="foo",
                   origin="some_user",
                   generation=1,
                   atime=12345678,
                   num_bytes=1))
-        audits = list(self.app.audit.get())
+        audits = list(dal.get_audits(self.conn))
         self.assertEqual(audits[0].num_bytes, 1)
         self.assertEqual(audits[0].atime, 12345678)
-        self.assert_golden_db(self.app)
+        self.assert_golden_db(self.conn)
 
     def test_apply_to_existing(self) -> None:
         self.add_fixture_data()
-        self.app.audit.apply(
+        dal.apply_audits(
+            self.conn,
             Audit(infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
                   tracker="foo",
                   origin="some_user",
@@ -189,18 +196,19 @@ class TestApply(lib.TestCase):
                   atime=23456789,
                   num_bytes=1))
         audits = list(
-            self.app.audit.get(
-                infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709"))
+            dal.get_audits(self.conn,
+                           infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709"))
         self.assertEqual(audits[0].num_bytes, 9)
         self.assertEqual(audits[0].atime, 23456789)
-        self.assert_golden_db(self.app)
+        self.assert_golden_db(self.conn)
 
 
 class TestCalculate(lib.TestCase):
-    """Tests for tvaf.audit.calculate_audits."""
+    """Tests for tvaf.dal.calculate_audits()."""
 
     def setUp(self) -> None:
-        self.app = lib.get_mock_app()
+        self.conn = apsw.Connection(":memory:")
+        dal.create_schema(self.conn)
 
         self.empty_status = TorrentStatus(
             infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
@@ -253,21 +261,21 @@ class TestCalculate(lib.TestCase):
             assert False
 
         audits = list(
-            audit_lib.calculate_audits(self.empty_status, self.empty_status,
-                                       should_not_call))
+            dal.calculate_audits(self.empty_status, self.empty_status,
+                                 should_not_call))
         self.assertEqual(audits, [])
 
         audits = list(
-            audit_lib.calculate_audits(self.complete_status,
-                                       self.complete_status, should_not_call))
+            dal.calculate_audits(self.complete_status, self.complete_status,
+                                 should_not_call))
         self.assertEqual(audits, [])
 
     def test_changes_with_no_requests(self) -> None:
         time_val = 1234567
         with lib.mock_time(time_val):
             audits = list(
-                audit_lib.calculate_audits(self.empty_status,
-                                           self.complete_status, lambda: []))
+                dal.calculate_audits(self.empty_status, self.complete_status,
+                                     lambda: []))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, const.ORIGIN_UNKNOWN)
@@ -280,8 +288,8 @@ class TestCalculate(lib.TestCase):
 
     def test_changes_with_requests(self) -> None:
         audits = list(
-            audit_lib.calculate_audits(self.empty_status, self.complete_status,
-                                       lambda: [self.normal_req]))
+            dal.calculate_audits(self.empty_status, self.complete_status,
+                                 lambda: [self.normal_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.normal_req.origin)
@@ -295,8 +303,8 @@ class TestCalculate(lib.TestCase):
         self.normal_req.start = 10000
         self.normal_req.stop = 1000000
         audits = list(
-            audit_lib.calculate_audits(self.empty_status, self.complete_status,
-                                       lambda: [self.normal_req]))
+            dal.calculate_audits(self.empty_status, self.complete_status,
+                                 lambda: [self.normal_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.normal_req.origin)
@@ -308,9 +316,8 @@ class TestCalculate(lib.TestCase):
 
     def test_high_priority_req_wins(self) -> None:
         audits = list(
-            audit_lib.calculate_audits(
-                self.empty_status, self.complete_status,
-                lambda: [self.normal_req, self.high_pri_req]))
+            dal.calculate_audits(self.empty_status, self.complete_status,
+                                 lambda: [self.normal_req, self.high_pri_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.high_pri_req.origin)
@@ -323,8 +330,8 @@ class TestCalculate(lib.TestCase):
     def test_deactivated_requests(self) -> None:
         self.normal_req.deactivated_at = 12345678
         audits = list(
-            audit_lib.calculate_audits(self.empty_status, self.complete_status,
-                                       lambda: [self.normal_req]))
+            dal.calculate_audits(self.empty_status, self.complete_status,
+                                 lambda: [self.normal_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.normal_req.origin)
@@ -337,9 +344,8 @@ class TestCalculate(lib.TestCase):
     def test_active_wins_vs_high_pri(self) -> None:
         self.high_pri_req.deactivated_at = 12345678
         audits = list(
-            audit_lib.calculate_audits(
-                self.empty_status, self.complete_status,
-                lambda: [self.normal_req, self.high_pri_req]))
+            dal.calculate_audits(self.empty_status, self.complete_status,
+                                 lambda: [self.normal_req, self.high_pri_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.normal_req.origin)
@@ -354,8 +360,8 @@ class TestCalculate(lib.TestCase):
         newer.time += 100
         newer.origin = "newer"
         audits = list(
-            audit_lib.calculate_audits(self.empty_status, self.complete_status,
-                                       lambda: [self.normal_req, newer]))
+            dal.calculate_audits(self.empty_status, self.complete_status,
+                                 lambda: [self.normal_req, newer]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, newer.origin)
@@ -369,9 +375,8 @@ class TestCalculate(lib.TestCase):
         self.normal_req.stop = 524288
         self.high_pri_req.start = 524288
         audits = list(
-            audit_lib.calculate_audits(
-                self.empty_status, self.complete_status,
-                lambda: [self.normal_req, self.high_pri_req]))
+            dal.calculate_audits(self.empty_status, self.complete_status,
+                                 lambda: [self.normal_req, self.high_pri_req]))
 
         self.assertEqual(len(audits), 2)
         self.assertEqual(sum(a.num_bytes for a in audits), 1048576)
@@ -379,11 +384,12 @@ class TestCalculate(lib.TestCase):
 
 
 class TestResolve(lib.TestCase):
-    """Tests for tvaf.audit.AuditService.resolve_locked."""
+    """Tests for tvaf.dal._resolve_audits_locked()."""
 
     def setUp(self) -> None:
-        self.app = lib.get_mock_app()
-        lib.add_fixture_row(self.app,
+        self.conn = apsw.Connection(":memory:")
+        dal.create_schema(self.conn)
+        lib.add_fixture_row(self.conn,
                             "torrent_meta",
                             infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
                             generation=1)
@@ -425,7 +431,6 @@ class TestResolve(lib.TestCase):
             stop=1048576,
             time=12345678,
             tracker="foo",
-            torrent_id="123",
             random=False,
             readahead=False)
         self.high_pri_req = Request(
@@ -437,25 +442,27 @@ class TestResolve(lib.TestCase):
             stop=1048576,
             time=12345678,
             tracker="foo",
-            torrent_id="123",
             random=False,
             readahead=False)
 
     def test_no_changes(self) -> None:
-        self.app.audit.resolve_locked([self.empty_status])
+        # pylint: disable=protected-access
+        dal._resolve_audits_locked(self.conn, [self.empty_status])
 
-        audits = list(self.app.audit.get())
+        audits = list(dal.get_audits(self.conn))
         audit = audits[0]
         self.assertEqual(audit.num_bytes, 0)
 
     def test_changes_with_no_requests(self) -> None:
         time_val = 1234567
         with lib.mock_time(time_val):
-            self.app.audit.resolve_locked([self.complete_status])
+            # pylint: disable=protected-access
+            dal._resolve_audits_locked(self.conn, [self.complete_status])
 
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, const.ORIGIN_UNKNOWN)
@@ -467,14 +474,16 @@ class TestResolve(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_changes_with_requests(self) -> None:
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.normal_req))
 
-        self.app.audit.resolve_locked([self.complete_status])
+        # pylint: disable=protected-access
+        dal._resolve_audits_locked(self.conn, [self.complete_status])
 
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -487,15 +496,17 @@ class TestResolve(lib.TestCase):
     def test_half_changes_with_requests(self) -> None:
         status_dict = dataclasses.asdict(self.first_half_status)
         status_dict.pop("files")
-        lib.add_fixture_row(self.app, "torrent_status", **status_dict)
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "torrent_status", **status_dict)
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.normal_req))
 
-        self.app.audit.resolve_locked([self.complete_status])
+        # pylint: disable=protected-access
+        dal._resolve_audits_locked(self.conn, [self.complete_status])
 
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -508,14 +519,16 @@ class TestResolve(lib.TestCase):
     def test_audit_piece_lengths(self) -> None:
         self.normal_req.start = 10000
         self.normal_req.stop = 1000000
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.normal_req))
 
-        self.app.audit.resolve_locked([self.complete_status])
+        # pylint: disable=protected-access
+        dal._resolve_audits_locked(self.conn, [self.complete_status])
 
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -526,16 +539,18 @@ class TestResolve(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_audit_high_pri_wins(self) -> None:
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.normal_req))
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.high_pri_req))
 
-        self.app.audit.resolve_locked([self.complete_status])
+        # pylint: disable=protected-access
+        dal._resolve_audits_locked(self.conn, [self.complete_status])
 
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.high_pri_req.origin)
@@ -547,14 +562,16 @@ class TestResolve(lib.TestCase):
 
     def test_deactivated_request(self) -> None:
         self.normal_req.deactivated_at = 12345678
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.normal_req))
 
-        self.app.audit.resolve_locked([self.complete_status])
+        # pylint: disable=protected-access
+        dal._resolve_audits_locked(self.conn, [self.complete_status])
 
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -566,16 +583,18 @@ class TestResolve(lib.TestCase):
 
     def test_active_wins_vs_high_pri(self) -> None:
         self.high_pri_req.deactivated_at = 12345678
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.normal_req))
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.high_pri_req))
 
-        self.app.audit.resolve_locked([self.complete_status])
+        # pylint: disable=protected-access
+        dal._resolve_audits_locked(self.conn, [self.complete_status])
 
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -590,15 +609,17 @@ class TestResolve(lib.TestCase):
         newer.request_id = 2
         newer.time += 100
         newer.origin = "newer"
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.normal_req))
-        lib.add_fixture_row(self.app, "request", **dataclasses.asdict(newer))
+        lib.add_fixture_row(self.conn, "request", **dataclasses.asdict(newer))
 
-        self.app.audit.resolve_locked([self.complete_status])
+        # pylint: disable=protected-access
+        dal._resolve_audits_locked(self.conn, [self.complete_status])
 
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, newer.origin)
@@ -611,16 +632,18 @@ class TestResolve(lib.TestCase):
     def test_multiple_audits(self) -> None:
         self.normal_req.stop = 524288
         self.high_pri_req.start = 524288
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.normal_req))
-        lib.add_fixture_row(self.app, "request",
+        lib.add_fixture_row(self.conn, "request",
                             **dataclasses.asdict(self.high_pri_req))
 
-        self.app.audit.resolve_locked([self.complete_status])
+        # pylint: disable=protected-access
+        dal._resolve_audits_locked(self.conn, [self.complete_status])
 
         audits = list(
-            self.app.audit.get(group_by=("infohash", "generation", "tracker",
-                                         "origin")))
+            dal.get_audits(self.conn,
+                           group_by=("infohash", "generation", "tracker",
+                                     "origin")))
         self.assertEqual(len(audits), 2)
         self.assertEqual(sum(a.num_bytes for a in audits), 1048576)
         self.assert_golden_audit(*audits)

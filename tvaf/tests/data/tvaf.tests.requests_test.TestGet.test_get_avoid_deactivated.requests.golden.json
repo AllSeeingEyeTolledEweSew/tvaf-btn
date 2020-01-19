@@ -10,7 +10,6 @@
         "start": 0,
         "stop": 1048576,
         "time": 1234567,
-        "torrent_id": "123",
         "tracker": "foo"
     }
 ]

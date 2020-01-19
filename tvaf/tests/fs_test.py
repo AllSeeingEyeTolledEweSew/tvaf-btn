@@ -77,11 +77,12 @@ class TestTorrentFile(unittest.TestCase):
     """Tests for tvaf.fs.TorrentFile."""
 
     def setUp(self):
-        self.tfile = fs.TorrentFile(tracker="foo",
-                                    torrent_id="123",
-                                    start=0,
-                                    stop=1048576,
-                                    mtime=12345678)
+        self.tfile = fs.TorrentFile(
+            tracker="foo",
+            infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            start=0,
+            stop=1048576,
+            mtime=12345678)
 
     def test_stat(self):
         stat = self.tfile.stat()
@@ -94,6 +95,6 @@ class TestTorrentFile(unittest.TestCase):
         self.assertEqual(
             ref,
             fs.TorrentRef(tracker="foo",
-                          torrent_id="123",
+                          infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
                           start=0,
                           stop=1048576))

@@ -1,7 +1,10 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
-"""Tests for the tvaf.torrents module."""
+"""Tests for the torrent-level functions in the tvaf.dal module."""
 
+import apsw
+
+import tvaf.dal as dal
 from tvaf.tests import lib
 from tvaf.types import TorrentStatus
 from tvaf.types import FileRef
@@ -9,19 +12,20 @@ from tvaf.types import TorrentMeta
 
 
 class TestGetTorrentStatus(lib.TestCase):
-    """Tests for tvaf.torrents.TorrentService.get_status()."""
+    """Tests for tvaf.dal.get_torrent_status()."""
 
     def setUp(self):
-        self.app = lib.get_mock_app()
+        self.conn = apsw.Connection(":memory:")
+        dal.create_schema(self.conn)
 
     def test_none(self):
-        status = self.app.torrents.get_status(
-            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        status = dal.get_torrent_status(
+            self.conn, "da39a3ee5e6b4b0d3255bfef95601890afd80709")
         self.assertEqual(status, None)
 
     def test_get_status(self):
         lib.add_fixture_torrent_status(
-            self.app,
+            self.conn,
             TorrentStatus(infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
                           tracker="foo",
                           piece_length=65536,
@@ -41,8 +45,8 @@ class TestGetTorrentStatus(lib.TestCase):
                                       stop=1038576)
                           ]))
 
-        status = self.app.torrents.get_status(
-            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        status = dal.get_torrent_status(
+            self.conn, "da39a3ee5e6b4b0d3255bfef95601890afd80709")
 
         self.assertNotEqual(status.tracker, None)
         self.assertNotEqual(status.files, None)
@@ -52,65 +56,70 @@ class TestGetTorrentStatus(lib.TestCase):
 
 
 class TestGetTorrentMeta(lib.TestCase):
-    """Tests for tvaf.torrents.TorrentService.get_meta()."""
+    """Tests for tvaf.dal.get_meta()."""
 
     def setUp(self):
-        self.app = lib.get_mock_app()
+        self.conn = apsw.Connection(":memory:")
+        dal.create_schema(self.conn)
 
     def test_get_meta(self):
         lib.add_fixture_torrent_meta(
-            self.app,
+            self.conn,
             TorrentMeta(infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
                         managed=True,
                         generation=10,
                         atime=10000))
 
-        meta = self.app.torrents.get_meta(
-            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        meta = dal.get_meta(self.conn,
+                            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
 
         self.assert_golden_torrent_meta(meta)
 
     def test_get_none(self):
-        meta = self.app.torrents.get_meta(
-            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        meta = dal.get_meta(self.conn,
+                            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
         self.assertEqual(meta, None)
 
 
 class TestMarkActive(lib.TestCase):
-    """Tests for tvaf.torrents.TorrentService.mark_active()."""
+    """Tests for tvaf.dal.mark_torrent_active()."""
 
     def setUp(self):
-        self.app = lib.get_mock_app()
+        self.conn = apsw.Connection(":memory:")
+        dal.create_schema(self.conn)
 
     def test_mark_auto(self):
         with lib.mock_time(1234567):
-            self.app.torrents.mark_active(
-                "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+            dal.mark_torrent_active(self.conn,
+                                    "da39a3ee5e6b4b0d3255bfef95601890afd80709")
 
-        meta = self.app.torrents.get_meta(
-            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        meta = dal.get_meta(self.conn,
+                            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
         self.assertEqual(meta.atime, 1234567)
 
     def test_mark_manual(self):
-        self.app.torrents.mark_active(
-            "da39a3ee5e6b4b0d3255bfef95601890afd80709", atime=1234567.0)
+        dal.mark_torrent_active(self.conn,
+                                "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+                                atime=1234567.0)
 
-        meta = self.app.torrents.get_meta(
-            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        meta = dal.get_meta(self.conn,
+                            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
         self.assertEqual(meta.atime, 1234567)
 
 
 class TestManage(lib.TestCase):
-    """Tests for tvaf.torrents.TorrentService.manage()."""
+    """Tests for tvaf.dal.manage_torrent()."""
 
     def setUp(self):
-        self.app = lib.get_mock_app()
+        self.conn = apsw.Connection(":memory:")
+        dal.create_schema(self.conn)
 
     def test_manage(self):
-        self.app.torrents.manage("da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        dal.manage_torrent(self.conn,
+                           "da39a3ee5e6b4b0d3255bfef95601890afd80709")
 
-        meta = self.app.torrents.get_meta(
-            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        meta = dal.get_meta(self.conn,
+                            "da39a3ee5e6b4b0d3255bfef95601890afd80709")
         self.assertTrue(meta.managed)
 
 
@@ -150,79 +159,81 @@ def get_status_incomplete():
 
 
 class TestUpdate(lib.TestCase):
-    """Tetss for tvaf.torrents.TorrentService.update()."""
+    """Tetss for dal.update_torrent_status()."""
 
     def setUp(self):
-        self.app = lib.get_mock_app()
+        self.conn = apsw.Connection(":memory:")
+        dal.create_schema(self.conn)
 
     def test_update_no_files(self):
         first = get_status_incomplete()
 
-        self.app.torrents.update([first], skip_audit=True)
+        dal.update_torrent_status(self.conn, [first], skip_audit=True)
 
-        second = self.app.torrents.get_status(first.infohash)
+        second = dal.get_torrent_status(self.conn, first.infohash)
         self.assertEqual(first, second)
-        self.assert_golden_db(self.app)
+        self.assert_golden_db(self.conn)
 
     def test_update_from_empty(self):
         first = get_status_complete()
 
-        self.app.torrents.update([first], skip_audit=True)
+        dal.update_torrent_status(self.conn, [first], skip_audit=True)
 
-        second = self.app.torrents.get_status(first.infohash)
+        second = dal.get_torrent_status(self.conn, first.infohash)
         self.assertEqual(first, second)
-        self.assert_golden_db(self.app)
+        self.assert_golden_db(self.conn)
 
     def test_update_with_progress(self):
         partial = get_status_complete()
         partial.piece_bitmap = b"\xff\x00"
-        lib.add_fixture_torrent_status(self.app, partial)
+        lib.add_fixture_torrent_status(self.conn, partial)
         complete = get_status_complete()
 
-        self.app.torrents.update([complete], skip_audit=True)
+        dal.update_torrent_status(self.conn, [complete], skip_audit=True)
 
-        second = self.app.torrents.get_status(complete.infohash)
+        second = dal.get_torrent_status(self.conn, complete.infohash)
         self.assertEqual(complete, second)
-        self.assert_golden_db(self.app)
+        self.assert_golden_db(self.conn)
 
     def test_delete_one_add_one(self):
         will_delete = get_status_complete()
-        lib.add_fixture_torrent_status(self.app, will_delete)
+        lib.add_fixture_torrent_status(self.conn, will_delete)
         will_add = get_status_incomplete()
 
-        self.app.torrents.update([will_add], skip_audit=True)
+        dal.update_torrent_status(self.conn, [will_add], skip_audit=True)
 
-        should_have_deleted = self.app.torrents.get_status(will_delete.infohash)
+        should_have_deleted = dal.get_torrent_status(self.conn,
+                                                     will_delete.infohash)
         self.assertEqual(should_have_deleted, None)
-        self.assert_golden_db(self.app)
+        self.assert_golden_db(self.conn)
 
     def test_delete_all(self):
         status = get_status_complete()
-        lib.add_fixture_torrent_status(self.app, status)
+        lib.add_fixture_torrent_status(self.conn, status)
 
-        self.app.torrents.update([], skip_audit=True)
+        dal.update_torrent_status(self.conn, [], skip_audit=True)
 
-        status = self.app.torrents.get_status(status.infohash)
+        status = dal.get_torrent_status(self.conn, status.infohash)
         self.assertEqual(status, None)
-        self.assert_golden_db(self.app)
+        self.assert_golden_db(self.conn)
 
     def test_first_generation(self):
         new = get_status_complete()
 
-        self.app.torrents.update([new], skip_audit=True)
+        dal.update_torrent_status(self.conn, [new], skip_audit=True)
 
-        meta = self.app.torrents.get_meta(new.infohash)
+        meta = dal.get_meta(self.conn, new.infohash)
         self.assertGreater(meta.generation, 0)
-        self.assert_golden_db(self.app)
+        self.assert_golden_db(self.conn)
 
     def test_second_generation(self):
         come_and_go = get_status_complete()
 
         # Add, then delete, then add again
-        self.app.torrents.update([come_and_go], skip_audit=True)
-        self.app.torrents.update([], skip_audit=True)
-        self.app.torrents.update([come_and_go], skip_audit=True)
+        dal.update_torrent_status(self.conn, [come_and_go], skip_audit=True)
+        dal.update_torrent_status(self.conn, [], skip_audit=True)
+        dal.update_torrent_status(self.conn, [come_and_go], skip_audit=True)
 
-        meta = self.app.torrents.get_meta(come_and_go.infohash)
+        meta = dal.get_meta(self.conn, come_and_go.infohash)
         self.assertGreater(meta.generation, 1)
-        self.assert_golden_db(self.app)
+        self.assert_golden_db(self.conn)

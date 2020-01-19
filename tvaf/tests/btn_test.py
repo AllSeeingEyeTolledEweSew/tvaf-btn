@@ -1,5 +1,6 @@
 """Tests for the tvaf.btn module."""
 
+import hashlib
 import unittest
 from typing import Any
 import stat as stat_lib
@@ -90,6 +91,7 @@ def add_entry(conn: apsw.Connection, **torrent_entry: Any) -> None:
                 group_id=110,
                 deleted=0)
     data.update(torrent_entry)
+    data["info_hash"] = hashlib.sha1(str(data["id"]).encode()).hexdigest()
     add_fixture_row(conn, "torrent_entry", **data)
 
 
@@ -124,7 +126,6 @@ class TestBrowseFile(unittest.TestCase):
         self.assertEqual(stat.size, 100)
         ref = node.get_torrent_ref()
         self.assertEqual(ref.tracker, "btn")
-        self.assertEqual(ref.torrent_id, "111")
         self.assertEqual(ref.start, 0)
         self.assertEqual(ref.stop, 100)
 
@@ -140,7 +141,6 @@ class TestBrowseFile(unittest.TestCase):
 
         ref = node.get_torrent_ref()
         self.assertEqual(ref.tracker, "btn")
-        self.assertEqual(ref.torrent_id, "111")
 
     def test_multiple_files(self):
         conn = get_mock_db()

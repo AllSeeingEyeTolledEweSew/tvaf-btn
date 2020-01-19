@@ -89,7 +89,7 @@ class RequestStatus:
     order.
 
     Note that tvaf may not fully fill out the files attribute. See
-    RequestService.get_status() for more information.
+    tvaf.dal.get_request_status() for more information.
 
     Attributes:
         progress: The total number of bytes available for reading.
@@ -109,18 +109,17 @@ class RequestStatus:
 class Request:
     """A request for a range of data.
 
-    Requests are submitted to tvaf via RequestService.add(), and should be
-    polled via RequestService.get_status() (though both are not required in all
-    cases -- see those functions for more details).
+    Requests are submitted to tvaf via tvaf.dal.add_request(), and should be
+    polled via tvaf.dal.get_request_status() (though both are not required in
+    all cases -- see those functions for more details).
 
     Not all fields are required when submitting a new request.
 
     For more information about the significance of each field, see
-    RequestService.add().
+    tvaf.dal.add_request().
 
     Attributes:
         tracker: The name of a tracker, as understood by tvaf.
-        torrent_id: The id of a torrent, in the local namespace of the tracker.
         start: The first byte referenced.
         stop: The last byte referenced, plus one.
         origin: The origin of this Request.
@@ -137,7 +136,6 @@ class Request:
     # pylint: disable=too-many-instance-attributes
 
     tracker: str = ""
-    torrent_id: str = ""
     start: int = 0
     stop: int = 0
     origin: str = ""
@@ -250,7 +248,7 @@ class Audit:
     An Audit may either be an atomic attribution, or a roll-up record. For
     example, when origin is "username" and the other key fields are None, the
     Audit record is an attribution that "tvaf has downloaded {num_bytes} on
-    behalf of username." AuditService.get() directly creates group-by queries
+    behalf of username." tvaf.dal.get_audits() directly creates group-by queries
     to create these rollup records.
 
     Typically origins correspond directly to usernames. However, tvaf may
@@ -286,27 +284,3 @@ class Audit:
     generation: Optional[int] = None
     num_bytes: int = 0
     atime: int = 0
-
-
-@dataclasses.dataclass
-class TorrentEntry:
-    """Metadata about a torrent, as provided by a tracker.
-
-    TorrentEntry represents the way a tracker understands its torrents. A
-    tracker's torrent entries may include various tags such as media container
-    information, or content identification.
-
-    One of tvaf's design goals is to always have offline access to all
-    TorrentEntry data for its trackers.
-
-    Attributes:
-        torrent_id: The id of the torrent, in the tracker's namespace.
-        tracker: The name of the tracker to which this TorrentEntry belongs.
-        infohash: The infohash of this torrent.
-        length: The length of the torrent in bytes.
-    """
-
-    torrent_id: str = ""
-    tracker: str = ""
-    infohash: str = ""
-    length: int = 0

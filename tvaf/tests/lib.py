@@ -287,10 +287,10 @@ class TestCase(unittest.TestCase):
             AssertionError: If the given value doesn't match the golden data,
                 and GOLDEN_MELD is unset.
         """
-        output = io.StringIO()
-        shell = apsw.Shell(db=app.db.get(), stdout=output)
+        output_file = io.StringIO()
+        shell = apsw.Shell(db=app.db.get(), stdout=output_file)
         shell.process_command(".dump")
-        output = output.getvalue()
+        output = output_file.getvalue()
         # Remove comments, which include unstable data like timestamps,
         # usernames and hostnames.
         output = re.sub(r"-- (.*?)\n", "", output)

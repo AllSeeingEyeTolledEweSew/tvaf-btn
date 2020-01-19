@@ -380,7 +380,7 @@ class TestAdd(lib.TestCase):
         with lib.mock_time(1234567, autoincrement=1):
             req = self.app.requests.add(self.req)
 
-        self.assertNotEqual(req.id, None)
+        self.assertNotEqual(req.request_id, None)
         self.assertEqual(req.infohash,
                          "da39a3ee5e6b4b0d3255bfef95601890afd80709")
         self.assertGreaterEqual(req.time, 1234567)

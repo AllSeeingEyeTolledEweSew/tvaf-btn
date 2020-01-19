@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import abc
 from typing import Iterable
 from typing import Optional
 
@@ -11,7 +10,7 @@ from tvaf import exceptions as exc_lib
 from tvaf.types import TorrentEntry
 
 
-class Tracker(abc.ABC):
+class Tracker:
     """An abstract base class for functions about a specific tracker.
 
     Attributes:
@@ -23,7 +22,6 @@ class Tracker(abc.ABC):
         self.app = app
         self.name = name
 
-    @abc.abstractmethod
     def get_torrent_entry(self,
                           torrent_id: Optional[str] = None,
                           infohash: Optional[str] = None) -> TorrentEntry:
@@ -42,8 +40,7 @@ class Tracker(abc.ABC):
         Raises:
             exc_lib.TorrentEntryNotFound: If the TorrentEntry wasn't found.
         """
-        assert torrent_id is not None or infohash is not None
-        assert torrent_id is None or infohash is None
+        raise NotImplementedError
 
 
 class TrackerService:

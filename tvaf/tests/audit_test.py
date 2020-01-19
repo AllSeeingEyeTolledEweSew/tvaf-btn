@@ -36,7 +36,7 @@ class TestGet(lib.TestCase):
                                             num_bytes=1)
 
     def test_no_grouping(self) -> None:
-        audits = self.app.audit.get()
+        audits = list(self.app.audit.get())
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -46,7 +46,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_group_by_infohash(self) -> None:
-        audits = self.app.audit.get(group_by=("infohash",))
+        audits = list(self.app.audit.get(group_by=("infohash",)))
         self.assertEqual(len(audits), 2)
         self.assertNotEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -56,7 +56,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_group_by_tracker(self) -> None:
-        audits = self.app.audit.get(group_by=("tracker",))
+        audits = list(self.app.audit.get(group_by=("tracker",)))
         self.assertEqual(len(audits), 2)
         self.assertEqual(audits[0].infohash, None)
         self.assertNotEqual(audits[0].tracker, None)
@@ -66,7 +66,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_group_by_origin(self) -> None:
-        audits = self.app.audit.get(group_by=("origin",))
+        audits = list(self.app.audit.get(group_by=("origin",)))
         self.assertEqual(len(audits), 2)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -76,7 +76,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_group_by_generation(self) -> None:
-        audits = self.app.audit.get(group_by=("generation",))
+        audits = list(self.app.audit.get(group_by=("generation",)))
         self.assertEqual(len(audits), 2)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -86,8 +86,9 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_group_by_everything(self) -> None:
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 16)
         self.assertNotEqual(audits[0].infohash, None)
         self.assertNotEqual(audits[0].tracker, None)
@@ -97,8 +98,9 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_filter_infohash(self) -> None:
-        audits = self.app.audit.get(
-            infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        audits = list(
+            self.app.audit.get(
+                infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709"))
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash,
                          "da39a3ee5e6b4b0d3255bfef95601890afd80709")
@@ -109,7 +111,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_filter_tracker(self) -> None:
-        audits = self.app.audit.get(tracker="foo")
+        audits = list(self.app.audit.get(tracker="foo"))
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, "foo")
@@ -119,7 +121,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_filter_origin(self) -> None:
-        audits = self.app.audit.get(origin="user_a")
+        audits = list(self.app.audit.get(origin="user_a"))
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -129,7 +131,7 @@ class TestGet(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_filter_generation(self) -> None:
-        audits = self.app.audit.get(generation=1)
+        audits = list(self.app.audit.get(generation=1))
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].infohash, None)
         self.assertEqual(audits[0].tracker, None)
@@ -172,7 +174,7 @@ class TestApply(lib.TestCase):
                   generation=1,
                   atime=12345678,
                   num_bytes=1))
-        audits = self.app.audit.get()
+        audits = list(self.app.audit.get())
         self.assertEqual(audits[0].num_bytes, 1)
         self.assertEqual(audits[0].atime, 12345678)
         self.assert_golden_db(self.app)
@@ -186,8 +188,9 @@ class TestApply(lib.TestCase):
                   generation=1,
                   atime=23456789,
                   num_bytes=1))
-        audits = self.app.audit.get(
-            infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709")
+        audits = list(
+            self.app.audit.get(
+                infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709"))
         self.assertEqual(audits[0].num_bytes, 9)
         self.assertEqual(audits[0].atime, 23456789)
         self.assert_golden_db(self.app)
@@ -249,21 +252,22 @@ class TestCalculate(lib.TestCase):
         def should_not_call():
             assert False
 
-        audits = audit_lib.calculate_audits(self.empty_status,
-                                            self.empty_status, should_not_call)
+        audits = list(
+            audit_lib.calculate_audits(self.empty_status, self.empty_status,
+                                       should_not_call))
         self.assertEqual(audits, [])
 
-        audits = audit_lib.calculate_audits(self.complete_status,
-                                            self.complete_status,
-                                            should_not_call)
+        audits = list(
+            audit_lib.calculate_audits(self.complete_status,
+                                       self.complete_status, should_not_call))
         self.assertEqual(audits, [])
 
     def test_changes_with_no_requests(self) -> None:
         time_val = 1234567
         with lib.mock_time(time_val):
-            audits = audit_lib.calculate_audits(self.empty_status,
-                                                self.complete_status,
-                                                lambda: [])
+            audits = list(
+                audit_lib.calculate_audits(self.empty_status,
+                                           self.complete_status, lambda: []))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, const.ORIGIN_UNKNOWN)
@@ -275,9 +279,9 @@ class TestCalculate(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_changes_with_requests(self) -> None:
-        audits = audit_lib.calculate_audits(self.empty_status,
-                                            self.complete_status,
-                                            lambda: [self.normal_req])
+        audits = list(
+            audit_lib.calculate_audits(self.empty_status, self.complete_status,
+                                       lambda: [self.normal_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.normal_req.origin)
@@ -290,9 +294,9 @@ class TestCalculate(lib.TestCase):
     def test_piece_lengths(self) -> None:
         self.normal_req.start = 10000
         self.normal_req.stop = 1000000
-        audits = audit_lib.calculate_audits(self.empty_status,
-                                            self.complete_status,
-                                            lambda: [self.normal_req])
+        audits = list(
+            audit_lib.calculate_audits(self.empty_status, self.complete_status,
+                                       lambda: [self.normal_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.normal_req.origin)
@@ -303,9 +307,10 @@ class TestCalculate(lib.TestCase):
         self.assert_golden_audit(*audits)
 
     def test_high_priority_req_wins(self) -> None:
-        audits = audit_lib.calculate_audits(
-            self.empty_status, self.complete_status,
-            lambda: [self.normal_req, self.high_pri_req])
+        audits = list(
+            audit_lib.calculate_audits(
+                self.empty_status, self.complete_status,
+                lambda: [self.normal_req, self.high_pri_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.high_pri_req.origin)
@@ -317,9 +322,9 @@ class TestCalculate(lib.TestCase):
 
     def test_deactivated_requests(self) -> None:
         self.normal_req.deactivated_at = 12345678
-        audits = audit_lib.calculate_audits(self.empty_status,
-                                            self.complete_status,
-                                            lambda: [self.normal_req])
+        audits = list(
+            audit_lib.calculate_audits(self.empty_status, self.complete_status,
+                                       lambda: [self.normal_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.normal_req.origin)
@@ -331,9 +336,10 @@ class TestCalculate(lib.TestCase):
 
     def test_active_wins_vs_high_pri(self) -> None:
         self.high_pri_req.deactivated_at = 12345678
-        audits = audit_lib.calculate_audits(
-            self.empty_status, self.complete_status,
-            lambda: [self.normal_req, self.high_pri_req])
+        audits = list(
+            audit_lib.calculate_audits(
+                self.empty_status, self.complete_status,
+                lambda: [self.normal_req, self.high_pri_req]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, self.normal_req.origin)
@@ -347,9 +353,9 @@ class TestCalculate(lib.TestCase):
         newer = Request(**dataclasses.asdict(self.normal_req))
         newer.time += 100
         newer.origin = "newer"
-        audits = audit_lib.calculate_audits(self.empty_status,
-                                            self.complete_status,
-                                            lambda: [self.normal_req, newer])
+        audits = list(
+            audit_lib.calculate_audits(self.empty_status, self.complete_status,
+                                       lambda: [self.normal_req, newer]))
 
         self.assertEqual(len(audits), 1)
         self.assertEqual(audits[0].origin, newer.origin)
@@ -362,9 +368,10 @@ class TestCalculate(lib.TestCase):
     def test_multiple_audits(self) -> None:
         self.normal_req.stop = 524288
         self.high_pri_req.start = 524288
-        audits = audit_lib.calculate_audits(
-            self.empty_status, self.complete_status,
-            lambda: [self.normal_req, self.high_pri_req])
+        audits = list(
+            audit_lib.calculate_audits(
+                self.empty_status, self.complete_status,
+                lambda: [self.normal_req, self.high_pri_req]))
 
         self.assertEqual(len(audits), 2)
         self.assertEqual(sum(a.num_bytes for a in audits), 1048576)
@@ -437,7 +444,7 @@ class TestResolve(lib.TestCase):
     def test_no_changes(self) -> None:
         self.app.audit.resolve_locked([self.empty_status])
 
-        audits = self.app.audit.get()
+        audits = list(self.app.audit.get())
         audit = audits[0]
         self.assertEqual(audit.num_bytes, 0)
 
@@ -446,8 +453,9 @@ class TestResolve(lib.TestCase):
         with lib.mock_time(time_val):
             self.app.audit.resolve_locked([self.complete_status])
 
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, const.ORIGIN_UNKNOWN)
@@ -464,8 +472,9 @@ class TestResolve(lib.TestCase):
 
         self.app.audit.resolve_locked([self.complete_status])
 
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -484,8 +493,9 @@ class TestResolve(lib.TestCase):
 
         self.app.audit.resolve_locked([self.complete_status])
 
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -503,8 +513,9 @@ class TestResolve(lib.TestCase):
 
         self.app.audit.resolve_locked([self.complete_status])
 
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -522,8 +533,9 @@ class TestResolve(lib.TestCase):
 
         self.app.audit.resolve_locked([self.complete_status])
 
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.high_pri_req.origin)
@@ -540,8 +552,9 @@ class TestResolve(lib.TestCase):
 
         self.app.audit.resolve_locked([self.complete_status])
 
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -560,8 +573,9 @@ class TestResolve(lib.TestCase):
 
         self.app.audit.resolve_locked([self.complete_status])
 
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, self.normal_req.origin)
@@ -582,8 +596,9 @@ class TestResolve(lib.TestCase):
 
         self.app.audit.resolve_locked([self.complete_status])
 
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 1)
         audit = audits[0]
         self.assertEqual(audit.origin, newer.origin)
@@ -603,8 +618,9 @@ class TestResolve(lib.TestCase):
 
         self.app.audit.resolve_locked([self.complete_status])
 
-        audits = self.app.audit.get(group_by=("infohash", "generation",
-                                              "tracker", "origin"))
+        audits = list(
+            self.app.audit.get(group_by=("infohash", "generation", "tracker",
+                                         "origin")))
         self.assertEqual(len(audits), 2)
         self.assertEqual(sum(a.num_bytes for a in audits), 1048576)
         self.assert_golden_audit(*audits)

@@ -8,6 +8,8 @@ import dataclasses
 import time
 from typing import Optional
 from typing import Iterable
+from typing import List
+from typing import Any
 
 import apsw
 
@@ -150,6 +152,7 @@ class RequestsService:
         # Figure out the appropriate FileRefs that match the first contiguous
         # available chunk of data.
         offset_to_file = 0
+        files = []
         for fileref in torrent.files:
             if offset_to_file >= status.progress:
                 break
@@ -161,12 +164,14 @@ class RequestsService:
                 stop = status.progress
                 if stop > fileref.stop:
                     stop = fileref.stop
-                status.files.append(
+                files.append(
                     FileRef(file_index=fileref.file_index,
                             path=fileref.path,
                             start=start,
                             stop=stop))
             offset_to_file += fileref.stop - fileref.start
+
+        status.files = files
 
         return status
 
@@ -281,7 +286,7 @@ class RequestsService:
             params = ",".join(":" + k for k in keys)
             self.db.cursor().execute(
                 f"insert into request ({columns}) values ({params})", row)
-            req.id = self.db.last_insert_rowid()
+            req.request_id = self.db.last_insert_rowid()
 
         return req
 
@@ -303,7 +308,7 @@ class RequestsService:
             A list of requests.
         """
         clauses = []
-        bindings = []
+        bindings: List[Any] = []
         if infohash is not None:
             clauses.append("infohash = ?")
             bindings.append(infohash)

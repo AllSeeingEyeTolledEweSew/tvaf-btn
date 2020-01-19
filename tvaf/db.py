@@ -7,6 +7,7 @@ from __future__ import annotations
 import contextlib
 import threading
 import os
+from typing import Iterator
 from typing import ContextManager
 
 import apsw
@@ -15,7 +16,7 @@ import tvaf.app as app_lib
 
 
 @contextlib.contextmanager
-def begin(db: apsw.Connection, mode: str = "immediate") -> ContextManager[None]:
+def begin(db: apsw.Connection, mode: str = "immediate") -> Iterator[None]:
     """Return a context manager for BEGIN/COMMIT/ROLLBACK.
 
     This will execute "BEGIN <mode>" on the database connection before
@@ -69,7 +70,7 @@ class Database:
 
     def path(self) -> str:
         """Returns the path of the sqlite3 database."""
-        return self.app.config.state_db_path
+        raise NotImplementedError
 
     def get(self) -> apsw.Connection:
         """Returns a thread-local database connection."""

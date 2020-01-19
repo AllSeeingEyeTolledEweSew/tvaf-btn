@@ -17,3 +17,7 @@ class TrackerNotFound(BadRequest):
 
 class TorrentEntryNotFound(BadRequest):
     """Exception raised when input references an unknown torrent entry."""
+
+
+class ValidationError(BadRequest):
+    """Exception raised for some internal consistency errors."""

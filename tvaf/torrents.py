@@ -9,6 +9,7 @@ import time
 from typing import Optional
 from typing import SupportsInt
 from typing import Iterable
+from typing import cast
 
 import apsw
 
@@ -82,7 +83,8 @@ class TorrentsService:
             torrents: A list of new tvaf.types.TorrentStatus just retrieved
                 from the torrent client.
         """
-        self._insert_meta_locked(*[t.infohash for t in torrents])
+        infohashes = [cast(str, t.infohash) for t in torrents]
+        self._insert_meta_locked(*infohashes)
         # Bump the generation of each new torrent
         self.db.cursor().execute(
             "update torrent_meta set generation = generation + 1 "

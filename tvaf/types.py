@@ -4,9 +4,6 @@
 
 We use Python 3.7+'s dataclasses for all our data types.
 
-Tvaf's datatypes agree with the "required fields considered harmful"
-philosophy, so all fields are typed as typing.Optional.
-
 While we don't use any full ORM system, each of the following datatypes is also
 designed to closely align with its representation in tvaf's sqlite3 tables.
 Wherever possible, attribute names match table column names, and types match
@@ -19,9 +16,16 @@ stable part of the interface.
 
 import base64
 import dataclasses
-import typing
+from typing import Sequence
+from typing import Optional
+import re
+import os.path
 
 import dataclasses_json
+
+from tvaf.exceptions import ValidationError
+
+_SHA1_REGEX = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def _base64_to_bytes(string_in_base64):
@@ -47,15 +51,30 @@ class FileRef:
         path: The path to this file. Depending on the context, this may be
             a "suggested path" from a torrent file, or path to a real file on
             the local filesystem.
-        file_index (int): The index of this file within the larger collection.
+        file_index: The index of this file within the larger collection.
         start: The first byte referenced within this file.
         stop: The last byte referenced within this file, plus one.
     """
 
-    path: typing.Optional[str] = None
-    file_index: typing.Optional[int] = None
-    start: typing.Optional[int] = None
-    stop: typing.Optional[int] = None
+    path: str = ""
+    file_index: int = 0
+    start: int = 0
+    stop: int = 0
+
+    def validate(self):
+        """Raise ValidationError for any internal inconsistencies."""
+        if not self.path:
+            raise ValidationError("path is empty")
+        if not os.path.isabs(self.path):
+            raise ValidationError(f"path not absolute: {self.path}")
+        if self.file_index < 0:
+            raise ValidationError(f"file_index: {self.file_index} < 0")
+        if self.start < 0:
+            raise ValidationError(f"start: {self.start} < 0")
+        if self.stop <= 0:
+            raise ValidationError(f"stop: {self.stop} <= 0")
+        if self.start >= self.stop:
+            raise ValidationError(f"start/stop: {self.start} >= {self.stop}")
 
 
 @dataclasses_json.dataclass_json
@@ -80,9 +99,9 @@ class RequestStatus:
             on the local filesystem.
     """
 
-    progress: typing.Optional[int] = None
-    progress_percent: typing.Optional[float] = None
-    files: typing.Optional[typing.Sequence[FileRef]] = None
+    progress: int = 0
+    progress_percent: float = 0
+    files: Sequence[FileRef] = dataclasses.field(default_factory=list)
 
 
 @dataclasses_json.dataclass_json
@@ -117,18 +136,27 @@ class Request:
     """
     # pylint: disable=too-many-instance-attributes
 
-    tracker: typing.Optional[str] = None
-    torrent_id: typing.Optional[str] = None
-    start: typing.Optional[int] = None
-    stop: typing.Optional[int] = None
-    origin: typing.Optional[str] = None
-    random: typing.Optional[bool] = None
-    readahead: typing.Optional[bool] = None
-    priority: typing.Optional[int] = None
-    time: typing.Optional[int] = None
-    request_id: typing.Optional[int] = None
-    infohash: typing.Optional[str] = None
-    deactivated_at: typing.Optional[int] = None
+    tracker: str = ""
+    torrent_id: str = ""
+    start: int = 0
+    stop: int = 0
+    origin: str = ""
+    random: bool = False
+    readahead: bool = False
+    priority: int = 0
+    time: int = 0
+    request_id: Optional[int] = None
+    infohash: str = ""
+    deactivated_at: Optional[int] = None
+
+    def validate(self):
+        """Raise ValidationError for any internal inconsistencies."""
+        if self.start < 0:
+            raise ValidationError(f"start: {self.start} < 0")
+        if self.stop <= 0:
+            raise ValidationError(f"stop: {self.stop} <= 0")
+        if self.start >= self.stop:
+            raise ValidationError(f"start/stop: {self.start} >= {self.stop}")
 
 
 @dataclasses_json.dataclass_json
@@ -151,10 +179,10 @@ class TorrentMeta:
             tvaf.
     """
 
-    infohash: typing.Optional[str] = None
-    generation: typing.Optional[int] = None
-    managed: typing.Optional[bool] = None
-    atime: typing.Optional[int] = None
+    infohash: str = ""
+    generation: int = 0
+    managed: bool = False
+    atime: int = 0
 
 
 @dataclasses_json.dataclass_json
@@ -182,18 +210,32 @@ class TorrentStatus:
             piece in piece_bitmap is enabled.
     """
 
-    infohash: typing.Optional[str] = None
-    tracker: typing.Optional[str] = None
-    piece_bitmap: typing.Optional[typing.ByteString] = dataclasses.field(
-        default=None,
-        metadata=dataclasses_json.config(encoder=_base64_to_bytes,
-                                         decoder=_bytes_to_base64))
-    piece_length: typing.Optional[int] = None
-    length: typing.Optional[int] = None
-    seeders: typing.Optional[int] = None
-    leechers: typing.Optional[int] = None
-    announce_message: typing.Optional[str] = None
-    files: typing.Optional[typing.Sequence[FileRef]] = None
+    infohash: str = ""
+    tracker: str = ""
+    piece_bitmap: bytes = dataclasses.field(default=b"",
+                                            metadata=dataclasses_json.config(
+                                                encoder=_base64_to_bytes,
+                                                decoder=_bytes_to_base64))
+    piece_length: int = 0
+    length: int = 0
+    seeders: int = 0
+    leechers: int = 0
+    announce_message: str = ""
+    files: Sequence[FileRef] = dataclasses.field(default_factory=list)
+
+    def validate(self):
+        """Raise ValidationError for any internal inconsistencies."""
+        if not _SHA1_REGEX.match(self.infohash):
+            raise ValidationError(f"bad infohash: {self.infohash}")
+        if self.piece_length <= 0:
+            raise ValidationError(f"piece_length <= 0: {self.piece_length}")
+        if self.piece_length & (self.piece_length - 1) != 0:
+            raise ValidationError(
+                f"piece_length not a power of 2: {self.piece_length}")
+        if self.length <= 0:
+            raise ValidationError(f"length <= 0: {self.length}")
+        for fileref in self.files:
+            fileref.validate()
 
 
 @dataclasses_json.dataclass_json
@@ -238,12 +280,12 @@ class Audit:
             measured in seconds from epoch.
     """
 
-    origin: typing.Optional[str] = None
-    tracker: typing.Optional[str] = None
-    infohash: typing.Optional[str] = None
-    generation: typing.Optional[int] = None
-    num_bytes: typing.Optional[int] = None
-    atime: typing.Optional[int] = None
+    origin: Optional[str] = None
+    tracker: Optional[str] = None
+    infohash: Optional[str] = None
+    generation: Optional[int] = None
+    num_bytes: int = 0
+    atime: int = 0
 
 
 @dataclasses.dataclass
@@ -264,7 +306,7 @@ class TorrentEntry:
         length: The length of the torrent in bytes.
     """
 
-    torrent_id: typing.Optional[str]
-    tracker: typing.Optional[str]
-    infohash: typing.Optional[str]
-    length: typing.Optional[int]
+    torrent_id: str = ""
+    tracker: str = ""
+    infohash: str = ""
+    length: int = 0

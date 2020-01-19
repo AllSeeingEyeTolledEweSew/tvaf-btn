@@ -15,8 +15,10 @@ import stat as stat_lib
 import os
 import os.path
 from typing import Any
+from typing import Dict
 from typing import Optional
 from typing import Iterator
+from typing import cast
 
 
 def _mkoserror(code: int, *args: Any) -> OSError:
@@ -112,6 +114,8 @@ def lookup(root: Dir, path: str) -> Node:
 
     Raises:
         FileNotFoundError: If the given path couldn't be found within the root.
+        NotADirectoryError: If a non-terminal part of the path refers to a
+            non-directory.
         OSError: If some other error occurs.
     """
     path = os.path.normpath(path)
@@ -119,9 +123,12 @@ def lookup(root: Dir, path: str) -> Node:
     if path == ".":
         return root
     parts = path.split("/")
-    node = root
+    node: Node = root
     while parts:
-        node = node.lookup(parts.pop(0))
+        if node.stat().filetype != stat_lib.S_IFDIR:
+            raise _mkoserror(errno.ENOTDIR)
+        cur_dir = cast(Dir, node)
+        node = cur_dir.lookup(parts.pop(0))
     return node
 
 
@@ -179,7 +186,7 @@ class StaticDir(Dir):
 
     def __init__(self, mtime: Optional[int] = None):
         super().__init__(mtime=mtime)
-        self.children = {}
+        self.children: Dict[str, Node] = {}
 
     def mkchild(self, name: str, node: Node) -> None:
         """Adds a child node."""
@@ -236,10 +243,9 @@ class TorrentFile(File):
                  start: Optional[int] = None,
                  stop: Optional[int] = None,
                  mtime: Optional[int] = None) -> None:
+        size: Optional[int] = None
         if start is not None and stop is not None:
             size = stop - start
-        else:
-            size = None
         super().__init__(size=size, mtime=mtime)
         self.tracker = tracker
         self.torrent_id = torrent_id

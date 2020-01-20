@@ -196,7 +196,8 @@ class GroupBrowseSubdir(fs.Dir):
             path = path.decode("utf-8", "surrogateescape")
             tail = path[strip:].split("/")
             name = tail[0]
-            if name != prev_name and prev_name is not None:
+            if (name != prev_name and prev_name is not None and
+                    prev_stat is not None):
                 yield fs.Dirent(name=prev_name,
                                 stat=stat,
                                 next_offset=index + offset)
@@ -208,7 +209,7 @@ class GroupBrowseSubdir(fs.Dir):
                 stat = fs.Dir().stat()
             prev_name = name
             prev_stat = stat
-        if prev_name is not None:
+        if prev_name is not None and prev_stat is not None:
             yield fs.Dirent(name=prev_name,
                             stat=prev_stat,
                             next_offset=index + offset + 1)

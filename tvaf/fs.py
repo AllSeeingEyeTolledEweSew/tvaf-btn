@@ -19,6 +19,7 @@ from typing import Dict
 from typing import Optional
 from typing import Iterator
 from typing import cast
+import time
 
 
 def _mkoserror(code: int, *args: Any) -> OSError:
@@ -37,10 +38,10 @@ class TorrentRef:
         stop: The offset of the last byte of the referenced data, plus one.
     """
 
-    tracker: Optional[str] = None
-    infohash: Optional[str] = None
-    start: Optional[int] = None
-    stop: Optional[int] = None
+    tracker: str = ""
+    infohash: str = ""
+    start: int = 0
+    stop: int = 0
 
 
 @dataclasses.dataclass
@@ -53,9 +54,9 @@ class Stat:
         size: The size of the node.
         mtime: The last-modified time of the node.
     """
-    filetype: Optional[int] = 0
-    size: Optional[int] = 0
-    mtime: Optional[int] = 0
+    filetype: int = 0
+    size: int = 0
+    mtime: int = 0
 
 
 @dataclasses.dataclass
@@ -69,9 +70,9 @@ class Dirent:
             Dir.readdir().
     """
 
-    name: Optional[str] = None
-    stat: Optional[Stat] = None
-    next_offset: Optional[int] = None
+    name: str = ""
+    stat: Stat = dataclasses.field(default_factory=Stat)
+    next_offset: int = 0
 
 
 class Node:
@@ -97,6 +98,9 @@ class Node:
 
     def stat(self) -> Stat:
         """Returns a minimalist Stat for this node."""
+        assert self.filetype is not None
+        assert self.size is not None
+        assert self.mtime is not None
         return Stat(filetype=self.filetype, size=self.size, mtime=self.mtime)
 
 
@@ -134,8 +138,17 @@ def lookup(root: Dir, path: str) -> Node:
 class Dir(Node):
     """A virtual directory."""
 
-    def __init__(self, mtime: Optional[int] = None):
-        super().__init__(filetype=stat_lib.S_IFDIR, mtime=mtime)
+    def __init__(self, mtime: Optional[int] = None, size: Optional[int] = 0):
+        super().__init__(filetype=stat_lib.S_IFDIR, mtime=mtime, size=size)
+
+    def stat(self) -> Stat:
+        """Returns a default Stat for this node, with current mtime."""
+        assert self.filetype is not None
+        assert self.size is not None
+        mtime = self.mtime
+        if mtime is None:
+            mtime = int(time.time())
+        return Stat(filetype=self.filetype, size=self.size, mtime=mtime)
 
     def lookup(self, name: str) -> Node:
         """Look up a child Node by name.
@@ -252,6 +265,10 @@ class TorrentFile(File):
 
     def get_torrent_ref(self) -> Optional[TorrentRef]:
         """Returns a TorrentRef for this tracker data."""
+        assert self.tracker is not None
+        assert self.infohash is not None
+        assert self.start is not None
+        assert self.stop is not None
         return TorrentRef(tracker=self.tracker,
                           infohash=self.infohash,
                           start=self.start,

@@ -36,10 +36,13 @@ class TestLookup(unittest.TestCase):
 class TestDir(unittest.TestCase):
     """Tests for tvaf.fs.Dir."""
 
-    klass = fs.Dir
+    def get_dir(self):
+        """Returns a Dir object to test."""
+        # pylint: disable=no-self-use
+        return fs.Dir()
 
     def test_stat(self):
-        obj = self.klass()
+        obj = self.get_dir()
         self.assertEqual(obj.filetype, stat_lib.S_IFDIR)
         stat = obj.stat()
         self.assertEqual(stat.filetype, stat_lib.S_IFDIR)
@@ -48,10 +51,13 @@ class TestDir(unittest.TestCase):
 class TestStaticDir(TestDir):
     """Tests for tvaf.fs.StaticDir."""
 
-    klass = fs.StaticDir
+    def get_dir(self):
+        """Returns a StaticDir object to test."""
+        # pylint: disable=no-self-use
+        return fs.StaticDir()
 
     def setUp(self):
-        self.dir = self.klass()
+        self.dir = self.get_dir()
         self.file1 = fs.TorrentFile(start=0, stop=10, mtime=0)
         self.file2 = fs.TorrentFile(start=0, stop=100, mtime=12345)
         self.dir.mkchild("foo", self.file1)

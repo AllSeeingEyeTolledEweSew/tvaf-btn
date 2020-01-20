@@ -12,7 +12,7 @@ class TestLookup(unittest.TestCase):
     def setUp(self):
         self.root = fs.StaticDir()
         self.directory = fs.StaticDir()
-        self.file = fs.File()
+        self.file = fs.File(size=0)
         self.root.mkchild("directory", self.directory)
         self.directory.mkchild("file", self.file)
 
@@ -31,6 +31,25 @@ class TestLookup(unittest.TestCase):
     def test_not_found(self):
         with self.assertRaises(FileNotFoundError):
             fs.lookup(self.root, "does_not_exist")
+
+    def test_not_dir(self):
+        with self.assertRaises(NotADirectoryError):
+            fs.lookup(self.root, "directory/file/subpath")
+
+
+class TestFile(unittest.TestCase):
+    """Tests for tvaf.fs.File."""
+
+    def test_stat(self):
+        stat = fs.File(size=0).stat()
+        self.assertEqual(stat.filetype, stat_lib.S_IFREG)
+        self.assertEqual(stat.size, 0)
+        self.assertIs(stat.mtime, None)
+
+    def test_torrent_ref_none(self):
+        # pylint: disable=assignment-from-none
+        ref = fs.File().get_torrent_ref()
+        self.assertIs(ref, None)
 
 
 class TestDir(unittest.TestCase):

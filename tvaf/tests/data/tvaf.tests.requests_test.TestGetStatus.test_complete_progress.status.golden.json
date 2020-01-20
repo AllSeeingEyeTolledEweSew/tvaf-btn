@@ -11,7 +11,13 @@
                 "file_index": 1,
                 "path": "/downloads/movie/movie.mkv",
                 "start": 0,
-                "stop": 1038576
+                "stop": 1028576
+            },
+            {
+                "file_index": 2,
+                "path": "/downloads/movie/movie.nfo",
+                "start": 0,
+                "stop": 10000
             }
         ],
         "progress": 1048576,

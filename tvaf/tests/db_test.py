@@ -4,8 +4,9 @@
 
 import apsw
 
-import tvaf.dal as dal
+from tvaf import dal
 from tvaf.tests import lib
+from tvaf import db
 
 
 class TestDatabase(lib.TestCase):
@@ -15,3 +16,27 @@ class TestDatabase(lib.TestCase):
         conn = apsw.Connection(":memory:")
         dal.create_schema(conn)
         self.assert_golden_db(conn, include_schema=True)
+
+
+class TestBegin(lib.TestCase):
+    """Tests for tvaf.db.begin()."""
+
+    def test_positive(self) -> None:
+        conn = apsw.Connection(":memory:")
+        conn.cursor().execute("create table foo (foo integer primary key)")
+        with db.begin(conn):
+            conn.cursor().execute("insert into foo (foo) values (1)")
+        rows = conn.cursor().execute("select * from foo").fetchall()
+        self.assertEqual(rows, [(1,)])
+
+    def test_exception_rollback(self) -> None:
+        conn = apsw.Connection(":memory:")
+        conn.cursor().execute("create table foo (foo integer primary key)")
+        try:
+            with db.begin(conn):
+                conn.cursor().execute("insert into foo (foo) values (1)")
+                raise AssertionError
+        except AssertionError:
+            pass
+        rows = conn.cursor().execute("select * from foo").fetchall()
+        self.assertEqual(rows, [])

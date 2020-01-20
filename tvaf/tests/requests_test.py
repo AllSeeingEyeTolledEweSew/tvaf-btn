@@ -35,7 +35,14 @@ def add_fixture_data(conn: apsw.Connection, piece_bitmap: bytes) -> None:
                         file_index=1,
                         path="/downloads/movie/movie.mkv",
                         start=0,
-                        stop=1038576)
+                        stop=1028576)
+    lib.add_fixture_row(conn,
+                        "file",
+                        infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
+                        file_index=2,
+                        path="/downloads/movie/movie.nfo",
+                        start=0,
+                        stop=10000)
 
 
 class TestGetStatus(lib.TestCase):
@@ -287,6 +294,21 @@ class TestAdd(lib.TestCase):
 
     def test_bad_origin(self):
         self.req.origin = None
+        with self.assertRaises(exc_lib.BadRequest):
+            dal.add_request(self.conn, self.req)
+
+    def test_request_id_supplied(self):
+        self.req.request_id = 123
+        with self.assertRaises(exc_lib.BadRequest):
+            dal.add_request(self.conn, self.req)
+
+    def test_bad_infohash(self):
+        self.req.infohash = None
+        with self.assertRaises(exc_lib.BadRequest):
+            dal.add_request(self.conn, self.req)
+
+    def test_bad_tracker(self):
+        self.req.tracker = ""
         with self.assertRaises(exc_lib.BadRequest):
             dal.add_request(self.conn, self.req)
 

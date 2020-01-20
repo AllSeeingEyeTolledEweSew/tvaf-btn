@@ -194,6 +194,22 @@ class TestBrowseBase(unittest.TestCase):
         self.assertEqual(dirents[2].stat.filetype, stat_lib.S_IFDIR)
         self.assertEqual({d.name for d in dirents}, {"S 100", "S 200", "S 300"})
 
+    def test_readdir_empty_name(self):
+        conn = get_mock_db()
+        add_series(conn, name="S", id=100)
+        add_series(conn, name="", id=200)
+        add_group(conn, name="G")
+        add_entry(conn)
+        add_file(conn, path=b"path/to/a/file.mkv", start=0, stop=100)
+
+        root = tvaf_btn.RootDir(conn)
+        node = fs.lookup(root, "browse")
+        dirents = list(node.readdir())
+
+        self.assertEqual(len(dirents), 1)
+        self.assertEqual(dirents[0].stat.filetype, stat_lib.S_IFDIR)
+        self.assertEqual({d.name for d in dirents}, {"S"})
+
     def test_readdir_deleted(self):
         conn = get_mock_db()
         add_series(conn, name="S 100", id=100)
@@ -355,6 +371,22 @@ class TestBrowseSeries(unittest.TestCase):
         self.assertEqual(dirents[1].stat.filetype, stat_lib.S_IFDIR)
         self.assertEqual(dirents[2].stat.filetype, stat_lib.S_IFDIR)
         self.assertEqual({d.name for d in dirents}, {"G 110", "G 120", "G 130"})
+
+    def test_readdir_empty_name(self):
+        conn = get_mock_db()
+        add_series(conn, name="S")
+        add_group(conn, name="G", id=110, series_id=100)
+        add_group(conn, name="", id=120, series_id=100)
+        add_entry(conn)
+        add_file(conn, path=b"path/to/a/file.mkv", start=0, stop=100)
+
+        root = tvaf_btn.RootDir(conn)
+        node = fs.lookup(root, "browse/S")
+        dirents = list(node.readdir())
+
+        self.assertEqual(len(dirents), 1)
+        self.assertEqual(dirents[0].stat.filetype, stat_lib.S_IFDIR)
+        self.assertEqual({d.name for d in dirents}, {"G"})
 
     def test_readdir_deleted(self):
         conn = get_mock_db()

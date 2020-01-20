@@ -333,6 +333,8 @@ def add_request(conn: apsw.Connection, req: Request) -> Request:
         raise exc_lib.BadRequest("tracker must be set")
     if not req.infohash:
         raise exc_lib.BadRequest("infohash must be set")
+    if req.request_id is not None:
+        raise exc_lib.BadRequest("request_id must not be set")
 
     req.time = int(time.time())
     req.deactivated_at = None
@@ -344,8 +346,6 @@ def add_request(conn: apsw.Connection, req: Request) -> Request:
             return req
 
         row = dataclasses.asdict(req)
-        if "id" in row:
-            del row["id"]
         for k in ("random", "readahead"):
             row[k] = bool(row[k])
         keys = sorted(row.keys())

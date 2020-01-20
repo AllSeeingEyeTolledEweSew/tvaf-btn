@@ -56,7 +56,7 @@ class Stat:
     """
     filetype: int = 0
     size: int = 0
-    mtime: int = 0
+    mtime: Optional[int] = 0
 
 
 @dataclasses.dataclass
@@ -100,7 +100,6 @@ class Node:
         """Returns a minimalist Stat for this node."""
         assert self.filetype is not None
         assert self.size is not None
-        assert self.mtime is not None
         return Stat(filetype=self.filetype, size=self.size, mtime=self.mtime)
 
 

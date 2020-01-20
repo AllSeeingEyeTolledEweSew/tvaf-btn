@@ -16,7 +16,6 @@ stable part of the interface.
 
 import base64
 import dataclasses
-import os.path
 import re
 from typing import Optional
 from typing import Sequence
@@ -60,21 +59,6 @@ class FileRef:
     file_index: int = 0
     start: int = 0
     stop: int = 0
-
-    def validate(self):
-        """Raise ValidationError for any internal inconsistencies."""
-        if not self.path:
-            raise ValidationError("path is empty")
-        if not os.path.isabs(self.path):
-            raise ValidationError(f"path not absolute: {self.path}")
-        if self.file_index < 0:
-            raise ValidationError(f"file_index: {self.file_index} < 0")
-        if self.start < 0:
-            raise ValidationError(f"start: {self.start} < 0")
-        if self.stop <= 0:
-            raise ValidationError(f"stop: {self.stop} <= 0")
-        if self.start >= self.stop:
-            raise ValidationError(f"start/stop: {self.start} >= {self.stop}")
 
 
 @dataclasses_json.dataclass_json
@@ -220,20 +204,6 @@ class TorrentStatus:
     leechers: int = 0
     announce_message: str = ""
     files: Sequence[FileRef] = dataclasses.field(default_factory=list)
-
-    def validate(self):
-        """Raise ValidationError for any internal inconsistencies."""
-        if not _SHA1_REGEX.match(self.infohash):
-            raise ValidationError(f"bad infohash: {self.infohash}")
-        if self.piece_length <= 0:
-            raise ValidationError(f"piece_length <= 0: {self.piece_length}")
-        if self.piece_length & (self.piece_length - 1) != 0:
-            raise ValidationError(
-                f"piece_length not a power of 2: {self.piece_length}")
-        if self.length <= 0:
-            raise ValidationError(f"length <= 0: {self.length}")
-        for fileref in self.files:
-            fileref.validate()
 
 
 @dataclasses_json.dataclass_json

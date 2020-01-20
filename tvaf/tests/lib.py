@@ -18,11 +18,11 @@ from typing import SupportsFloat
 
 import apsw
 
+from tvaf.types import Audit
 from tvaf.types import Request
+from tvaf.types import RequestStatus
 from tvaf.types import TorrentMeta
 from tvaf.types import TorrentStatus
-from tvaf.types import RequestStatus
-from tvaf.types import Audit
 
 
 class TimeMocker:

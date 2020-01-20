@@ -11,15 +11,15 @@ from __future__ import annotations
 
 import dataclasses
 import errno
-import stat as stat_lib
 import os
 import os.path
+import stat as stat_lib
+import time
 from typing import Any
 from typing import Dict
-from typing import Optional
 from typing import Iterator
+from typing import Optional
 from typing import cast
-import time
 
 
 def _mkoserror(code: int, *args: Any) -> OSError:

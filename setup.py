@@ -2,8 +2,9 @@
 # accompanying UNLICENSE file.
 
 import distutils.cmd
-import setuptools
 import subprocess
+
+import setuptools
 
 
 class FormatCommand(distutils.cmd.Command):

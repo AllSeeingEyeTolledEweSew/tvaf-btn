@@ -4,11 +4,11 @@
 
 import apsw
 
-import tvaf.dal as dal
+from tvaf import dal
 from tvaf.tests import lib
-from tvaf.types import TorrentStatus
 from tvaf.types import FileRef
 from tvaf.types import TorrentMeta
+from tvaf.types import TorrentStatus
 
 
 class TestGetTorrentStatus(lib.TestCase):

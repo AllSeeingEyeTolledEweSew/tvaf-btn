@@ -16,10 +16,10 @@ stable part of the interface.
 
 import base64
 import dataclasses
-from typing import Sequence
-from typing import Optional
-import re
 import os.path
+import re
+from typing import Optional
+from typing import Sequence
 
 import dataclasses_json
 

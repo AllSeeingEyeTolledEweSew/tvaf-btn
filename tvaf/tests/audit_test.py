@@ -6,12 +6,12 @@ import dataclasses
 
 import apsw
 
-import tvaf.dal as dal
 import tvaf.const as const
+from tvaf import dal
 from tvaf.tests import lib
 from tvaf.types import Audit
-from tvaf.types import TorrentStatus
 from tvaf.types import Request
+from tvaf.types import TorrentStatus
 
 
 class TestGet(lib.TestCase):

@@ -2,11 +2,11 @@
 # accompanying UNLICENSE file.
 """BTN support for TVAF."""
 
+import errno
+import os
+import stat as stat_lib
 from typing import Any
 from typing import Iterator
-import errno
-import stat as stat_lib
-import os
 
 import apsw
 

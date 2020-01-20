@@ -1,29 +1,29 @@
 """Data access functions for tvaf."""
 
+import dataclasses
 import time
-from typing import Optional
-from typing import Union
-from typing import SupportsInt
+from typing import Any
 from typing import Callable
+from typing import Dict
 from typing import Iterable
 from typing import List
-from typing import Any
-from typing import Dict
-import dataclasses
+from typing import Optional
+from typing import SupportsInt
+from typing import Union
 
 import apsw
 import intervaltree
 
+import tvaf.exceptions as exc_lib
 from tvaf import const
 from tvaf import db
-import tvaf.exceptions as exc_lib
 from tvaf import util
+from tvaf.types import Audit
+from tvaf.types import FileRef
 from tvaf.types import Request
 from tvaf.types import RequestStatus
-from tvaf.types import Audit
-from tvaf.types import TorrentStatus
 from tvaf.types import TorrentMeta
-from tvaf.types import FileRef
+from tvaf.types import TorrentStatus
 
 
 def create_schema(conn: apsw.Connection) -> None:

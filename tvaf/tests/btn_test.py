@@ -1,9 +1,9 @@
 """Tests for the tvaf.btn module."""
 
 import hashlib
+import stat as stat_lib
 import unittest
 from typing import Any
-import stat as stat_lib
 
 import apsw
 import btn

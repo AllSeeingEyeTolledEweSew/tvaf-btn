@@ -1,7 +1,7 @@
 """Tests for the tvaf.fs module."""
 
-import unittest
 import stat as stat_lib
+import unittest
 
 from tvaf import fs
 

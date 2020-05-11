@@ -9,8 +9,30 @@ from typing import Any
 from typing import Iterator
 
 import apsw
+import btn as btn_lib
 
 from tvaf import fs
+from tvaf.config import Config
+from tvaf.exceptions import Error
+
+
+def get_api(config: Config) -> btn_lib.API:
+    return btn_lib.API(cache_path=config.btn_save_path)
+
+
+def fetch(config: Config, infohash: str) -> bytes:
+    api = get_api(config)
+    r = api.db.cursor().execute(
+        "select id from torrent_entry where infohash = ?",
+        (infohash,)).fetchone()
+    if not r:
+        raise Error(f"{infohash} not found on btn", 404)
+    torrent_id = r[0]
+    torrent_entry = api.getTorrentEntryByIdCached(torrent_id)
+    try:
+        return torrent_entry.get_raw_torrent()
+    except btn_lib.HTTPError as e:
+        raise Error(e.message, e.code, details=e.details)
 
 
 def _mkoserror(code: int, *args: Any):

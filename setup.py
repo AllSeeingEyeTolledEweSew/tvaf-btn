@@ -18,6 +18,9 @@ class FormatCommand(distutils.cmd.Command):
     def finalize_options(self):
         pass
 
+    def run_isort(self):
+        subprocess.check_call(["isort", "-rc", "-sl", "-y", "-o", "libtorrent"])
+
     def run_yapf(self):
         subprocess.check_call(["yapf", "-i", "-r", "--style=google", "."])
 
@@ -28,6 +31,7 @@ class FormatCommand(distutils.cmd.Command):
         ])
 
     def run(self):
+        self.run_isort()
         self.run_yapf()
         self.run_autoflake()
 
@@ -43,8 +47,8 @@ class LintCommand(distutils.cmd.Command):
     def finalize_options(self):
         pass
 
-    def run_yapf(self):
-        subprocess.check_call(["yapf", "-i", "-r", "--style=google", "."])
+    def run_mypy(self):
+        subprocess.check_call(["mypy", "--ignore-missing-imports", "tvaf"])
 
     def run_autoflake(self):
         subprocess.check_call([
@@ -72,6 +76,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     cmdclass={
         "format": FormatCommand,
+        "lint": LintCommand,
     },
     test_suite="tvaf.tests",
     python_requires=">=3.7",

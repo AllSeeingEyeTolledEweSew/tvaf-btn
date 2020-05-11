@@ -14,31 +14,21 @@ json encoding of datatypes, but that may change, and shouldn't be considered a
 stable part of the interface.
 """
 
-import base64
 import dataclasses
-import re
+import enum
 from typing import Optional
-from typing import Sequence
 
 import dataclasses_json
 
-from tvaf.exceptions import ValidationError
+from tvaf.exceptions import Error
 
-_SHA1_REGEX = re.compile(r"^[0-9a-fA-F]{40}$")
-
-
-def _base64_to_bytes(string_in_base64):
-    """Convert a base64 string to bytes."""
-    if string_in_base64 is None:
-        return None
-    return base64.b64encode(string_in_base64).decode("utf-8")
+USER_UNKNOWN = "*unknown*"
 
 
-def _bytes_to_base64(bytes_):
-    """Convert bytes to a base64 string."""
-    if bytes_ is None:
-        return None
-    return base64.b64decode(bytes_.encode("utf-8"))
+class Tracker(enum.Enum):
+
+    BTN = "btn"
+    PTP = "ptp"
 
 
 @dataclasses_json.dataclass_json
@@ -63,86 +53,6 @@ class FileRef:
 
 @dataclasses_json.dataclass_json
 @dataclasses.dataclass
-class RequestStatus:
-    """The current status of a Request.
-
-    For a variety of performance reasons, a Request is fulfilled by writing
-    data to disk, and the requesting application should retrieve the data by
-    reading ranges from the appropriate files on the local filesystem. Once
-    available, the files attribute describes the ranges to read, in the right
-    order.
-
-    Note that tvaf may not fully fill out the files attribute. See
-    tvaf.dal.get_request_status() for more information.
-
-    Attributes:
-        progress: The total number of bytes available for reading.
-        progress_percent: This is equal to progress divided by Request.stop -
-            Request.start. Once this is 1.0, the request is fully fulfilled.
-        files: A list of FileRefs. The path attribute of each refers to a file
-            on the local filesystem.
-    """
-
-    progress: int = 0
-    progress_percent: float = 0
-    files: Sequence[FileRef] = dataclasses.field(default_factory=list)
-
-
-@dataclasses_json.dataclass_json
-@dataclasses.dataclass
-class Request:
-    """A request for a range of data.
-
-    Requests are submitted to tvaf via tvaf.dal.add_request(), and should be
-    polled via tvaf.dal.get_request_status() (though both are not required in
-    all cases -- see those functions for more details).
-
-    Not all fields are required when submitting a new request.
-
-    For more information about the significance of each field, see
-    tvaf.dal.add_request().
-
-    Attributes:
-        tracker: The name of a tracker, as understood by tvaf.
-        start: The first byte referenced.
-        stop: The last byte referenced, plus one.
-        origin: The origin of this Request.
-        random: If True, the caller doesn't need sequential access to the data.
-        readahead: If True, the caller doesn't need the data immediately, but
-            will need it in the future.
-        priority: The priority of this request.
-        time: The time this request was created, in seconds since epoch.
-        request_id: The unique id of this request, assigned by tvaf.
-        infohash: The infohash of the torrent referenced by this request.
-        deactivated_at: None for active requests. If not None, then this is the
-            time (in seconds since epoch) that the request was deleted.
-    """
-    # pylint: disable=too-many-instance-attributes
-
-    tracker: str = ""
-    start: int = 0
-    stop: int = 0
-    origin: str = ""
-    random: bool = False
-    readahead: bool = False
-    priority: int = 0
-    time: int = 0
-    request_id: Optional[int] = None
-    infohash: str = ""
-    deactivated_at: Optional[int] = None
-
-    def validate(self):
-        """Raise ValidationError for any internal inconsistencies."""
-        if self.start < 0:
-            raise ValidationError(f"start: {self.start} < 0")
-        if self.stop <= 0:
-            raise ValidationError(f"stop: {self.stop} <= 0")
-        if self.start >= self.stop:
-            raise ValidationError(f"start/stop: {self.start} >= {self.stop}")
-
-
-@dataclasses_json.dataclass_json
-@dataclasses.dataclass
 class TorrentMeta:
     """Tvaf's metadata about a torrent.
 
@@ -152,104 +62,58 @@ class TorrentMeta:
         infohash: The infohash of the torrent.
         generation: The current generation of this torrent. Each time the
             torrent is added (either the first time, or after being deleted)
-            tvaf increments the generation. This is used in Audit records,
+            tvaf increments the generation. This is used in Acct records,
             since the same torrent may be downloaded multiple times.
-        managed: True if this torrent is managed by tvaf, and may be
-            automatically deleted. If False, tvaf will not automatically delete
-            this torrent.
         atime: The time (in seconds since epoch) this torrent was accessed via
             tvaf.
     """
 
     infohash: str = ""
     generation: int = 0
-    managed: bool = False
     atime: int = 0
 
 
 @dataclasses_json.dataclass_json
 @dataclasses.dataclass
-class TorrentStatus:
-    """Information about an active torrent.
+class Acct:
+    """A record attributing some downloaded torrent data to a user.
 
-    This represents tvaf's knowledge about a torrent which is actively
-    downloading or seeding. Once a torrent is deleted, it no longer has a
-    TorrentStatus.
-
-    Attributes:
-        infohash: The infohash of the torrent.
-        tracker: The name of a tracker which this torrent is currently using.
-        piece_bitmap: The bitmap of pieces which have been flushed to disk.
-        piece_length: The length of each piece. Always a power of two, at least
-            16k.
-        length: The total length of the torrent data in bytes.
-        seeders: The number of seeders last reported by the tracker.
-        leechers: The number of leechers last reported by the tracker.
-        announce_message: The announce message last reported by the tracker.
-        files: A list of FileRefs, corresponding to file ranges on the local
-            machine where torrent data has been or will be written. Data is not
-            guaranteed to actually have been written unless the corresponding
-            piece in piece_bitmap is enabled.
-    """
-
-    infohash: str = ""
-    tracker: str = ""
-    piece_bitmap: bytes = dataclasses.field(default=b"",
-                                            metadata=dataclasses_json.config(
-                                                encoder=_base64_to_bytes,
-                                                decoder=_bytes_to_base64))
-    piece_length: int = 0
-    length: int = 0
-    seeders: int = 0
-    leechers: int = 0
-    announce_message: str = ""
-    files: Sequence[FileRef] = dataclasses.field(default_factory=list)
-
-
-@dataclasses_json.dataclass_json
-@dataclasses.dataclass
-class Audit:
-    """An audit record attributing some downloaded torrent data to an origin.
-
-    An audit record is an attribution stating that "tvaf downloaded {num_bytes}
+    An Acct record is an attribution stating that "tvaf downloaded {num_bytes}
     bytes of torrent {infohash}, in its {generation}th generation, on tracker
-    {tracker}, on behalf of {origin}".
+    {tracker}, on behalf of {user}".
 
-    An Audit may either be an atomic attribution, or a roll-up record. For
-    example, when origin is "username" and the other key fields are None, the
-    Audit record is an attribution that "tvaf has downloaded {num_bytes} on
-    behalf of username." tvaf.dal.get_audits() directly creates group-by queries
+    An Acct may either be an atomic attribution, or a roll-up record. For
+    example, when username is "sam" and the other key fields are None, the
+    Acct record is an attribution that "tvaf has downloaded {num_bytes} on
+    behalf of sam." TODO directly creates group-by queries
     to create these rollup records.
 
-    Typically origins correspond directly to usernames. However, tvaf may
-    download data on its own to fulfill seeding requirements, and it may
-    observe that its torrent client downloaded some bytes that didn't
-    correspond to any request. The tvaf.const.ORIGIN_* constants are used for
-    these system-origin cases.
+    The username may be one of the tvaf.const.USER_* constants for some edge
+    cases which don't correspond to a real user.
 
-    To calculate audit records, tvaf monitors which torrent pieces have been
+    To calculate Acct records, tvaf monitors which torrent pieces have been
     downloaded. When a piece is newly-downloaded, tvaf looks at all outstanding
     requests for that piece, and picks one to "blame" for the new download. To
     help with this, requests are not deleted immediately, but are instead
-    placed in a deactivated state, for later audit tracking. If there are no
+    placed in a deactivated state, for later Acct tracking. If there are no
     outstanding or deactivated requests, tvaf blames the piece on
-    tvaf.const.ORIGIN_UNKNOWN.
+    tvaf.const.USER_UNKNOWN.
 
     Attributes:
-        origin: The origin of the downloaded bytes. Typically a username or one
-            of the tvaf.const.ORIGIN_* constants.
+        user: The user of the downloaded bytes. May be one of the
+            tvaf.const.USER_* constants.
         tracker: The name of the tracker on which the bytes were downloaded.
         infohash: The infohash of the torrent whose bytes were downloaded.
         generation: The generation of the torrent whose bytes were downloaded.
         num_bytes: The number of bytes that were downloaded.
-        atime: The time of the most recent request submitted by this origin for
-            this torrent at this generation. For tvaf.const.ORIGIN_UNKNOWN
+        atime: The time of the most recent request submitted by this user for
+            this torrent at this generation. For tvaf.const.USER_UNKNOWN
             records, this is just the time of the most recent download. Time is
             measured in seconds from epoch.
     """
 
-    origin: Optional[str] = None
-    tracker: Optional[str] = None
+    user: Optional[str] = None
+    tracker: Optional[Tracker] = None
     infohash: Optional[str] = None
     generation: Optional[int] = None
     num_bytes: int = 0

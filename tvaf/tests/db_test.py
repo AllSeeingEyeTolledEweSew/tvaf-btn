@@ -5,8 +5,8 @@
 import apsw
 
 from tvaf import dal
-from tvaf.tests import lib
 from tvaf import db
+from tvaf.tests import lib
 
 
 class TestDatabase(lib.TestCase):

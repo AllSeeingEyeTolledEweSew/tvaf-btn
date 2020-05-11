@@ -4,7 +4,6 @@
 import unittest
 
 import requests_mock
-
 from tvaf.transmission import APIError
 from tvaf.transmission import Client
 from tvaf.transmission import File

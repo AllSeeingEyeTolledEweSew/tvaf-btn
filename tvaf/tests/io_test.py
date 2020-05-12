@@ -1,26 +1,32 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
 
+import logging
+import os
+import os.path
+import sys
+import tempfile
 import time
 import unittest
 import unittest.mock
-import tempfile
-import os
-import os.path
-import logging
 
-import libtorrent as lt 
+import libtorrent as lt
 
-from tvaf.io import IOService
 from tvaf.config import Config
 from tvaf.exceptions import Error
+from tvaf.io import IOService
 from tvaf.io import RequestMode
+
 from . import tdummy
 
 SETTINGS = {
-    "enable_dht": False, "enable_lsd": False, "enable_natpmp": False,
-    "enable_upnp": False, "listen_interfaces": "127.0.0.1:0",
-    "alert_mask": -1}
+    "enable_dht": False,
+    "enable_lsd": False,
+    "enable_natpmp": False,
+    "enable_upnp": False,
+    "listen_interfaces": "127.0.0.1:0",
+    "alert_mask": -1
+}
 #(libtorrent.alert_category.error |
 #        libtorrent.alert_category.piece_progress |
 #        libtorrent.alert_category.peer |
@@ -30,38 +36,51 @@ SETTINGS = {
 #        libtorrent.alert_category.performance_warning |
 #        libtorrent.alert_category.piece_progress)}
 
+
 def dummy_fetch(infohash, _) -> lt.torrent_info:
     if infohash == tdummy.INFOHASH:
         return lt.torrent_info(tdummy.DICT)
     else:
         raise Error("Not found", 404)
 
+
 class IOServiceTestCase(unittest.TestCase):
     """Tests for tvaf.dal.create_schema()."""
 
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
-        self.config = Config(save_path = self.tempdir.name)
+        self.config = Config(save_path=self.tempdir.name)
         self.init_session()
 
     def init_session(self):
         self.session = lt.session(SETTINGS)
-        self.ios = IOService(session=self.session, get_config=lambda: self.config,
-                fetch=dummy_fetch)
+        self.ios = IOService(session=self.session,
+                             get_config=lambda: self.config,
+                             fetch=dummy_fetch)
 
     def tearDown(self):
         self.tempdir.cleanup()
 
     def pump_alerts(self, condition, msg="condition", timeout=5):
-        deadline = time.time() + timeout
+        condition_deadline = time.time() + timeout
         while not condition():
-            a = self.session.wait_for_alert(int((deadline - time.time()) *
-                1000))
-            if not a:
-                assert False, f"{msg} timed out"
-                break
+            deadline = min(condition_deadline, self.ios.get_tick_deadline(),
+                           self.ios.get_post_torrent_updates_deadline())
+            timeout = max(deadline - time.time(), 0.0)
+            timeout_ms = int(min(timeout * 1000, sys.maxsize))
+
+            a = self.session.wait_for_alert(int(timeout_ms))
+
             for a in self.session.pop_alerts():
                 self.ios.handle_alert(a)
+            now = time.time()
+            self.assertLess(now, condition_deadline, msg=f"{msg} timed out")
+            if now >= self.ios.get_tick_deadline():
+                self.ios.tick()
+            if now >= self.ios.get_post_torrent_updates_deadline():
+                self.session.post_torrent_updates(
+                    self.ios.get_post_torrent_updates_flags())
+                self.ios.on_fired_post_torrent_updates()
 
     def feed_pieces(self, piece_indexes=None):
         if not piece_indexes:
@@ -73,6 +92,7 @@ class IOServiceTestCase(unittest.TestCase):
 
     def read_all(self, req, msg="read all data", timeout=5):
         chunks = []
+
         def read_and_check():
             while req.has_next():
                 chunk = req.next(timeout=0)
@@ -87,8 +107,8 @@ class IOServiceTestCase(unittest.TestCase):
     def pump_and_find_first_alert(self, condition, timeout=5):
         deadline = time.time() + timeout
         while True:
-            a = self.session.wait_for_alert(int((deadline - time.time()) *
-                1000))
+            a = self.session.wait_for_alert(int(
+                (deadline - time.time()) * 1000))
             if not a:
                 assert False, f"condition timed out"
                 break
@@ -100,14 +120,25 @@ class IOServiceTestCase(unittest.TestCase):
             if saved is not None:
                 return saved
 
-    def add_req(self, mode=RequestMode.READ, infohash=tdummy.INFOHASH, start=0,
-            stop=len(tdummy.DATA), acct_params="tvaf", fetch_params="btn"):
-        return self.ios.add_request(mode=mode, infohash=infohash, start=start,
-                stop=stop, acct_params=acct_params, fetch_params=fetch_params)
+    def add_req(self,
+                mode=RequestMode.READ,
+                infohash=tdummy.INFOHASH,
+                start=0,
+                stop=len(tdummy.DATA),
+                acct_params="tvaf",
+                fetch_params="btn"):
+        return self.ios.add_request(mode=mode,
+                                    infohash=infohash,
+                                    start=start,
+                                    stop=stop,
+                                    acct_params=acct_params,
+                                    fetch_params=fetch_params)
 
     def wait_for_torrent(self):
+
         def find():
             return self.session.find_torrent(tdummy.SHA1_HASH)
+
         self.pump_alerts(lambda: find().is_valid(), msg="add")
         handle = find()
         self.assertTrue(handle.is_valid())
@@ -120,7 +151,8 @@ class TestAddRemove(IOServiceTestCase):
         req = self.add_req()
         self.pump_alerts(lambda: self.session.get_torrents(), msg="add")
         handles = self.session.get_torrents()
-        self.assertEqual([str(h.info_hash())for h in handles], [tdummy.INFOHASH])
+        self.assertEqual([str(h.info_hash()) for h in handles],
+                         [tdummy.INFOHASH])
         req.cancel()
         self.pump_alerts(lambda: not self.session.get_torrents(), msg="remove")
         self.assertIsNotNone(req.error)
@@ -201,6 +233,7 @@ class TestRead(IOServiceTestCase):
 
         chunks1 = []
         chunks2 = []
+
         def read_and_check():
             while req1.has_next():
                 chunk = req1.next(timeout=0)
@@ -218,7 +251,8 @@ class TestRead(IOServiceTestCase):
         self.assertEqual(b"".join(chunks1), tdummy.DATA)
         self.assertEqual(b"".join(chunks2), tdummy.DATA)
 
-        self.pump_alerts(lambda: not (req1.active or req2.active), msg="deactivate")
+        self.pump_alerts(lambda: not (req1.active or req2.active),
+                         msg="deactivate")
         self.assertIsNone(req1.error)
         self.assertIsNone(req2.error)
 
@@ -234,7 +268,8 @@ class TestRead(IOServiceTestCase):
         self.assertEqual(data1, tdummy.DATA)
         self.assertEqual(data2, tdummy.DATA)
 
-        self.pump_alerts(lambda: not (req1.active or req2.active), msg="deactivate")
+        self.pump_alerts(lambda: not (req1.active or req2.active),
+                         msg="deactivate")
         self.assertIsNone(req1.error)
         self.assertIsNone(req2.error)
 
@@ -292,6 +327,7 @@ class TestRead(IOServiceTestCase):
                 return False
             data = open(path, mode="rb").read()
             return data == tdummy.DATA
+
         self.pump_alerts(file_written, msg="write file")
 
         # Create a new session
@@ -310,17 +346,21 @@ class TestRead(IOServiceTestCase):
         req = self.add_req()
         # Feed one piece, so the torrent stays in the session
         self.feed_pieces(piece_indexes=(0,))
+
         def prioritized():
             return all(self.wait_for_torrent().piece_priorities())
-        self.pump_alerts(prioritized, msg = "prioritize")
+
+        self.pump_alerts(prioritized, msg="prioritize")
 
         # Cancel the request -- resets piece deadlines
         req.cancel()
+
         # Wait until deadlines have been reset
         def deprioritized():
             handle = self.wait_for_torrent()
             priorities = handle.piece_priorities()
             return not any(priorities[1:])
+
         self.pump_alerts(deprioritized, msg="deprioritize")
 
         # Recreate the request -- listens for read_piece_alert
@@ -338,10 +378,12 @@ class TestRead(IOServiceTestCase):
 class TestPriorities(IOServiceTestCase):
 
     def test_priorities(self):
+
         def add_req(mode_name, start_piece, stop_piece):
             self.add_req(mode=getattr(RequestMode, mode_name),
-                start=start_piece * tdummy.PIECE_LENGTH, stop=stop_piece *
-                tdummy.PIECE_LENGTH)
+                         start=start_piece * tdummy.PIECE_LENGTH,
+                         stop=stop_piece * tdummy.PIECE_LENGTH)
+
         assert len(tdummy.DATA) / tdummy.PIECE_LENGTH >= 9
         # One fill request for the whole torrent
         add_req("FILL", 0, 9)
@@ -360,19 +402,39 @@ class TestPriorities(IOServiceTestCase):
         handle = self.wait_for_torrent()
 
         self.assertLessEqual(
-            set({0: 1, 1: 7, 2: 7, 3: 7, 4: 7, 5:7, 6:7, 7:7, 8:7 }.items()),
+            set({
+                0: 1,
+                1: 7,
+                2: 7,
+                3: 7,
+                4: 7,
+                5: 7,
+                6: 7,
+                7: 7,
+                8: 7
+            }.items()),
             set(dict(enumerate(handle.get_piece_priorities())).items()))
         # libtorrent doesn't expose piece deadlines, so whitebox test here
         torrent = self.ios._torrents[tdummy.INFOHASH]
-        self.assertEqual(torrent._piece_seq,
-                {1: 2, 2: 3, 3: 0, 4: 1, 5: 2, 6: 3, 7: 0, 8: 1})
+        self.assertEqual(torrent._piece_seq, {
+            1: 2,
+            2: 3,
+            3: 0,
+            4: 1,
+            5: 2,
+            6: 3,
+            7: 0,
+            8: 1
+        })
         self.assertEqual(torrent._piece_reading, {3, 4, 7, 8})
 
     def test_with_have_pieces(self):
+
         def add_req(mode_name, start_piece, stop_piece):
             self.add_req(mode=getattr(RequestMode, mode_name),
-                start=start_piece * tdummy.PIECE_LENGTH, stop=stop_piece *
-                tdummy.PIECE_LENGTH)
+                         start=start_piece * tdummy.PIECE_LENGTH,
+                         stop=stop_piece * tdummy.PIECE_LENGTH)
+
         assert len(tdummy.DATA) / tdummy.PIECE_LENGTH >= 9
         # One fill request for the whole torrent
         add_req("FILL", 0, 9)
@@ -389,7 +451,13 @@ class TestPriorities(IOServiceTestCase):
         def check_prioritized():
             handle = self.wait_for_torrent()
             prio_dict = dict(enumerate(handle.get_piece_priorities()))
-            if set({0: 1, 2: 7, 4: 7, 6:7, 8:7 }.items()) > set(prio_dict.items()):
+            if set({
+                    0: 1,
+                    2: 7,
+                    4: 7,
+                    6: 7,
+                    8: 7
+            }.items()) > set(prio_dict.items()):
                 logging.debug("prio is %s", handle.get_piece_priorities())
                 return False
             # libtorrent doesn't expose piece deadlines, so whitebox test here
@@ -461,7 +529,7 @@ class TestLoad(IOServiceTestCase):
         self.session.pause()
         handle.save_resume_data(lt.save_resume_flags_t.save_info_dict)
         alert = self.pump_and_find_first_alert(
-            lambda a: isinstance(a,lt.save_resume_data_alert))
+            lambda a: isinstance(a, lt.save_resume_data_alert))
         resume_data = alert.resume_data
 
         # Start a new session and load the resume data
@@ -488,11 +556,12 @@ class TestLoad(IOServiceTestCase):
         self.session.pause()
         handle.save_resume_data(lt.save_resume_flags_t.save_info_dict)
         alert = self.pump_and_find_first_alert(
-            lambda a: isinstance(a,lt.save_resume_data_alert))
+            lambda a: isinstance(a, lt.save_resume_data_alert))
         resume_data = alert.resume_data
 
         # Corrupt the data
-        with open(os.path.join(self.tempdir.name, tdummy.NAME.decode()), mode="w") as f:
+        with open(os.path.join(self.tempdir.name, tdummy.NAME.decode()),
+                  mode="w") as f:
             f.write("corrupted!")
 
         # Open a new session, and load the torrent with resume data
@@ -508,6 +577,7 @@ class TestLoad(IOServiceTestCase):
                 lt.torrent_status.states.allocating,
                 lt.torrent_status.states.checking_resume_data,
                 lt.torrent_status.states.checking_files)
+
         self.pump_alerts(not_checking, msg="finish checking")
 
         # Feed the pieces

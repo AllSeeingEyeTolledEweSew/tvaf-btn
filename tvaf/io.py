@@ -3,36 +3,34 @@
 """Data access functions for tvaf."""
 from __future__ import annotations
 
-import enum
+import collections
 import dataclasses
+import enum
 import logging
 import math
 import random
+import re
 import threading
 import time
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import Iterable
 from typing import List
 from typing import Optional
+from typing import Set
 from typing import SupportsFloat
 from typing import Tuple
-from typing import Set
-from typing import Callable
-import re
 from weakref import WeakValueDictionary
-import collections
 
-import intervaltree
 import dataclasses_json
+import intervaltree
 import libtorrent as lt
 
-import tvaf.btn
 from tvaf import util
-from tvaf.config import Config
 from tvaf.config import GetConfig
-from tvaf.exceptions import ErrorValue
 from tvaf.exceptions import Error
+from tvaf.exceptions import ErrorValue
 
 _log = logging.getLogger(__name__)
 
@@ -66,8 +64,7 @@ class RequestParams:
         if self.stop <= 0:
             raise Error(f"stop: {self.stop} <= 0", code=400)
         if self.start >= self.stop:
-            raise Error(f"start/stop: {self.start} >= {self.stop}",
-                                code=400)
+            raise Error(f"start/stop: {self.start} >= {self.stop}", code=400)
         if not _SHA1_REGEX.match(self.infohash):
             raise Error(f"invalid infohash: {self.infohash}", code=400)
         super().__setattr__("infohash", self.infohash.lower())
@@ -100,26 +97,28 @@ class Request:
             time (in seconds since epoch) that the request was deleted.
     """
 
-    def __init__(self, *, params:Optional[RequestParams]=None,
-            torrent:Optional[_Torrent]=None):
+    def __init__(self,
+                 *,
+                 params: Optional[RequestParams] = None,
+                 torrent: Optional[_Torrent] = None):
         assert params is not None
         assert torrent is not None
 
         self._params = params
         self._time = time.time()
         self._deactivated_at: Optional[SupportsFloat] = None
-        self._error:Optional[ErrorValue] = None
+        self._error: Optional[ErrorValue] = None
 
         self._condition = threading.Condition(torrent._lock)
         self._torrent = torrent
         self._outstanding = params.stop - params.start
-        self._have_chunk:Set[int] = set()
+        self._have_chunk: Set[int] = set()
 
-        self._torrent_info :Optional[lt.torrent_info] = None
+        self._torrent_info: Optional[lt.torrent_info] = None
         self._start_piece = 0
         self._stop_piece = 0
 
-        self._chunks:Dict[int, bytes] = dict()
+        self._chunks: Dict[int, bytes] = dict()
         self._read_offset = params.start
         self._read_outstanding = params.stop - params.start
 
@@ -159,7 +158,7 @@ class Request:
         self._set_error(ErrorValue(message="Operation cancelled", code=499))
         self._torrent._sync()
 
-    def _clamp(self, start:int, stop: int) -> Tuple[int, int]:
+    def _clamp(self, start: int, stop: int) -> Tuple[int, int]:
         return max(start, self.params.start), min(stop, self.params.stop)
 
     def _deactivate(self):
@@ -167,7 +166,7 @@ class Request:
             if self._deactivated_at is None:
                 self._deactivated_at = time.time()
 
-    def _on_piece_finished(self, piece_index:int):
+    def _on_piece_finished(self, piece_index: int):
         with self._condition:
             assert self._torrent_info is not None
             start = piece_index * self._torrent_info.piece_length()
@@ -184,7 +183,7 @@ class Request:
         with self._condition:
             return self._outstanding > 0
 
-    def _set_torrent_info(self, torrent_info:lt.torrent_info):
+    def _set_torrent_info(self, torrent_info: lt.torrent_info):
         with self._condition:
             if self._torrent_info is not None:
                 return
@@ -209,7 +208,7 @@ class Request:
             if start in self._chunks:
                 if len(chunk) != len(self._chunks[start]):
                     _log.warning("adding different size chunk at %d: %d != %d",
-                            start, len(chunk), len(self._chunks[start]))
+                                 start, len(chunk), len(self._chunks[start]))
                 return
             self._chunks[start] = chunk
             self._condition.notify_all()
@@ -220,18 +219,19 @@ class Request:
         with self._condition:
             return self._read_offset < self.params.stop
 
-    def next(self, timeout:Optional[float]=None):
+    def next(self, timeout: Optional[float] = None):
         assert self.params.mode == RequestMode.READ
         with self._condition:
             assert self.has_next()
+
             def condition():
                 if self._read_offset in self._chunks:
                     return True
                 if self._error is not None:
                     return True
                 return False
-            value = self._condition.wait_for(condition,
-                                           timeout=timeout)
+
+            value = self._condition.wait_for(condition, timeout=timeout)
             if self._error is not None:
                 self._error.raise_exception()
             if self._read_offset in self._chunks:
@@ -309,22 +309,33 @@ class _Action(enum.Enum):
 
 
 def _req_key(req: Request):
-    return (req.deactivated_at is not None,
-            req.params.mode != RequestMode.READ,
+    return (req.deactivated_at is not None, req.params.mode != RequestMode.READ,
             req.params.mode != RequestMode.READAHEAD,
             req.params.mode != RequestMode.FILL, random.random())
+
+
+_cache_have_bug_4604 = None
+_4604_STATE_TIMEOUT = 30
+_4604_TICK_INTERVAL = 5
+
+
+def _have_bug_4604():
+    global _cache_have_bug_4604
+    if _cache_have_bug_4604 is None:
+        version = tuple(int(i) for i in lt.version.split("."))
+        _cache_have_bug_4604 = (version < (1, 2, 7))
+    return _cache_have_bug_4604
 
 
 class _Torrent:
 
     _DEADLINE_GAP = 10000
 
-    def __init__(
-        self,
-        *,
-        ios: Optional[IOService] = None,
-        infohash: Optional[str] = None,
-        add_torrent_params: Optional[lt.add_torrent_params] = None):
+    def __init__(self,
+                 *,
+                 ios: Optional[IOService] = None,
+                 infohash: Optional[str] = None,
+                 add_torrent_params: Optional[lt.add_torrent_params] = None):
         assert ios is not None
 
         if infohash is None:
@@ -351,17 +362,65 @@ class _Torrent:
 
         self._piece_priorities: Dict[int, int] = dict()
         self._piece_seq: Dict[int, int] = dict()
-        self._piece_readers:Dict[int, WeakValueDictionary[int, Request]] = collections.defaultdict(WeakValueDictionary)
-        self._piece_reading:Set[int] = set()
-        self._piece_have:Set[int] = set()
-        self._state:lt.torrent_status.states = lt.torrent_status.states.checking_resume_data
+        self._piece_readers: Dict[int, WeakValueDictionary[
+            int, Request]] = collections.defaultdict(WeakValueDictionary)
+        self._piece_reading: Set[int] = set()
+        self._piece_have: Set[int] = set()
+        self._state: lt.torrent_status.states = lt.torrent_status.states.checking_resume_data
         self._flags = 0
 
         self._removal_requested = False
         self._remove_data_requested = False
 
+        # State to work around libtorrent bug 4604
+        self._pieces_downloaded = 0
+        self._time_4604_changed = 0.0
+
         if add_torrent_params is not None:
             self._set_add_torrent_params(add_torrent_params)
+
+    def _check_4604(self):
+        if not _have_bug_4604():
+            return
+
+        with self._lock:
+            if self._handle is None:
+                return
+            now = time.time()
+            delta = self._time_4604_changed - now
+            if delta < _4604_STATE_TIMEOUT:
+                return
+            if self._state != lt.torrent_status.states.downloading:
+                return
+            outstanding = self._pieces_downloaded - len(self._piece_have)
+            if outstanding <= 0:
+                return
+
+            self._warning(
+                "Working around "
+                "http://github.com/arvidn/libtorrent/issues/4604: "
+                "there have been %d pieces downloaded but not hashed for %s "
+                "seconds. Force-checking the torrent to recover lost hash "
+                "jobs. You should upgrade to libtorrent>=1.2.7", outstanding,
+                delta)
+            self._handle.force_recheck()
+            self._time_4604_changed = now
+
+    def handle_status_update(self, status: lt.torrent_status):
+        with self._lock:
+            assert self._torrent_info is not None
+
+            if _have_bug_4604():
+                pieces_downloaded = round(status.progress *
+                                          self._torrent_info.num_pieces())
+                if pieces_downloaded != self._pieces_downloaded:
+                    self._time_4604_changed = time.time()
+                self._pieces_downloaded = pieces_downloaded
+                self._check_4604()
+
+    def tick(self):
+        with self._lock:
+            self._check_4604()
 
     def _is_paused(self) -> bool:
         with self._lock:
@@ -372,6 +431,8 @@ class _Torrent:
         atp.file_priorities = []
         atp.piece_priorities = [0] * atp.ti.num_pieces()
         atp.flags &= ~lt.torrent_flags.paused
+        if _have_bug_4604():
+            atp.flags |= lt.torrent_flags.update_subscribe
         with self._lock:
             self._add_torrent_params = atp
             self._torrent_info = atp.ti
@@ -379,7 +440,7 @@ class _Torrent:
                 self._init_req(req)
             self._sync()
 
-    def _log(self, method, msg:str, *args, **kwargs):
+    def _log(self, method, msg: str, *args, **kwargs):
         msg = "%s: " + msg
         if self._torrent_info is not None:
             title = self._torrent_info.name()
@@ -387,16 +448,16 @@ class _Torrent:
             title = self._infohash
         method(msg, *([title] + list(args)), **kwargs)
 
-    def _debug(self, msg:str, *args, **kwargs):
+    def _debug(self, msg: str, *args, **kwargs):
         self._log(_log.debug, msg, *args, **kwargs)
 
-    def _exception(self, msg:str, *args, **kwargs):
+    def _exception(self, msg: str, *args, **kwargs):
         self._log(_log.exception, msg, *args, **kwargs)
 
-    def _error(self, msg:str, *args, **kwargs):
+    def _error(self, msg: str, *args, **kwargs):
         self._log(_log.error, msg, *args, **kwargs)
 
-    def _warning(self, msg:str, *args, **kwargs):
+    def _warning(self, msg: str, *args, **kwargs):
         self._log(_log.warning, msg, *args, **kwargs)
 
     def _any_pending(self) -> bool:
@@ -457,11 +518,13 @@ class _Torrent:
 
             assert self._torrent_info is not None
 
-            want_seq:Dict[int, int] = dict()
-            want_reading:Set[int] = set()
-            want_priorities:Dict[int, int] = {
-                i: 0 for i in range(self._torrent_info.num_pieces())
-                if i not in self._piece_have}
+            want_seq: Dict[int, int] = dict()
+            want_reading: Set[int] = set()
+            want_priorities: Dict[int, int] = {
+                i: 0
+                for i in range(self._torrent_info.num_pieces())
+                if i not in self._piece_have
+            }
 
             for req in self._requests:
                 if req.params.mode != RequestMode.FILL:
@@ -492,8 +555,8 @@ class _Torrent:
                 for i in req.pieces():
                     if i in self._piece_have:
                         continue
-                    want_seq[i] = min(seq + base_readahead_seq, want_seq.get(i,
-                        math.inf))
+                    want_seq[i] = min(seq + base_readahead_seq,
+                                      want_seq.get(i, math.inf))
                     want_priorities[i] = 7
                     seq += 1
 
@@ -502,8 +565,8 @@ class _Torrent:
             # and libtorrent checks the current time with every
             # set_piece_deadline call.
 
-            piece_reading_outstanding:Set[int] = set()
-            piece_reading_have:Set[int] = set()
+            piece_reading_outstanding: Set[int] = set()
+            piece_reading_have: Set[int] = set()
             for i in self._piece_reading:
                 if i in self._piece_have:
                     piece_reading_have.add(i)
@@ -523,7 +586,8 @@ class _Torrent:
                 # Pieces with equal sequence numbers may end up with offset
                 # deadlines, since libtorrent adds the current time. Assign
                 # them in random order to avoid bias.
-                update_pieces = random.sample(update_pieces, k=len(update_pieces))
+                update_pieces = random.sample(update_pieces,
+                                              k=len(update_pieces))
 
             # NB: If there are many outstanding read_piece_alerts for the same
             # READ request, we will end up triggering duplicate
@@ -540,7 +604,7 @@ class _Torrent:
                         flags |= lt.deadline_flags_t.alert_when_available
                     deadline = seq * self._DEADLINE_GAP
                     self._debug("set_piece_deadline(%d, %d, %d)", i, deadline,
-                            flags)
+                                flags)
                     # Non-blocking
                     self._handle.set_piece_deadline(i, deadline, flags)
                 else:
@@ -550,7 +614,7 @@ class _Torrent:
 
             if want_priorities != self._piece_priorities:
                 self._debug("prioritize_pieces(%s)",
-                        list(want_priorities.items()))
+                            list(want_priorities.items()))
                 # Non-blocking
                 self._handle.prioritize_pieces(list(want_priorities.items()))
                 self._piece_priorities = want_priorities
@@ -573,12 +637,14 @@ class _Torrent:
                     req._set_error(error)
                 self._sync()
 
-    def handle_piece_finished_alert(self,
-                                    alert: lt.piece_finished_alert):
+    def handle_piece_finished_alert(self, alert: lt.piece_finished_alert):
         i = alert.piece_index
 
         with self._lock:
             assert self._torrent_info is not None
+
+            if _have_bug_4604():
+                self._time_4604_changed = time.time()
 
             self._piece_have.add(i)
             self._piece_priorities.pop(i, None)
@@ -605,7 +671,7 @@ class _Torrent:
 
             self._debug("acct(%d, %s)", piece_size, params)
 
-    def handle_hash_failed_alert(self, alert:lt.hash_failed_alert):
+    def handle_hash_failed_alert(self, alert: lt.hash_failed_alert):
         i = alert.piece_index
 
         with self._lock:
@@ -626,7 +692,8 @@ class _Torrent:
             # whether we have data, keep the torrent for now.
             if self._piece_have:
                 return True
-            if self._add_torrent_params is not None and any(self._add_torrent_params.have_pieces):
+            if self._add_torrent_params is not None and any(
+                    self._add_torrent_params.have_pieces):
                 return True
             if self._handle is not None and self._is_checking():
                 return True
@@ -637,10 +704,10 @@ class _Torrent:
     def _is_checking(self) -> bool:
         with self._lock:
             return self._state in (
-                    lt.torrent_status.states.checking_resume_data,
-                    lt.torrent_status.states.allocating,
-                    lt.torrent_status.states.checking_files,
-                )
+                lt.torrent_status.states.checking_resume_data,
+                lt.torrent_status.states.allocating,
+                lt.torrent_status.states.checking_files,
+            )
 
     def _fatal(self, error: ErrorValue):
         with self._lock:
@@ -654,13 +721,13 @@ class _Torrent:
             self._requests = []
             for req in requests:
                 self._debug("cleanup: %s: %s, %s", req, req.error,
-                        req._have_outstanding())
+                            req._have_outstanding())
                 if req.error is None and req._have_outstanding():
                     self._requests.append(req)
                 else:
                     req._deactivate()
                     self._requests_tree.discardi(req.start_piece,
-                            req.stop_piece, req)
+                                                 req.stop_piece, req)
 
     def _read_pieces(self):
         with self._lock:
@@ -682,7 +749,7 @@ class _Torrent:
             if self._handle is None:
                 return
 
-            set_bits:List[Tuple[int, bool]] = []
+            set_bits: List[Tuple[int, bool]] = []
 
             if self._keep():
                 if not (self._flags & lt.torrent_flags.auto_managed):
@@ -713,13 +780,13 @@ class _Torrent:
             # Non-blocking
             self._handle.set_flags(flags, mask)
 
-    def handle_torrent_paused_alert(self, alert:lt.torrent_paused_alert):
+    def handle_torrent_paused_alert(self, alert: lt.torrent_paused_alert):
         with self._lock:
             self._remove_pending(_Action.PAUSE)
             self._flags |= lt.torrent_flags.paused
             self._sync()
 
-    def handle_torrent_resumed_alert(self, alert:lt.torrent_resumed_alert):
+    def handle_torrent_resumed_alert(self, alert: lt.torrent_resumed_alert):
         with self._lock:
             self._flags &= lt.torrent_flags.paused
             self._sync()
@@ -806,7 +873,7 @@ class _Torrent:
                 error = ErrorValue.from_exc_info()
             try:
                 self._handle_fetched_torrent_info(torrent_info=torrent_info,
-                                                 error=error)
+                                                  error=error)
             except:
                 self._exception("during handle_fetched_torrent_info")
 
@@ -823,12 +890,9 @@ class _Torrent:
             assert reqs
             params = reqs[0].params.fetch_params
 
-            fetch_thread = threading.Thread(
-                name=f"fetch-{self._infohash}",
-                target=fetch,
-                args=(
-                    params,
-                ))
+            fetch_thread = threading.Thread(name=f"fetch-{self._infohash}",
+                                            target=fetch,
+                                            args=(params,))
             fetch_thread.start()
 
     def _handle_fetched_torrent_info(
@@ -919,8 +983,7 @@ class _Torrent:
             # DOES block (checks handle is valid)
             self._ios._session.remove_torrent(handle, flags)
 
-    def handle_torrent_removed_alert(self,
-                                     alert: lt.torrent_removed_alert):
+    def handle_torrent_removed_alert(self, alert: lt.torrent_removed_alert):
         with self._lock:
             self._remove_pending(_Action.REMOVE)
 
@@ -938,14 +1001,16 @@ class _Torrent:
             self._debug("removing from parent")
             del self._ios._torrents[self._infohash]
 
-    def handle_torrent_error_alert(self, alert:lt.torrent_error_alert):
+    def handle_torrent_error_alert(self, alert: lt.torrent_error_alert):
         with self._lock:
             error = ErrorValue.from_alert(alert)
             if error is not None:
                 self._fatal(error)
 
-    def handle_state_changed_alert(self, alert:lt.state_changed_alert):
+    def handle_state_changed_alert(self, alert: lt.state_changed_alert):
         with self._lock:
+            if _have_bug_4604():
+                self._time_4604_changed = time.time()
             self._debug("%s -> %s", alert.prev_state, alert.state)
             self._state = alert.state
             self._sync()
@@ -1007,50 +1072,115 @@ class IOService:
         self._lock = threading.RLock()
         self._torrents: Dict[str, _Torrent] = dict()
         self._torrents_by_handle: Dict[lt.torrent_handle, _Torrent] = dict()
+        if _have_bug_4604():
+            self._post_torrent_updates_deadline = -math.inf
+            self._tick_deadline = -math.inf
+        else:
+            self._post_torrent_updates_deadline = math.inf
+            self._tick_deadline = math.inf
 
-    def add_request(self, *, params:Optional[RequestParams]=None,
-    infohash: Optional[str]=None,
-    fetch_params: Any = None,
-    start: Optional[int]=None,
-    stop: Optional[int]=None,
-    acct_params: Any=None,
-    mode: Optional[RequestMode]=None,
-            ) -> Request:
+    @staticmethod
+    def get_alert_mask() -> int:
+        return (lt.alert_category.status | lt.alert_category.piece_progress)
+
+    def get_post_torrent_updates_deadline(self) -> float:
+        with self._lock:
+            return self._post_torrent_updates_deadline
+
+    def on_fired_post_torrent_updates(self):
+        if not _have_bug_4604():
+            return
+
+        with self._lock:
+            self._post_torrent_updates_deadline = time.time(
+            ) + _4604_TICK_INTERVAL
+
+    @staticmethod
+    def get_post_torrent_updates_flags():
+        return 0
+
+    def get_tick_deadline(self) -> float:
+        with self._lock:
+            return self._tick_deadline
+
+    def tick(self):
+        if not _have_bug_4604():
+            return
+
+        with self._lock:
+            self._tick_deadline = time.time() + _4604_TICK_INTERVAL
+            for torrent in self._torrents.values():
+                torrent.tick()
+
+    def add_request(
+            self,
+            *,
+            params: Optional[RequestParams] = None,
+            infohash: Optional[str] = None,
+            fetch_params: Any = None,
+            start: Optional[int] = None,
+            stop: Optional[int] = None,
+            acct_params: Any = None,
+            mode: Optional[RequestMode] = None,
+    ) -> Request:
         with self._lock:
             if params is None:
                 assert infohash is not None
                 assert start is not None
                 assert stop is not None
                 assert mode is not None
-                params = RequestParams(infohash=infohash, start=start,
-                        stop=stop, mode=mode, fetch_params=fetch_params,
-                        acct_params=acct_params)
+                params = RequestParams(infohash=infohash,
+                                       start=start,
+                                       stop=stop,
+                                       mode=mode,
+                                       fetch_params=fetch_params,
+                                       acct_params=acct_params)
             torrent = self._torrents.get(params.infohash)
             if not torrent:
                 torrent = _Torrent(ios=self, infohash=params.infohash)
                 self._torrents[params.infohash] = torrent
             return torrent.add_request(params)
 
-    def add_torrent(self, atp:lt.add_torrent_params):
+    def add_torrent(self, atp: lt.add_torrent_params):
         with self._lock:
             infohash = str(atp.info_hash)
             if infohash in self._torrents:
                 raise KeyError(infohash)
-            self._torrents[infohash] = _Torrent(ios=self, add_torrent_params=atp)
+            self._torrents[infohash] = _Torrent(ios=self,
+                                                add_torrent_params=atp)
 
     def remove_torrent(self, infohash: str, remove_data: bool = False):
         with self._lock:
             torrent = self._torrents[infohash]
             torrent.request_removal(remove_data=remove_data)
 
-    def _filter_alert(self, alert:lt.alert):
+    def _filter_alert(self, alert: lt.alert):
         # libtorrent fires read_piece_alert with an "Operation cancelled" error
         # whenever we change alert_when_available state. Not useful to us.
         if isinstance(alert, lt.read_piece_alert):
             error = alert.error
-            if (error.category(), error.value()) == (lt.generic_category(), 125):
+            if (error.category(), error.value()) == (lt.generic_category(),
+                                                     125):
                 return False
         return True
+
+    def _get_torrent_for_handle(self, handle: lt.torrent_handle):
+        with self._lock:
+            torrent = self._torrents_by_handle.get(handle)
+            if not torrent:
+                infohash = str(handle.info_hash())
+                torrent = self._torrents.get(infohash)
+            return torrent
+
+    def _handle_state_update_alert(self, alert: lt.state_update_alert):
+        with self._lock:
+            for status in alert.status:
+                torrent = self._get_torrent_for_handle(status.handle)
+                if not torrent:
+                    _log.warning("state update for torrent we don't have? %s",
+                                 str(status.handle.info_hash()))
+                    continue
+                torrent.handle_status_update(status)
 
     def handle_alert(self, alert: lt.alert):
         if not self._filter_alert(alert):
@@ -1059,15 +1189,13 @@ class IOService:
         if isinstance(alert, lt.torrent_alert):
             handle = alert.handle
             with self._lock:
-                torrent = self._torrents_by_handle.get(handle)
-                if not torrent:
-                    infohash = str(handle.info_hash())
-                    torrent = self._torrents.get(infohash)
+                torrent = self._get_torrent_for_handle(handle)
                 if not torrent:
                     # Some alerts are expected after we've totally removed the
                     # torrent.
-                    if not isinstance(alert, (
-                            lt.torrent_deleted_alert, lt.torrent_log_alert)):
+                    if not isinstance(
+                            alert,
+                        (lt.torrent_deleted_alert, lt.torrent_log_alert)):
                         _log_alert(alert,
                                    method=_log.warning,
                                    message="alert for torrent we don't have?")
@@ -1075,7 +1203,7 @@ class IOService:
                 self._torrents_by_handle[handle] = torrent
             handler = getattr(torrent, "handle_" + type_name, None)
         else:
-            handler = getattr(self, "handle_" + type_name, None)
+            handler = getattr(self, "_handle_" + type_name, None)
         _log_alert(alert)
         if handler:
             handler(alert)

@@ -324,6 +324,9 @@ def _have_bug_4604():
     if _cache_have_bug_4604 is None:
         version = tuple(int(i) for i in lt.version.split("."))
         _cache_have_bug_4604 = (version < (1, 2, 7))
+        if _cache_have_bug_4604:
+            _log.warning("libtorrent with bug #4604 detected. "
+                    "Please upgrade to libtorrent 1.2.7 or later.")
     return _cache_have_bug_4604
 
 
@@ -899,7 +902,7 @@ class _Torrent:
         self,
         torrent_info: Optional[lt.torrent_info] = None,
         error: Optional[ErrorValue] = None):
-        save_path = self._ios.get_config().save_path
+        save_path = str(self._ios.get_config().download_dir)
 
         with self._lock:
             self._remove_pending(_Action.FETCH)

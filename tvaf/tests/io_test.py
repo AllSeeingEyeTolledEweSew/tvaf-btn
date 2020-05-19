@@ -17,24 +17,8 @@ from tvaf.exceptions import Error
 from tvaf.io import IOService
 from tvaf.io import RequestMode
 
+from . import test_utils
 from . import tdummy
-
-SETTINGS = {
-    "enable_dht": False,
-    "enable_lsd": False,
-    "enable_natpmp": False,
-    "enable_upnp": False,
-    "listen_interfaces": "127.0.0.1:0",
-    "alert_mask": -1
-}
-#(libtorrent.alert_category.error |
-#        libtorrent.alert_category.piece_progress |
-#        libtorrent.alert_category.peer |
-#        libtorrent.alert_category.storage |
-#        libtorrent.alert_category.connect |
-#        libtorrent.alert_category.status |
-#        libtorrent.alert_category.performance_warning |
-#        libtorrent.alert_category.piece_progress)}
 
 
 def dummy_fetch(infohash, _) -> lt.torrent_info:
@@ -49,11 +33,11 @@ class IOServiceTestCase(unittest.TestCase):
 
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
-        self.config = Config(save_path=self.tempdir.name)
+        self.config = Config(download_dir=self.tempdir.name)
         self.init_session()
 
     def init_session(self):
-        self.session = lt.session(SETTINGS)
+        self.session = test_utils.create_isolated_session()
         self.ios = IOService(session=self.session,
                              get_config=lambda: self.config,
                              fetch=dummy_fetch)
@@ -274,7 +258,7 @@ class TestRead(IOServiceTestCase):
         self.assertIsNone(req2.error)
 
     def test_download(self):
-        seed = lt.session(SETTINGS)
+        seed = test_utils.create_isolated_session()
         seed_dir = tempfile.TemporaryDirectory()
         atp = lt.add_torrent_params()
         atp.ti = lt.torrent_info(tdummy.DICT)
@@ -300,7 +284,7 @@ class TestRead(IOServiceTestCase):
         path = os.path.join(self.tempdir.name, "file.txt")
         with open(path, mode="w") as f:
             pass
-        self.config = self.config.replace(save_path=path)
+        self.config = self.config.replace(download_dir=path)
 
         req = self.add_req()
         self.feed_pieces()

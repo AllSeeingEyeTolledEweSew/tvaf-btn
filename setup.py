@@ -50,15 +50,8 @@ class LintCommand(distutils.cmd.Command):
     def run_mypy(self):
         subprocess.check_call(["mypy", "--ignore-missing-imports", "tvaf"])
 
-    def run_autoflake(self):
-        subprocess.check_call([
-            "autoflake", "-i", "-r", "--remove-all-unused-imports",
-            "--remove-duplicate-keys", "--remove-unused-variables", "."
-        ])
-
     def run(self):
-        self.run_yapf()
-        self.run_autoflake()
+        self.run_mypy()
 
 
 with open("README") as readme:

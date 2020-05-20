@@ -46,18 +46,18 @@ class IOServiceTestCase(unittest.TestCase):
         self.tempdir.cleanup()
 
     def pump_alerts(self, condition, msg="condition", timeout=5):
-        condition_deadline = time.time() + timeout
+        condition_deadline = time.monotonic() + timeout
         while not condition():
             deadline = min(condition_deadline, self.ios.get_tick_deadline(),
                            self.ios.get_post_torrent_updates_deadline())
-            timeout = max(deadline - time.time(), 0.0)
+            timeout = max(deadline - time.monotonic(), 0.0)
             timeout_ms = int(min(timeout * 1000, sys.maxsize))
 
             a = self.session.wait_for_alert(int(timeout_ms))
 
             for a in self.session.pop_alerts():
                 self.ios.handle_alert(a)
-            now = time.time()
+            now = time.monotonic()
             self.assertLess(now, condition_deadline, msg=f"{msg} timed out")
             if now >= self.ios.get_tick_deadline():
                 self.ios.tick()
@@ -89,10 +89,10 @@ class IOServiceTestCase(unittest.TestCase):
         return b"".join(chunks)
 
     def pump_and_find_first_alert(self, condition, timeout=5):
-        deadline = time.time() + timeout
+        deadline = time.monotonic() + timeout
         while True:
             a = self.session.wait_for_alert(int(
-                (deadline - time.time()) * 1000))
+                (deadline - time.monotonic()) * 1000))
             if not a:
                 assert False, f"condition timed out"
                 break

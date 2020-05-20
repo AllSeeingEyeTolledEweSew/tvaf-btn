@@ -105,8 +105,8 @@ class Request:
         assert torrent is not None
 
         self._params = params
-        self._time = time.time()
-        self._deactivated_at: Optional[SupportsFloat] = None
+        self._time = time.time() # uses time.time()
+        self._deactivated_at: Optional[SupportsFloat] = None # uses time.time()
         self._error: Optional[ErrorValue] = None
 
         self._condition = threading.Condition(torrent._lock)
@@ -377,7 +377,7 @@ class _Torrent:
 
         # State to work around libtorrent bug 4604
         self._pieces_downloaded = 0
-        self._time_4604_changed = 0.0
+        self._time_4604_changed = -math.inf # Uses time.monotonic()
 
         if add_torrent_params is not None:
             self._set_add_torrent_params(add_torrent_params)
@@ -389,7 +389,7 @@ class _Torrent:
         with self._lock:
             if self._handle is None:
                 return
-            now = time.time()
+            now = time.monotonic()
             delta = self._time_4604_changed - now
             if delta < _4604_STATE_TIMEOUT:
                 return
@@ -417,7 +417,7 @@ class _Torrent:
                 pieces_downloaded = round(status.progress *
                                           self._torrent_info.num_pieces())
                 if pieces_downloaded != self._pieces_downloaded:
-                    self._time_4604_changed = time.time()
+                    self._time_4604_changed = time.monotonic()
                 self._pieces_downloaded = pieces_downloaded
                 self._check_4604()
 
@@ -647,7 +647,7 @@ class _Torrent:
             assert self._torrent_info is not None
 
             if _have_bug_4604():
-                self._time_4604_changed = time.time()
+                self._time_4604_changed = time.monotonic()
 
             self._piece_have.add(i)
             self._piece_priorities.pop(i, None)
@@ -1013,7 +1013,7 @@ class _Torrent:
     def handle_state_changed_alert(self, alert: lt.state_changed_alert):
         with self._lock:
             if _have_bug_4604():
-                self._time_4604_changed = time.time()
+                self._time_4604_changed = time.monotonic()
             self._debug("%s -> %s", alert.prev_state, alert.state)
             self._state = alert.state
             self._sync()
@@ -1095,7 +1095,7 @@ class IOService:
             return
 
         with self._lock:
-            self._post_torrent_updates_deadline = time.time(
+            self._post_torrent_updates_deadline = time.monotonic(
             ) + _4604_TICK_INTERVAL
 
     @staticmethod
@@ -1111,7 +1111,7 @@ class IOService:
             return
 
         with self._lock:
-            self._tick_deadline = time.time() + _4604_TICK_INTERVAL
+            self._tick_deadline = time.monotonic() + _4604_TICK_INTERVAL
             for torrent in self._torrents.values():
                 torrent.tick()
 

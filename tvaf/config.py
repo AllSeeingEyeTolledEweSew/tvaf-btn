@@ -190,7 +190,7 @@ class Config:
         try:
             with tmp_path.open(mode="w") as fp:
                 json.dump(config_data, fp, sort_keys=True, indent=4)
-            tmp_path.rename(path)
+            tmp_path.replace(path)
         finally:
             try:
                 tmp_path.unlink()

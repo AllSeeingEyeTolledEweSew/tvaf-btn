@@ -42,26 +42,35 @@ class TimeMocker:
 
     def __init__(self, time: SupportsFloat, autoincrement: SupportsFloat = 0):
         self.time = float(time)
+        self.monotonic = 0
         self.autoincrement = float(autoincrement)
         assert self.autoincrement >= 0
         self._patches = [
             unittest.mock.patch("time.time", new=self._time),
             unittest.mock.patch("time.monotonic", new=self._monotonic),
             unittest.mock.patch("time.sleep", new=self._sleep),
+            unittest.mock.patch("threading.Condition.wait", new=self._wait),
         ]
 
     def _time(self) -> float:
         """Mock version of time.time()."""
-        self.time += self.autoincrement
+        self._sleep(0)
         return self.time
 
     def _monotonic(self) -> float:
         """Mock version of time.monotonic()."""
-        return self._time()
+        self._sleep(0)
+        return self.monotonic
+
+    def _wait(self, timeout=Optional[SupportsFloat]) -> None:
+        assert timeout is not None, "would sleep forever"
+        self._sleep(timeout)
 
     def _sleep(self, time: SupportsFloat) -> None:
         """Mock version of time.sleep()."""
-        self.time += float(time) + self.autoincrement
+        increment = float(time) + self.autoincrement
+        self.time += increment
+        self.monotonic += increment
 
     def __enter__(self) -> TimeMocker:
         """Returns itself after enabling all time function patches."""

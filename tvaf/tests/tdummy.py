@@ -143,6 +143,9 @@ class Torrent:
     def atp(self):
         atp = lt.add_torrent_params()
         atp.ti = self.ti()
+        # this is necessary so that
+        # atp == read_resume_data(write_resume_data(atp))
+        atp.info_hash = self.sha1_hash
         return atp
 
 

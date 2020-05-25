@@ -23,7 +23,7 @@ from typing import Optional
 from typing import cast
 
 
-def _mkoserror(code: int, *args: Any) -> OSError:
+def mkoserror(code: int, *args: Any) -> OSError:
     """Returns OSError with a proper error message."""
     return OSError(code, os.strerror(code), *args)
 
@@ -128,7 +128,7 @@ def lookup(root: Dir, path: Union[os.PathLike, str]) -> Node:
     node: Node = root
     for part in path.parts:
         if node.stat().filetype != stat_lib.S_IFDIR:
-            raise _mkoserror(errno.ENOTDIR)
+            raise mkoserror(errno.ENOTDIR)
         cur_dir = cast(Dir, node)
         node = cur_dir.lookup(part)
     return node
@@ -160,7 +160,7 @@ class Dir(Node):
             OSError: If some implementation error occurs.
         """
         # pylint: disable=no-self-use
-        raise _mkoserror(errno.ENOSYS)
+        raise mkoserror(errno.ENOSYS)
 
     def readdir(self, offset: int = 0) -> Iterator[Dirent]:
         """List the contents of a directory.
@@ -182,7 +182,7 @@ class Dir(Node):
             A Dirent for each directory entry.
         """
         # pylint: disable=no-self-use
-        raise _mkoserror(errno.ENOSYS)
+        raise mkoserror(errno.ENOSYS)
 
 
 class StaticDir(Dir):
@@ -208,7 +208,7 @@ class StaticDir(Dir):
         try:
             return self.children[name]
         except KeyError:
-            raise _mkoserror(errno.ENOENT, name)
+            raise mkoserror(errno.ENOENT, name)
 
     def readdir(self, offset: int = 0) -> Iterator[Dirent]:
         """Yields all child directory entries."""

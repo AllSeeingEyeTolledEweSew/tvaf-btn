@@ -14,6 +14,7 @@ import errno
 import os
 import os.path
 import stat as stat_lib
+import pathlib
 import time
 from typing import Any
 from typing import Dict
@@ -103,7 +104,7 @@ class Node:
         return Stat(filetype=self.filetype, size=self.size, mtime=self.mtime)
 
 
-def lookup(root: Dir, path: str) -> Node:
+def lookup(root: Dir, path: Union[os.PathLike, str]) -> Node:
     """Recursively look up a node by path.
 
     Args:
@@ -119,18 +120,17 @@ def lookup(root: Dir, path: str) -> Node:
         NotADirectoryError: If a non-terminal part of the path refers to a
             non-directory.
         OSError: If some other error occurs.
+        ValueError: If the given path is absolute.
     """
-    path = os.path.normpath(path)
-    assert not os.path.isabs(path)
-    if path == ".":
-        return root
-    parts = path.split("/")
+    path = pathlib.PurePath(path)
+    if path.is_absolute():
+        raise ValueError(path)
     node: Node = root
-    while parts:
+    for part in path.parts:
         if node.stat().filetype != stat_lib.S_IFDIR:
             raise _mkoserror(errno.ENOTDIR)
         cur_dir = cast(Dir, node)
-        node = cur_dir.lookup(parts.pop(0))
+        node = cur_dir.lookup(part)
     return node
 
 

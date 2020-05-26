@@ -87,12 +87,22 @@ class Node:
         mtime: If not None, the fixed mtime field of stat(). Otherwise, mtime
             may be determined by calling stat() (but may be None if
             unspecified).
+        parent: The parent directory. This is only necessary when using
+            symlinks whose target is a Node. Always None for root directories.
+        name: The canonical name of this file within its parent directory. This
+            is used for symlinks whose target is a Node. Always None for root
+            directories.
     """
 
     def __init__(self,
+                 *,
+                 parent: Optional[fs.Dir]=None,
+                 name: Optional[str] = None,
                  filetype: int = None,
                  size: Optional[int] = None,
                  mtime: Optional[int] = None):
+        self.name = name
+        self.parent = parent
         self.filetype = filetype
         self.size = size
         self.mtime = mtime
@@ -137,8 +147,9 @@ def lookup(root: Dir, path: Union[os.PathLike, str]) -> Node:
 class Dir(Node):
     """A virtual directory."""
 
-    def __init__(self, mtime: Optional[int] = None, size: Optional[int] = 0):
-        super().__init__(filetype=stat_lib.S_IFDIR, mtime=mtime, size=size)
+    def __init__(self, *, name:Optional[str]=None,
+            parent:Optional[fs.Dir]=None, mtime: Optional[int] = None, size: Optional[int] = 0):
+        super().__init__(filetype=stat_lib.S_IFDIR, name=name, parent=parent, mtime=mtime, size=size)
 
     def stat(self) -> Stat:
         """Returns a default Stat for this node, with current mtime."""
@@ -195,12 +206,18 @@ class StaticDir(Dir):
         children: A name-to-Node dictionary.
     """
 
-    def __init__(self, mtime: Optional[int] = None):
-        super().__init__(mtime=mtime)
+    def __init__(self, *, name:Optional[str]=None,
+            parent:Optional[fs.Dir]=None, mtime: Optional[int] = None):
+        super().__init__(name=name, parent=parent, mtime=mtime)
         self.children: Dict[str, Node] = {}
 
-    def mkchild(self, name: str, node: Node) -> None:
+    def mkchild(self, node: Node, name:Optional[str]=None) -> None:
         """Adds a child node."""
+        if name is None:
+            name = node.name
+        assert name is not None
+        if node.parent is None:
+            node.parent = self
         self.children[name] = node
 
     def lookup(self, name: str) -> Node:
@@ -228,13 +245,49 @@ class File(Node):
     Reading other files isn't currently implemented.
     """
 
-    def __init__(self, size: Optional[int] = None, mtime: Optional[int] = None):
-        super().__init__(filetype=stat_lib.S_IFREG, size=size, mtime=mtime)
+    def __init__(self, *, name:Optional[str]=None,
+            parent:Optional[fs.Dir]=None, size: Optional[int] = None, mtime: Optional[int] = None):
+        super().__init__(filetype=stat_lib.S_IFREG, name=name, parent=parent, size=size, mtime=mtime)
 
     def get_torrent_ref(self) -> Optional[TorrentRef]:
         """Returns a TorrentRef if this is a torrent-backed file, else None."""
         # pylint: disable=no-self-use
         return None
+
+
+class Symlink(Node):
+
+    def __init__(self, *, name:Optional[str]=None,
+            parent:Optional[fs.Dir]=None, target:Optional[Union[str,
+                os.PathLike, fs.Node]]=None, mtime:Optional[int]=None):
+        super().__init__(filetype=stat_lib.S_IFLNK, name=name, parent=parent,
+                mtime=mtime)
+        self.target = target
+
+    def readlink(self) -> pathlib.PurePath:
+        if self.target is None:
+            raise mkoserror(errno.ENOSYS)
+        if isinstance(self.target, Node):
+            base = self.parent
+            parts = []
+            while base is not None:
+                node = self.target
+                rparts = []
+                while node and (node is not base):
+                    if not node.name:
+                        break
+                    rparts.append(node.name)
+                    node = node.parent
+                if node is base:
+                    break
+                parts.append("..")
+                base = base.parent
+            if base is None:
+                raise mkoserror(errno.ENOSYS)
+            rparts.reverse()
+            parts += rparts
+            return pathlib.PurePath().joinpath(*parts)
+        return pathlib.PurePath(os.fspath(self.target))
 
 
 class TorrentFile(File):

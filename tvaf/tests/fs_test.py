@@ -2,6 +2,7 @@
 
 import stat as stat_lib
 import unittest
+import pathlib
 
 from tvaf import fs
 
@@ -13,8 +14,8 @@ class TestLookup(unittest.TestCase):
         self.root = fs.StaticDir()
         self.directory = fs.StaticDir()
         self.file = fs.File(size=0)
-        self.root.mkchild("directory", self.directory)
-        self.directory.mkchild("file", self.file)
+        self.root.mkchild(self.directory, "directory")
+        self.directory.mkchild(self.file, "file")
 
     def test_empty(self):
         self.assertIs(fs.lookup(self.root, ""), self.root)
@@ -79,8 +80,8 @@ class TestStaticDir(TestDir):
         self.dir = self.get_dir()
         self.file1 = fs.TorrentFile(start=0, stop=10, mtime=0)
         self.file2 = fs.TorrentFile(start=0, stop=100, mtime=12345)
-        self.dir.mkchild("foo", self.file1)
-        self.dir.mkchild("bar", self.file2)
+        self.dir.mkchild(self.file1, "foo")
+        self.dir.mkchild(self.file2, "bar")
 
     def test_readdir(self):
         dirents = list(self.dir.readdir())
@@ -123,3 +124,30 @@ class TestTorrentFile(unittest.TestCase):
                           infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
                           start=0,
                           stop=1048576))
+
+
+class TestSymlink(unittest.TestCase):
+
+    def setUp(self):
+        self.root = fs.StaticDir()
+        self.dir1 = fs.StaticDir(name="dir1")
+        self.dir2 = fs.StaticDir(name="dir2")
+        self.root.mkchild(self.dir1)
+        self.root.mkchild(self.dir2)
+        self.file = fs.File(name="file")
+        self.dir2.mkchild(self.file)
+        self.symlink = fs.Symlink(name="symlink")
+        self.dir1.mkchild(self.symlink)
+
+    def test_no_target(self):
+        with self.assertRaises(OSError):
+            self.symlink.readlink()
+
+    def test_str_target(self):
+        self.symlink.target = "other"
+        self.assertEqual(self.symlink.readlink(), pathlib.PurePath("other"))
+
+    def test_obj_target(self):
+        self.symlink.target = self.file
+        self.assertEqual(self.symlink.readlink(),
+                pathlib.PurePath("../dir2/file"))

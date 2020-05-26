@@ -89,15 +89,6 @@ class TestStaticDir(TestDir):
         self.assertEqual({d.name for d in dirents}, {"foo", "bar"})
         self.assertEqual({d.stat.size for d in dirents}, {10, 100})
 
-    def test_readdir_offset(self):
-        dirents = list(self.dir.readdir(offset=0))
-        first = dirents[0]
-        offset = first.next_offset
-        dirents = list(self.dir.readdir(offset=offset))
-        self.assertEqual(len(dirents), 1)
-        second = dirents[0]
-        self.assertNotEqual(first.name, second.name)
-
 
 class TestTorrentFile(unittest.TestCase):
     """Tests for tvaf.fs.TorrentFile."""

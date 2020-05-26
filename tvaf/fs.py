@@ -67,13 +67,10 @@ class Dirent:
     Attributes:
         name: The name of the file or directory.
         stat: The stat structure for the file or directory.
-        next_offset: The offset of the next dirent after this one. See
-            Dir.readdir().
     """
 
     name: str = ""
     stat: Stat = dataclasses.field(default_factory=Stat)
-    next_offset: int = 0
 
 
 class Node:
@@ -173,21 +170,8 @@ class Dir(Node):
         # pylint: disable=no-self-use
         raise mkoserror(errno.ENOSYS)
 
-    def readdir(self, offset: int = 0) -> Iterator[Dirent]:
+    def readdir(self) -> Iterator[Dirent]:
         """List the contents of a directory.
-
-        If offset is 0 (the default), the result will start with the first
-        directory entry.
-
-        The next_offset field of each Dirent may be passed as the offset. If
-        next_offset is used, readdir will return directory entries starting
-        with the next entry after the Dirent whose next_offset was used.
-
-        Any other values passed as offset are invalid and may result in
-        undefined behavior.
-
-        Args:
-            offset: An offset to start reading.
 
         Yields:
             A Dirent for each directory entry.
@@ -227,13 +211,10 @@ class StaticDir(Dir):
         except KeyError:
             raise mkoserror(errno.ENOENT, name)
 
-    def readdir(self, offset: int = 0) -> Iterator[Dirent]:
+    def readdir(self) -> Iterator[Dirent]:
         """Yields all child directory entries."""
-        dirents = []
-        for i, (name, node) in enumerate(sorted(self.children.items())):
-            dirents.append(
-                Dirent(name=name, stat=node.stat(), next_offset=i + 1))
-        return iter(dirents[offset:])
+        for name, node in self.children.items():
+            yield Dirent(name=name, stat=node.stat())
 
 
 class File(Node):

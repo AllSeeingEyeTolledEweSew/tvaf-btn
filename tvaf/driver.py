@@ -74,10 +74,10 @@ class AlertDriver:
 class Ticker:
 
     def get_tick_deadline(self) -> float:
-        raise NotImplementedError
+        return math.inf
 
     def tick(self, now:float):
-        raise NotImplementedError
+        pass
 
 
 class TickDriver:

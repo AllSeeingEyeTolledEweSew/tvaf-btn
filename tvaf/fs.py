@@ -29,23 +29,6 @@ def mkoserror(code: int, *args: Any) -> OSError:
 
 
 @dataclasses.dataclass
-class TorrentRef:
-    """A reference to a block of data within a torrent.
-
-    Attributes:
-        tracker: The well-known name of the tracker (e.g. "btn").
-        infohash: The infohash of the torrent.
-        start: The offset of the first byte of the referenced data.
-        stop: The offset of the last byte of the referenced data, plus one.
-    """
-
-    tracker: str = ""
-    infohash: str = ""
-    start: int = 0
-    stop: int = 0
-
-
-@dataclasses.dataclass
 class Stat:
     """A minimal stat structure, as returned by os.stat.
 
@@ -234,11 +217,6 @@ class File(Node):
     def __init__(self, *, size: Optional[int] = None, mtime: Optional[int] = None):
         super().__init__(filetype=stat_lib.S_IFREG, size=size, mtime=mtime)
 
-    def get_torrent_ref(self) -> Optional[TorrentRef]:
-        """Returns a TorrentRef if this is a torrent-backed file, else None."""
-        # pylint: disable=no-self-use
-        return None
-
 
 class Symlink(Node):
 
@@ -271,40 +249,3 @@ class Symlink(Node):
             parts += rparts
             return pathlib.PurePath().joinpath(*parts)
         return pathlib.PurePath(os.fspath(self.target))
-
-
-class TorrentFile(File):
-    """A File representing some torrent data.
-
-    Attributes:
-        tracker: The well-known name of the tracker (e.g. "btn").
-        infohash: The infohash of the torrent.
-        start: The offset of the first byte of the referenced data.
-        stop: The offset of the last byte of the referenced data, plus one.
-    """
-
-    def __init__(self,
-                 tracker: Optional[str] = None,
-                 infohash: Optional[str] = None,
-                 start: Optional[int] = None,
-                 stop: Optional[int] = None,
-                 mtime: Optional[int] = None) -> None:
-        size: Optional[int] = None
-        if start is not None and stop is not None:
-            size = stop - start
-        super().__init__(size=size, mtime=mtime)
-        self.tracker = tracker
-        self.infohash = infohash
-        self.start = start
-        self.stop = stop
-
-    def get_torrent_ref(self) -> Optional[TorrentRef]:
-        """Returns a TorrentRef for this tracker data."""
-        assert self.tracker is not None
-        assert self.infohash is not None
-        assert self.start is not None
-        assert self.stop is not None
-        return TorrentRef(tracker=self.tracker,
-                          infohash=self.infohash,
-                          start=self.start,
-                          stop=self.stop)

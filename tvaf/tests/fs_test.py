@@ -55,11 +55,6 @@ class TestFile(unittest.TestCase):
         self.assertEqual(stat.size, 0)
         self.assertIs(stat.mtime, None)
 
-    def test_torrent_ref_none(self):
-        # pylint: disable=assignment-from-none
-        ref = fs.File().get_torrent_ref()
-        self.assertIs(ref, None)
-
 
 class TestDir(unittest.TestCase):
     """Tests for tvaf.fs.Dir."""
@@ -129,8 +124,8 @@ class TestStaticDir(unittest.TestCase):
 
     def setUp(self):
         self.dir = fs.StaticDir()
-        self.file1 = fs.TorrentFile(start=0, stop=10, mtime=0)
-        self.file2 = fs.TorrentFile(start=0, stop=100, mtime=12345)
+        self.file1 = fs.File(size=10, mtime=0)
+        self.file2 = fs.File(size=100, mtime=12345)
         self.dir.mkchild("foo", self.file1)
         self.dir.mkchild("bar", self.file2)
 
@@ -149,33 +144,6 @@ class TestStaticDir(unittest.TestCase):
         self.assertIs(obj, self.file1)
         self.assertIs(obj.parent, self.dir)
         self.assertEqual(obj.name, "foo")
-
-
-class TestTorrentFile(unittest.TestCase):
-    """Tests for tvaf.fs.TorrentFile."""
-
-    def setUp(self):
-        self.tfile = fs.TorrentFile(
-            tracker="foo",
-            infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
-            start=0,
-            stop=1048576,
-            mtime=12345678)
-
-    def test_stat(self):
-        stat = self.tfile.stat()
-        self.assertEqual(stat.filetype, stat_lib.S_IFREG)
-        self.assertEqual(stat.size, 1048576)
-        self.assertEqual(stat.mtime, 12345678)
-
-    def test_torrent_ref(self):
-        ref = self.tfile.get_torrent_ref()
-        self.assertEqual(
-            ref,
-            fs.TorrentRef(tracker="foo",
-                          infohash="da39a3ee5e6b4b0d3255bfef95601890afd80709",
-                          start=0,
-                          stop=1048576))
 
 
 class TestSymlink(unittest.TestCase):

@@ -144,9 +144,8 @@ def lookup(root: Dir, path: Union[os.PathLike, str]) -> Node:
 class Dir(Node):
     """A virtual directory."""
 
-    def __init__(self, *, name:Optional[str]=None,
-            parent:Optional[fs.Dir]=None, mtime: Optional[int] = None, size: Optional[int] = 0):
-        super().__init__(filetype=stat_lib.S_IFDIR, name=name, parent=parent, mtime=mtime, size=size)
+    def __init__(self, *, mtime: Optional[int] = None, size: Optional[int] = 0):
+        super().__init__(filetype=stat_lib.S_IFDIR, mtime=mtime, size=size)
 
     def stat(self) -> Stat:
         """Returns a default Stat for this node, with current mtime."""
@@ -156,6 +155,9 @@ class Dir(Node):
         if mtime is None:
             mtime = int(time.time())
         return Stat(filetype=self.filetype, size=self.size, mtime=mtime)
+
+    def _do_lookup(self, name:str) -> Optional[Node]:
+        raise mkoserror(errno.ENOSYS)
 
     def lookup(self, name: str) -> Node:
         """Look up a child Node by name.
@@ -167,8 +169,12 @@ class Dir(Node):
             FileNotFoundError: If the child Node was not found.
             OSError: If some implementation error occurs.
         """
-        # pylint: disable=no-self-use
-        raise mkoserror(errno.ENOSYS)
+        node = self._do_lookup(name)
+        if node is None:
+            raise mkoserror(errno.ENOENT)
+        node.parent = self
+        node.name = name
+        return node
 
     def readdir(self) -> Iterator[Dirent]:
         """List the contents of a directory.
@@ -180,7 +186,21 @@ class Dir(Node):
         raise mkoserror(errno.ENOSYS)
 
 
-class StaticDir(Dir):
+class DictDir(Dir):
+
+    def get_dict(self) -> Dict[str, Node]:
+        raise mkoserror(errno.ENOSYS)
+
+    def _do_lookup(self, name:str) -> Optional[Node]:
+        return self.get_dict().get(name)
+
+    def readdir(self) -> Iterator[Dirent]:
+        for name, node in self.get_dict().items():
+            yield Dirent(name=name, stat=node.stat())
+
+
+
+class StaticDir(DictDir):
     """A directory with fixed contents that never vary.
 
     The intent is that the directory structure will be created in the
@@ -190,31 +210,16 @@ class StaticDir(Dir):
         children: A name-to-Node dictionary.
     """
 
-    def __init__(self, *, name:Optional[str]=None,
-            parent:Optional[fs.Dir]=None, mtime: Optional[int] = None):
-        super().__init__(name=name, parent=parent, mtime=mtime)
+    def __init__(self, *, mtime: Optional[int] = None):
+        super().__init__(mtime=mtime)
         self.children: Dict[str, Node] = {}
 
-    def mkchild(self, node: Node, name:Optional[str]=None) -> None:
+    def mkchild(self, name:str, node: Node):
         """Adds a child node."""
-        if name is None:
-            name = node.name
-        assert name is not None
-        if node.parent is None:
-            node.parent = self
         self.children[name] = node
 
-    def lookup(self, name: str) -> Node:
-        """Returns a child Node by name."""
-        try:
-            return self.children[name]
-        except KeyError:
-            raise mkoserror(errno.ENOENT, name)
-
-    def readdir(self) -> Iterator[Dirent]:
-        """Yields all child directory entries."""
-        for name, node in self.children.items():
-            yield Dirent(name=name, stat=node.stat())
+    def get_dict(self):
+        return self.children
 
 
 class File(Node):
@@ -226,9 +231,8 @@ class File(Node):
     Reading other files isn't currently implemented.
     """
 
-    def __init__(self, *, name:Optional[str]=None,
-            parent:Optional[fs.Dir]=None, size: Optional[int] = None, mtime: Optional[int] = None):
-        super().__init__(filetype=stat_lib.S_IFREG, name=name, parent=parent, size=size, mtime=mtime)
+    def __init__(self, *, size: Optional[int] = None, mtime: Optional[int] = None):
+        super().__init__(filetype=stat_lib.S_IFREG, size=size, mtime=mtime)
 
     def get_torrent_ref(self) -> Optional[TorrentRef]:
         """Returns a TorrentRef if this is a torrent-backed file, else None."""
@@ -238,11 +242,9 @@ class File(Node):
 
 class Symlink(Node):
 
-    def __init__(self, *, name:Optional[str]=None,
-            parent:Optional[fs.Dir]=None, target:Optional[Union[str,
+    def __init__(self, *, target:Optional[Union[str,
                 os.PathLike, fs.Node]]=None, mtime:Optional[int]=None):
-        super().__init__(filetype=stat_lib.S_IFLNK, name=name, parent=parent,
-                mtime=mtime)
+        super().__init__(filetype=stat_lib.S_IFLNK, mtime=mtime)
         self.target = target
 
     def readlink(self) -> pathlib.PurePath:

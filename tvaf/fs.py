@@ -21,6 +21,7 @@ from typing import Dict
 from typing import Iterator
 from typing import Optional
 from typing import cast
+from typing import Union
 
 
 def mkoserror(code: int, *args: Any) -> OSError:
@@ -139,7 +140,7 @@ class Dir(Node):
             mtime = int(time.time())
         return Stat(filetype=self.filetype, size=self.size, mtime=mtime)
 
-    def _do_lookup(self, name:str) -> Optional[Node]:
+    def get_node(self, name:str) -> Optional[Node]:
         raise mkoserror(errno.ENOSYS)
 
     def lookup(self, name: str) -> Node:
@@ -152,7 +153,7 @@ class Dir(Node):
             FileNotFoundError: If the child Node was not found.
             OSError: If some implementation error occurs.
         """
-        node = self._do_lookup(name)
+        node = self.get_node(name)
         if node is None:
             raise mkoserror(errno.ENOENT)
         node.parent = self
@@ -174,7 +175,7 @@ class DictDir(Dir):
     def get_dict(self) -> Dict[str, Node]:
         raise mkoserror(errno.ENOSYS)
 
-    def _do_lookup(self, name:str) -> Optional[Node]:
+    def get_node(self, name:str) -> Optional[Node]:
         return self.get_dict().get(name)
 
     def readdir(self) -> Iterator[Dirent]:
@@ -217,7 +218,7 @@ class File(Node):
     def __init__(self, *, size: Optional[int] = None, mtime: Optional[int] = None):
         super().__init__(filetype=stat_lib.S_IFREG, size=size, mtime=mtime)
 
-SymlinkTarget = Union[str, os.PathLike, fs.Node]
+SymlinkTarget = Union[str, os.PathLike, Node]
 
 
 class Symlink(Node):

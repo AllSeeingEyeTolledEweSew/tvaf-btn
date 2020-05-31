@@ -63,7 +63,7 @@ class TestDir(unittest.TestCase):
         self.dir = fs.Dir()
         self.file = fs.File(size=100)
 
-        def lookup(name):
+        def get_node(name):
             if name == "foo":
                 return self.file
             return None
@@ -71,7 +71,7 @@ class TestDir(unittest.TestCase):
         def readdir(self):
             return [fs.Dirent(name="foo", stat=self.file.stat())]
 
-        self.dir._do_lookup = lookup
+        self.dir.get_node = get_node
         self.dir.readdir = readdir
 
     def test_stat(self):

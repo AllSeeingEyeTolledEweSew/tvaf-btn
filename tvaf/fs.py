@@ -217,11 +217,12 @@ class File(Node):
     def __init__(self, *, size: Optional[int] = None, mtime: Optional[int] = None):
         super().__init__(filetype=stat_lib.S_IFREG, size=size, mtime=mtime)
 
+SymlinkTarget = Union[str, os.PathLike, fs.Node]
+
 
 class Symlink(Node):
 
-    def __init__(self, *, target:Optional[Union[str,
-                os.PathLike, fs.Node]]=None, mtime:Optional[int]=None):
+    def __init__(self, *, target:Optional[SymlinkTarget]=None, mtime:Optional[int]=None):
         super().__init__(filetype=stat_lib.S_IFLNK, mtime=mtime)
         self.target = target
 

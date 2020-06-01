@@ -21,13 +21,6 @@ from . import test_utils
 from . import tdummy
 
 
-def dummy_fetch(infohash, _) -> lt.torrent_info:
-    if infohash == tdummy.INFOHASH:
-        return lt.torrent_info(tdummy.DICT)
-    else:
-        raise Error("Not found", 404)
-
-
 class IOServiceTestCase(unittest.TestCase):
     """Tests for tvaf.dal.create_schema()."""
 
@@ -39,8 +32,7 @@ class IOServiceTestCase(unittest.TestCase):
     def init_session(self):
         self.session = test_utils.create_isolated_session()
         self.ios = IOService(session=self.session,
-                             get_config=lambda: self.config,
-                             fetch=dummy_fetch)
+                             get_config=lambda: self.config)
 
     def tearDown(self):
         self.tempdir.cleanup()
@@ -110,13 +102,13 @@ class IOServiceTestCase(unittest.TestCase):
                 start=0,
                 stop=len(tdummy.DATA),
                 acct_params="tvaf",
-                fetch_params="btn"):
+                get_torrent=lambda: lt.bencode(tdummy.DICT)):
         return self.ios.add_request(mode=mode,
                                     infohash=infohash,
                                     start=start,
                                     stop=stop,
                                     acct_params=acct_params,
-                                    fetch_params=fetch_params)
+                                    get_torrent=get_torrent)
 
     def wait_for_torrent(self):
 
@@ -143,11 +135,13 @@ class TestAddRemove(IOServiceTestCase):
         self.assertEqual(req.error.code, 499)
 
     def test_fetch_error(self):
-        req = self.add_req(infohash="0000000000000000000000000000000000000000")
+        def _raise_error():
+            raise Error(message="Test error", code=456)
+        req = self.add_req(get_torrent=_raise_error)
         with self.assertRaises(Error):
             req.next(timeout=5)
         self.assertIsNotNone(req.error)
-        self.assertEqual(req.error.code, 404)
+        self.assertEqual(req.error.code, 456)
 
 
 class TestRead(IOServiceTestCase):

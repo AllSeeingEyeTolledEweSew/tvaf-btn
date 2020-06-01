@@ -45,11 +45,15 @@ class RequestMode(enum.Enum):
 _SHA1_REGEX = re.compile(r"[0-9a-fA-F]{40}")
 
 
+def _raise_notimplemented():
+    raise NotImplementedError
+
+
 @dataclasses_json.dataclass_json
 @dataclasses.dataclass(frozen=True)
 class RequestParams:
     infohash: str = ""
-    fetch_params: Any = None
+    get_torrent: Callable[[], bytes] = _raise_notimplemented
     start: int = 0
     stop: int = 0
     acct_params: Any = None
@@ -867,11 +871,11 @@ class _Torrent:
 
     def _maybe_async_fetch_torrent_info(self):
 
-        def fetch(params: Any):
+        def fetch(get_torrent:Callable[[], bytes]):
             torrent_info: Optional[lt.torrent_info] = None
             error: Optional[ErrorValue] = None
             try:
-                torrent_info = self._ios.fetch(self._infohash, params)
+                torrent_info = lt.torrent_info(lt.bdecode(get_torrent()))
             except:
                 error = ErrorValue.from_exc_info()
             try:
@@ -891,11 +895,11 @@ class _Torrent:
 
             reqs = sorted(self._requests, key=_req_key)
             assert reqs
-            params = reqs[0].params.fetch_params
+            get_torrent = reqs[0].params.get_torrent
 
             fetch_thread = threading.Thread(name=f"fetch-{self._infohash}",
                                             target=fetch,
-                                            args=(params,))
+                                            args=(get_torrent,))
             fetch_thread.start()
 
     def _handle_fetched_torrent_info(
@@ -1051,23 +1055,17 @@ def _log_alert(alert: lt.alert,
     method(message, *args)
 
 
-Fetch = Callable[[str, Any], bytes]
-
-
 class IOService:
 
     def __init__(self,
                  *,
                  session: lt.session = None,
-                 get_config: Optional[GetConfig] = None,
-                 fetch: Optional[Fetch] = None):
+                 get_config: Optional[GetConfig] = None):
         assert session is not None
         assert get_config is not None
-        assert fetch is not None
 
         self._session = session
         self.get_config = get_config
-        self.fetch = fetch
 
         # One lock for both top-level and per-torrent operations. I have not
         # yet implemented a proper locking protocol between IOService and
@@ -1120,7 +1118,7 @@ class IOService:
             *,
             params: Optional[RequestParams] = None,
             infohash: Optional[str] = None,
-            fetch_params: Any = None,
+            get_torrent: Optional[Callable[[], bytes]] = None,
             start: Optional[int] = None,
             stop: Optional[int] = None,
             acct_params: Any = None,
@@ -1132,11 +1130,12 @@ class IOService:
                 assert start is not None
                 assert stop is not None
                 assert mode is not None
+                assert get_torrent is not None
                 params = RequestParams(infohash=infohash,
                                        start=start,
                                        stop=stop,
                                        mode=mode,
-                                       fetch_params=fetch_params,
+                                       get_torrent=get_torrent,
                                        acct_params=acct_params)
             torrent = self._torrents.get(params.infohash)
             if not torrent:

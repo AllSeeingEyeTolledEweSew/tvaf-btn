@@ -77,11 +77,11 @@ class Node:
 
     def __init__(self,
                  *,
-                 parent: Optional[fs.Dir]=None,
-                 name: Optional[str] = None,
+                 parent: Dir=None,
+                 name: str = None,
                  filetype: int = None,
-                 size: Optional[int] = None,
-                 mtime: Optional[int] = None):
+                 size: int = None,
+                 mtime: int = None):
         self.name = name
         self.parent = parent
         self.filetype = filetype
@@ -128,7 +128,7 @@ def lookup(root: Dir, path: Union[os.PathLike, str]) -> Node:
 class Dir(Node):
     """A virtual directory."""
 
-    def __init__(self, *, mtime: Optional[int] = None, size: Optional[int] = 0):
+    def __init__(self, *, mtime: int = None, size: int = 0):
         super().__init__(filetype=stat_lib.S_IFDIR, mtime=mtime, size=size)
 
     def stat(self) -> Stat:
@@ -194,7 +194,7 @@ class StaticDir(DictDir):
         children: A name-to-Node dictionary.
     """
 
-    def __init__(self, *, mtime: Optional[int] = None):
+    def __init__(self, *, mtime: int = None):
         super().__init__(mtime=mtime)
         self.children: Dict[str, Node] = {}
 
@@ -215,7 +215,7 @@ class File(Node):
     Reading other files isn't currently implemented.
     """
 
-    def __init__(self, *, size: Optional[int] = None, mtime: Optional[int] = None):
+    def __init__(self, *, size: int = None, mtime: int = None):
         super().__init__(filetype=stat_lib.S_IFREG, size=size, mtime=mtime)
 
 SymlinkTarget = Union[str, os.PathLike, Node]
@@ -223,7 +223,7 @@ SymlinkTarget = Union[str, os.PathLike, Node]
 
 class Symlink(Node):
 
-    def __init__(self, *, target:Optional[SymlinkTarget]=None, mtime:Optional[int]=None):
+    def __init__(self, *, target:SymlinkTarget=None, mtime:int=None):
         super().__init__(filetype=stat_lib.S_IFLNK, mtime=mtime)
         self.target = target
 
@@ -234,7 +234,7 @@ class Symlink(Node):
             base = self.parent
             parts = []
             while base is not None:
-                node = self.target
+                node:Optional[Node] = self.target
                 rparts = []
                 while node and (node is not base):
                     if not node.name:

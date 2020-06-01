@@ -8,6 +8,8 @@ from typing import Callable
 import dataclasses
 import ipaddress
 import pathlib
+from typing import List
+from typing import Any
 from typing import Dict
 from typing import Union
 
@@ -17,8 +19,6 @@ import libtorrent as lt
 FILENAME = "config.json"
 RESUME_DATA_DIR_NAME = "resume"
 DEFAULT_DOWNLOAD_DIR_NAME = "downloads"
-
-SettingsPack = Dict[str, Union[str, int, bool]]
 
 class SettingsPack(dict):
 
@@ -65,7 +65,7 @@ def get_libtorrent_alert_categories() -> Dict[str, int]:
     return name_to_mask
 
 
-_IPAdress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+_IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 _IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
 

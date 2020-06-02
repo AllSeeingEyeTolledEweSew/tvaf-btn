@@ -41,7 +41,7 @@ class Stat:
     """
     filetype: int = 0
     size: int = 0
-    mtime: Optional[int] = 0
+    mtime: Optional[int] = None
 
 
 @dataclasses.dataclass

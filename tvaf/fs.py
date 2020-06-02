@@ -224,7 +224,7 @@ SymlinkTarget = Union[str, os.PathLike, Node]
 class Symlink(Node):
 
     def __init__(self, *, target:SymlinkTarget=None, mtime:int=None):
-        super().__init__(filetype=stat_lib.S_IFLNK, mtime=mtime)
+        super().__init__(filetype=stat_lib.S_IFLNK, mtime=mtime, size=0)
         self.target = target
 
     def readlink(self) -> pathlib.PurePath:

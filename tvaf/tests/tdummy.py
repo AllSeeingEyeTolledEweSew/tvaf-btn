@@ -46,6 +46,8 @@ class File:
         self.path = path
         self.path_split = path_split
         self.length = length
+        self.start = None
+        self.stop = None
 
     @property
     def data(self):
@@ -70,6 +72,12 @@ class Torrent:
         self.piece_length = piece_length
         self.files = [File(**f) for f in files]
         self.length = sum(f.length for f in self.files)
+
+        offset = 0
+        for f in self.files:
+            f.start = offset
+            f.stop = offset + f.length
+            offset = f.stop
 
         self._data = None
         self._pieces = None
@@ -112,7 +120,7 @@ class Torrent:
                         b"length": f.length,
                         b"path": f.path_split[1:],
                     }
-                    self._info[b"files"].append(f)
+                    self._info[b"files"].append(fdict)
         return self._info
 
     @property

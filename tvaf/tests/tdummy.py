@@ -30,7 +30,8 @@ SHA1_HASH = lt.sha1_hash(INFOHASH_BYTES)
 
 class File:
 
-    def __init__(self, *, data=None, length=None, path=None, path_split=None):
+    def __init__(self, *, data=None, length=None, path=None, path_split=None,
+            attr=None):
         assert length is not None
         assert path or path_split
 
@@ -46,11 +47,14 @@ class File:
         self.path = path
         self.path_split = path_split
         self.length = length
+        self.attr = attr or b""
         self.start = None
         self.stop = None
 
     @property
     def data(self):
+        if b"p" in self.attr:
+            return b"\x00" * self.length
         if self._data is None:
             # 7-bit data to make it easy to work around libtorrent bug #4612
             self._data = bytes(random.getrandbits(7) for _ in
@@ -61,9 +65,10 @@ class File:
 class Torrent:
 
     @classmethod
-    def single_file(cls, *, piece_length=16384, length=None, name=None):
+    def single_file(cls, *, piece_length=16384, length=None, name=None,
+            attr=None):
         return cls(piece_length=piece_length, files=[dict(length=length,
-            path=name)])
+            path=name, attr=attr)])
 
     def __init__(self, *, piece_length=16384, files=None):
         assert piece_length is not None
@@ -120,6 +125,8 @@ class Torrent:
                         b"length": f.length,
                         b"path": f.path_split[1:],
                     }
+                    if f.attr:
+                        fdict[b"attr"] = f.attr
                     self._info[b"files"].append(fdict)
         return self._info
 

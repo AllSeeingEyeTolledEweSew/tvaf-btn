@@ -200,6 +200,8 @@ class StaticDir(DictDir):
 
     def mkchild(self, name:str, node: Node):
         """Adds a child node."""
+        node.name = name
+        node.parent = self
         self.children[name] = node
 
     def get_dict(self):

@@ -15,7 +15,6 @@ import os
 import os.path
 import stat as stat_lib
 import pathlib
-import time
 from typing import Any
 from typing import Dict
 from typing import Iterator
@@ -135,10 +134,7 @@ class Dir(Node):
         """Returns a default Stat for this node, with current mtime."""
         assert self.filetype is not None
         assert self.size is not None
-        mtime = self.mtime
-        if mtime is None:
-            mtime = int(time.time())
-        return Stat(filetype=self.filetype, size=self.size, mtime=mtime)
+        return Stat(filetype=self.filetype, size=self.size, mtime=self.mtime)
 
     def get_node(self, name:str) -> Optional[Node]:
         raise mkoserror(errno.ENOSYS)

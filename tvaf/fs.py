@@ -106,36 +106,6 @@ class Node:
         return Stat(filetype=self.filetype, perms=self.perms, size=self.size, mtime=self.mtime)
 
 
-def lookup(root: Dir, path: Union[os.PathLike, str]) -> Node:
-    """Recursively look up a node by path.
-
-    Args:
-        root: A root directory.
-        path: A relative path to another node within the root. Must not be an
-            absolute path.
-
-    Returns:
-        A Node somewhere in the subtree of this Node.
-
-    Raises:
-        FileNotFoundError: If the given path couldn't be found within the root.
-        NotADirectoryError: If a non-terminal part of the path refers to a
-            non-directory.
-        OSError: If some other error occurs.
-        ValueError: If the given path is absolute.
-    """
-    path = pathlib.PurePath(path)
-    if path.is_absolute():
-        raise ValueError(path)
-    node: Node = root
-    for part in path.parts:
-        if node.stat().filetype != stat_lib.S_IFDIR:
-            raise mkoserror(errno.ENOTDIR)
-        cur_dir = cast(Dir, node)
-        node = cur_dir.lookup(part)
-    return node
-
-
 class Dir(Node):
     """A virtual directory."""
 
@@ -166,6 +136,34 @@ class Dir(Node):
             raise mkoserror(errno.ENOENT)
         node.parent = self
         node.name = name
+        return node
+
+    def traverse(self, path: Union[str, os.PathLike], follow_symlink=True) -> fs.Node:
+        """Recursively look up a node by path.
+
+        Args:
+            path: A relative path to another node within this Dir. Must not be an
+                absolute path.
+
+        Returns:
+            A Node somewhere in the subtree of this Dir.
+
+        Raises:
+            FileNotFoundError: If the given path couldn't be found within the root.
+            NotADirectoryError: If a non-terminal part of the path refers to a
+                non-directory.
+            OSError: If some other error occurs.
+            ValueError: If the given path is absolute.
+        """
+        path = pathlib.PurePosixPath(path)
+        if path.is_absolute():
+            raise ValueError(path)
+        node: Node = self
+        for part in path.parts:
+            if node.stat().filetype != stat_lib.S_IFDIR:
+                raise mkoserror(errno.ENOTDIR)
+            cur_dir = cast(Dir, node)
+            node = cur_dir.lookup(part)
         return node
 
     def readdir(self) -> Iterator[Dirent]:

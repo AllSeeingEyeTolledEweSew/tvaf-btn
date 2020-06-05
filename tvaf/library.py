@@ -250,4 +250,4 @@ class LibraryService:
         return Path().joinpath("v1", info_hash)
 
     def lookup_torrent(self, info_hash:str) -> fs.Node:
-        return fs.lookup(self.root, self.get_torrent_path(info_hash))
+        return self.root.traverse(self.get_torrent_path(info_hash))

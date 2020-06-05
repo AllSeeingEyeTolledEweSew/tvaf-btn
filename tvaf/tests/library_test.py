@@ -121,7 +121,7 @@ class TestLibraryService(unittest.TestCase):
     def test_get_torrent_path(self):
         for info_hash in self.torrents:
             path = self.libs.get_torrent_path(info_hash)
-            torrent_dir = fs.lookup(self.libs.root, path)
+            torrent_dir = self.libs.root.traverse(path)
             self.assert_is_dir(torrent_dir)
 
     def test_lookup_torrent(self):
@@ -136,11 +136,11 @@ class TestLibraryService(unittest.TestCase):
 
         # Test the failer doesn't interfere with torrents known to other
         # libraries
-        fs.lookup(self.libs.root, f"v1/{SINGLE.infohash}/test/i/0")
+        self.libs.root.traverse(f"v1/{SINGLE.infohash}/test/i/0")
 
         # Ensure it gets called, but correct error is thrown
         with self.assertRaises(FileNotFoundError):
-            fs.lookup(self.libs.root, f"v1/{'0'*40}")
+            self.libs.root.traverse(f"v1/{'0'*40}")
 
     def test_get_access_func_fails(self):
         def whoops(info_hash):
@@ -148,12 +148,12 @@ class TestLibraryService(unittest.TestCase):
         self.libs.get_access_funcs["whoops"] = whoops
 
         # Test the failer doesn't show up in readdir
-        torrent_dir = fs.lookup(self.libs.root, f"v1/{SINGLE.infohash}")
+        torrent_dir = self.libs.root.traverse(f"v1/{SINGLE.infohash}")
         self.assert_dirents_like(torrent_dir.readdir(), [("d", None, "test")])
 
         # Ensure it gets called, but correct error is thrown
         with self.assertRaises(FileNotFoundError):
-            fs.lookup(self.libs.root, f"v1/{SINGLE.infohash}/whoops/i/0")
+            self.libs.root.traverse(f"v1/{SINGLE.infohash}/whoops/i/0")
 
     def test_get_hints_func_fails(self):
         def whoops(info_hash, index):
@@ -161,7 +161,7 @@ class TestLibraryService(unittest.TestCase):
         self.libs.get_hints_funcs["whoops"] = whoops
 
         # Test the failer doesn't interfere with other hints
-        tfile = cast(library.TorrentFile, fs.lookup(self.libs.root,
+        tfile = cast(library.TorrentFile, self.libs.root.traverse(
             f"v1/{SINGLE.infohash}/test/i/0"))
         self.assert_torrent_file(tfile, dummy=SINGLE,
                 dummy_file=0, mime_type="text/plain")
@@ -171,12 +171,12 @@ class TestLibraryService(unittest.TestCase):
             return library.Hints(mtime=12345)
         self.libs.get_hints_funcs["mtime"] = get_mtime
 
-        tfile = cast(library.TorrentFile, fs.lookup(self.libs.root,
+        tfile = cast(library.TorrentFile, self.libs.root.traverse(
             f"v1/{SINGLE.infohash}/test/i/0"))
         self.assertEqual(tfile.hints.mtime, 12345)
         self.assertEqual(tfile.stat().mtime, 12345)
 
-        by_index = cast(fs.Dir, fs.lookup(self.libs.root, f"v1/{SINGLE.infohash}/test/i"))
+        by_index = cast(fs.Dir, self.libs.root.traverse(f"v1/{SINGLE.infohash}/test/i"))
         self.assert_dirents_like(by_index.readdir(), [("-", 12345, "0")])
 
     def test_browse(self):
@@ -185,45 +185,45 @@ class TestLibraryService(unittest.TestCase):
             SINGLE.infohash)))
         self.libs.browse_nodes["test"] = test_dir
 
-        browse = fs.lookup(self.libs.root, "browse")
+        browse = self.libs.root.traverse("browse")
         self.assert_dirents_like(browse.readdir(), [("d", None, "test")])
 
         test_dir = cast(fs.Dir, browse.lookup("test"))
         self.assert_is_dir(test_dir)
 
-        link = cast(fs.Symlink, fs.lookup(self.libs.root,
+        link = cast(fs.Symlink, self.libs.root.traverse(
             "browse/test/single"))
         self.assertEqual(str(link.readlink()), f"../../v1/{SINGLE.infohash}")
 
     def test_v1_lookup(self):
         for info_hash in self.torrents:
-            self.assert_is_dir(fs.lookup(self.libs.root, f"v1/{info_hash}"))
+            self.assert_is_dir(self.libs.root.traverse(f"v1/{info_hash}"))
 
     def test_v1_lookup_bad(self):
-        v1 = fs.lookup(self.libs.root, "v1")
+        v1 = self.libs.root.traverse("v1")
         with self.assertRaises(FileNotFoundError):
             v1.lookup("0" * 40)
 
     def test_v1_readdir(self):
-        v1 = fs.lookup(self.libs.root, "v1")
+        v1 = self.libs.root.traverse("v1")
         with self.assertRaises(OSError):
             list(v1.readdir())
 
     def test_torrent_dir_readdir(self):
         for info_hash in self.torrents:
-            torrent_dir = cast(fs.Dir, fs.lookup(self.libs.root, f"v1/{info_hash}"))
+            torrent_dir = cast(fs.Dir, self.libs.root.traverse(f"v1/{info_hash}"))
             self.assert_dirents_like(torrent_dir.readdir(), [("d", None,
                 "test")])
 
     def test_torrent_dir_lookup(self):
         for info_hash in self.torrents:
-            self.assert_is_dir(fs.lookup(self.libs.root,
+            self.assert_is_dir(self.libs.root.traverse(
                 f"v1/{info_hash}/test"))
 
     def test_torrent_dir_lookup_bad(self):
         for info_hash in self.torrents:
             with self.assertRaises(FileNotFoundError):
-                self.assert_is_dir(fs.lookup(self.libs.root,
+                self.assert_is_dir(self.libs.root.traverse(
                     f"v1/{info_hash}/does-not-exist"))
 
     def test_torrent_dir_with_no_access(self):
@@ -232,7 +232,7 @@ class TestLibraryService(unittest.TestCase):
             return {dummy.infohash: dummy}[info_hash]
         self.libs.get_layout_info_dict_funcs["dummy"] = get_info_dict
 
-        torrent_dir = fs.lookup(self.libs.root, f"v1/{dummy.infohash}")
+        torrent_dir = self.libs.root.traverse(f"v1/{dummy.infohash}")
         self.assert_dirents_like(torrent_dir.readdir(), [])
 
     def test_torrent_dir_with_redirect_access(self):
@@ -240,7 +240,7 @@ class TestLibraryService(unittest.TestCase):
             return library.Access(redirect_to="test")
         self.libs.get_access_funcs["redirect"] = get_redirect
 
-        torrent_dir = cast(fs.Dir, fs.lookup(self.libs.root,
+        torrent_dir = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{SINGLE.infohash}"))
         self.assert_dirents_like(torrent_dir.readdir(), [("l", None,
             "redirect"), ("d", None, "test")])
@@ -250,18 +250,18 @@ class TestLibraryService(unittest.TestCase):
 
     def test_access_readdir(self):
         for info_hash in self.torrents:
-            access = cast(fs.Dir, fs.lookup(self.libs.root,
+            access = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{info_hash}/test"))
             self.assert_dirents_like(access.readdir(), [("d", None, "f"), ("d",
                 None, "i")])
 
     def test_access_lookup(self):
         for info_hash in self.torrents:
-            self.assert_is_dir(fs.lookup(self.libs.root, f"v1/{info_hash}/test/f"))
-            self.assert_is_dir(fs.lookup(self.libs.root, f"v1/{info_hash}/test/i"))
+            self.assert_is_dir(self.libs.root.traverse(f"v1/{info_hash}/test/f"))
+            self.assert_is_dir(self.libs.root.traverse(f"v1/{info_hash}/test/i"))
 
     def test_by_path_single(self):
-        by_path = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_path = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{SINGLE.infohash}/test/f"))
 
         self.assert_dirents_like(by_path.readdir(), [("l", None, "test.txt")])
@@ -271,7 +271,7 @@ class TestLibraryService(unittest.TestCase):
         self.assertEqual(str(link.readlink()), "../i/0")
 
     def test_by_index_single(self):
-        by_index = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_index = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{SINGLE.infohash}/test/i"))
 
         self.assert_dirents_like(by_index.readdir(), [("-", None, "0")])
@@ -281,7 +281,7 @@ class TestLibraryService(unittest.TestCase):
                 dummy_file=0, mime_type="text/plain")
 
     def test_by_path_multi(self):
-        by_path = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_path = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{MULTI.infohash}/test/f"))
 
         self.assert_dirents_like(by_path.readdir(), [("d", None, "multi")])
@@ -301,7 +301,7 @@ class TestLibraryService(unittest.TestCase):
         self.assertEqual(str(link.readlink()), "../../i/1")
 
     def test_by_index_multi(self):
-        by_index = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_index = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{MULTI.infohash}/test/i"))
 
         self.assert_dirents_like(by_index.readdir(), [("-", None, "0"), ("-",
@@ -319,7 +319,7 @@ class TestLibraryService(unittest.TestCase):
     def test_conflict_file(self):
         # Don't test by-path directory, as its contents are undefined. Do test
         # that the by-index path still holds file references.
-        by_index = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_index = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{CONFLICT_FILE.infohash}/test/i"))
 
         self.assert_dirents_like(by_index.readdir(), [("-", None, "0"), ("-",
@@ -333,7 +333,7 @@ class TestLibraryService(unittest.TestCase):
     def test_conflict_file_dir(self):
         # Don't test by-path directory, as its contents are undefined. Do test
         # that the by-index path still holds file references.
-        by_index = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_index = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{CONFLICT_FILE_DIR.infohash}/test/i"))
 
         self.assert_dirents_like(by_index.readdir(), [("-", None, "0"), ("-",
@@ -347,7 +347,7 @@ class TestLibraryService(unittest.TestCase):
     def test_conflict_dir_file(self):
         # Don't test by-path directory, as its contents are undefined. Do test
         # that the by-index path still holds file references.
-        by_index = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_index = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{CONFLICT_DIR_FILE.infohash}/test/i"))
 
         self.assert_dirents_like(by_index.readdir(), [("-", None, "0"), ("-",
@@ -361,11 +361,11 @@ class TestLibraryService(unittest.TestCase):
     def test_bad_paths(self):
         # All paths in BAD_PATHS are bad, so the by-path directory should be
         # empty.
-        by_path = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_path = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{BAD_PATHS.infohash}/test/f"))
         self.assert_dirents_like(by_path.readdir(), [])
 
-        by_index = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_index = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{BAD_PATHS.infohash}/test/i"))
 
         # Ensure we can still access files by index.
@@ -378,12 +378,12 @@ class TestLibraryService(unittest.TestCase):
                     dummy_file=i)
 
     def test_padded(self):
-        by_path = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_path = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{PADDED.infohash}/test/f/padded"))
         self.assert_dirents_like(by_path.readdir(), [("l", None,
             "file.tar.gz"), ("l", None, "info.nfo")])
 
-        by_index = cast(fs.Dir, fs.lookup(self.libs.root,
+        by_index = cast(fs.Dir, self.libs.root.traverse(
             f"v1/{PADDED.infohash}/test/i"))
 
         # Ensure we can still access files by index.

@@ -7,8 +7,7 @@ import pathlib
 from tvaf import fs
 
 
-class TestLookup(unittest.TestCase):
-    """Tests for tvaf.fs.lookup()."""
+class TestTraverse(unittest.TestCase):
 
     def setUp(self):
         self.root = fs.StaticDir()
@@ -18,32 +17,32 @@ class TestLookup(unittest.TestCase):
         self.directory.mkchild("file", self.file)
 
     def test_empty(self):
-        self.assertIs(fs.lookup(self.root, ""), self.root)
+        self.assertIs(self.root.traverse(""), self.root)
         self.assertIsNone(self.root.parent)
         self.assertIsNone(self.root.name)
 
     def test_directory(self):
-        self.assertIs(fs.lookup(self.root, "directory"), self.directory)
+        self.assertIs(self.root.traverse("directory"), self.directory)
         self.assertIs(self.directory.parent, self.root)
         self.assertEqual(self.directory.name, "directory")
 
     def test_file(self):
-        self.assertIs(fs.lookup(self.root, "directory/file"), self.file)
+        self.assertIs(self.root.traverse("directory/file"), self.file)
         self.assertIs(self.directory.parent, self.root)
         self.assertEqual(self.directory.name, "directory")
         self.assertIs(self.file.parent, self.directory)
         self.assertEqual(self.file.name, "file")
 
     def test_normalize(self):
-        self.assertIs(fs.lookup(self.root, "directory//file/"), self.file)
+        self.assertIs(self.root.traverse("directory//file/"), self.file)
 
     def test_not_found(self):
         with self.assertRaises(FileNotFoundError):
-            fs.lookup(self.root, "does_not_exist")
+            self.root.traverse("does_not_exist")
 
     def test_not_dir(self):
         with self.assertRaises(NotADirectoryError):
-            fs.lookup(self.root, "directory/file/subpath")
+            self.root.traverse("directory/file/subpath")
 
 
 class TestFile(unittest.TestCase):
@@ -170,8 +169,8 @@ class TestSymlink(unittest.TestCase):
 
     def test_obj_target(self):
         # Ensure lookup
-        fs.lookup(self.root, "dir1/symlink")
-        fs.lookup(self.root, "dir2/file")
+        self.root.traverse("dir1/symlink")
+        self.root.traverse("dir2/file")
         self.symlink.target = self.file
         self.assertEqual(self.symlink.readlink(),
                 pathlib.PurePath("../dir2/file"))

@@ -185,7 +185,7 @@ class _V1Torrent(fs.Dir):
 class _V1(fs.Dir):
 
     def __init__(self, libs:LibraryService):
-        super().__init__()
+        super().__init__(perms=0o444)
         self.libs = libs
 
     def get_node(self, info_hash: str) -> Optional[fs.Node]:

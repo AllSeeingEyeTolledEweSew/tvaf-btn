@@ -44,6 +44,12 @@ class TestTraverse(unittest.TestCase):
         with self.assertRaises(NotADirectoryError):
             self.root.traverse("directory/file/subpath")
 
+    def test_absolute(self):
+        self.assertIs(self.root.traverse("/directory/file"), self.file)
+
+    def test_absolute_from_subdir(self):
+        self.assertIs(self.directory.traverse("/directory/file"), self.file)
+
 
 class TestFile(unittest.TestCase):
     """Tests for tvaf.fs.File."""

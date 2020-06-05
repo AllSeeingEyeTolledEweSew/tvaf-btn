@@ -153,12 +153,13 @@ class Dir(Node):
             NotADirectoryError: If a non-terminal part of the path refers to a
                 non-directory.
             OSError: If some other error occurs.
-            ValueError: If the given path is absolute.
         """
+        node:Node = self
         path = pathlib.PurePosixPath(path)
         if path.is_absolute():
-            raise ValueError(path)
-        node: Node = self
+            while node.parent is not None:
+                node = node.parent
+            path = path.relative_to("/")
         for part in path.parts:
             if node.stat().filetype != stat_lib.S_IFDIR:
                 raise mkoserror(errno.ENOTDIR)

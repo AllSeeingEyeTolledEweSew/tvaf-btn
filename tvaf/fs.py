@@ -40,8 +40,17 @@ class Stat:
     """
     filetype: int = 0
     size: int = 0
-    perms: Optional[int] = None
+    perms: int = -1
     mtime: Optional[int] = None
+
+    def __post_init__(self):
+        if self.perms == -1:
+            if self.filetype == stat_lib.S_IFDIR:
+                self.perms = 0o555
+            elif self.filetype == stat_lib.S_IFLNK:
+                self.perms = 0o777
+            else:
+                self.perms = 0o444
 
 
 @dataclasses.dataclass

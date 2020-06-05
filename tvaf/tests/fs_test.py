@@ -62,6 +62,20 @@ class TestFile(unittest.TestCase):
         self.assertIs(stat.perms, None)
 
 
+class TestGetRoot(unittest.TestCase):
+
+    def setUp(self):
+        self.dir = fs.StaticDir()
+        self.inner = fs.Dir()
+        self.dir.mkchild("inner", self.inner)
+
+    def test_root_from_root(self):
+        self.assertIs(self.dir.get_root(), self.dir)
+
+    def test_root_from_inner(self):
+        self.assertIs(self.inner.get_root(), self.dir)
+
+
 class TestDir(unittest.TestCase):
     """Tests for tvaf.fs.Dir."""
 

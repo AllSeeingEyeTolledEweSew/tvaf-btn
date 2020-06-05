@@ -138,6 +138,12 @@ class Dir(Node):
         node.name = name
         return node
 
+    def get_root(self) -> Dir:
+        cur = self
+        while cur.parent:
+            cur = cur.parent
+        return cur
+
     def traverse(self, path: Union[str, os.PathLike], follow_symlink=True) -> fs.Node:
         """Recursively look up a node by path.
 
@@ -157,8 +163,7 @@ class Dir(Node):
         node:Node = self
         path = pathlib.PurePosixPath(path)
         if path.is_absolute():
-            while node.parent is not None:
-                node = node.parent
+            node = self.get_root()
             path = path.relative_to("/")
         for part in path.parts:
             if node.stat().filetype != stat_lib.S_IFDIR:

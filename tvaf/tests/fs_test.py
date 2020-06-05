@@ -54,6 +54,7 @@ class TestFile(unittest.TestCase):
         self.assertEqual(stat.filetype, stat_lib.S_IFREG)
         self.assertEqual(stat.size, 0)
         self.assertIs(stat.mtime, None)
+        self.assertIs(stat.perms, None)
 
 
 class TestDir(unittest.TestCase):

@@ -40,6 +40,7 @@ class Stat:
     """
     filetype: int = 0
     size: int = 0
+    perms: Optional[int] = None
     mtime: Optional[int] = None
 
 
@@ -79,11 +80,13 @@ class Node:
                  parent: Dir=None,
                  name: str = None,
                  filetype: int = None,
+                 perms: int = None,
                  size: int = None,
                  mtime: int = None):
         self.name = name
         self.parent = parent
         self.filetype = filetype
+        self.perms = perms
         self.size = size
         self.mtime = mtime
 
@@ -91,7 +94,7 @@ class Node:
         """Returns a minimalist Stat for this node."""
         assert self.filetype is not None
         assert self.size is not None
-        return Stat(filetype=self.filetype, size=self.size, mtime=self.mtime)
+        return Stat(filetype=self.filetype, perms=self.perms, size=self.size, mtime=self.mtime)
 
 
 def lookup(root: Dir, path: Union[os.PathLike, str]) -> Node:
@@ -127,14 +130,14 @@ def lookup(root: Dir, path: Union[os.PathLike, str]) -> Node:
 class Dir(Node):
     """A virtual directory."""
 
-    def __init__(self, *, mtime: int = None, size: int = 0):
-        super().__init__(filetype=stat_lib.S_IFDIR, mtime=mtime, size=size)
+    def __init__(self, *, perms:int = None, mtime: int = None, size: int = 0):
+        super().__init__(filetype=stat_lib.S_IFDIR, perms=perms, mtime=mtime, size=size)
 
     def stat(self) -> Stat:
         """Returns a default Stat for this node, with current mtime."""
         assert self.filetype is not None
         assert self.size is not None
-        return Stat(filetype=self.filetype, size=self.size, mtime=self.mtime)
+        return Stat(filetype=self.filetype, perms=self.perms, size=self.size, mtime=self.mtime)
 
     def get_node(self, name:str) -> Optional[Node]:
         raise mkoserror(errno.ENOSYS)
@@ -190,8 +193,8 @@ class StaticDir(DictDir):
         children: A name-to-Node dictionary.
     """
 
-    def __init__(self, *, mtime: int = None):
-        super().__init__(mtime=mtime)
+    def __init__(self, *, mtime: int = None, perms:int = None):
+        super().__init__(mtime=mtime, perms=perms)
         self.children: Dict[str, Node] = {}
 
     def mkchild(self, name:str, node: Node):
@@ -213,16 +216,16 @@ class File(Node):
     Reading other files isn't currently implemented.
     """
 
-    def __init__(self, *, size: int = None, mtime: int = None):
-        super().__init__(filetype=stat_lib.S_IFREG, size=size, mtime=mtime)
+    def __init__(self, *, perms:int=None, size: int = None, mtime: int = None):
+        super().__init__(filetype=stat_lib.S_IFREG, perms=perms, size=size, mtime=mtime)
 
 SymlinkTarget = Union[str, os.PathLike, Node]
 
 
 class Symlink(Node):
 
-    def __init__(self, *, target:SymlinkTarget=None, mtime:int=None):
-        super().__init__(filetype=stat_lib.S_IFLNK, mtime=mtime, size=0)
+    def __init__(self, *, target:SymlinkTarget=None, perms:int=None, mtime:int=None):
+        super().__init__(filetype=stat_lib.S_IFLNK, perms=perms, mtime=mtime, size=0)
         self.target = target
 
     def readlink(self) -> pathlib.PurePath:

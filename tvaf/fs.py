@@ -17,6 +17,8 @@ import stat as stat_lib
 import pathlib
 from typing import Any
 from typing import Dict
+from typing import Tuple
+from typing import List
 from typing import Iterator
 from typing import Optional
 from typing import cast
@@ -106,13 +108,14 @@ class Node:
     def stat(self) -> Stat:
         """Returns a minimalist Stat for this node."""
         assert self.filetype is not None
-        return Stat(filetype=self.filetype, perms=self.perms, size=self.size or
+        return Stat(filetype=self.filetype, perms=self.perms or 0, size=self.size or
                 0, mtime=self.mtime)
 
     def abspath(self) -> Path:
         parts : List[str] = []
         node = self
         while node.parent:
+            assert node.name is not None
             parts.append(node.name)
             node = node.parent
         return Path("/").joinpath(*reversed(parts))
@@ -126,7 +129,7 @@ def _partial_traverse(cur_dir:Dir, path:Path, follow_symlinks=True) -> Tuple[Nod
             cur_dir = cur_dir.get_root()
             path = path.relative_to("/")
 
-        node = cur_dir
+        node:Node = cur_dir
         for i, part in enumerate(path.parts):
             # If we fail before lookup, our remainder includes the current part
             # we failed to lookup.
@@ -154,20 +157,20 @@ def _partial_traverse(cur_dir:Dir, path:Path, follow_symlinks=True) -> Tuple[Nod
             if i == len(path.parts) - 1 and depth == 0 and not follow_symlinks:
                 continue
 
-            if node in seen_symlink:
-                if seen_symlink[node] is not None:
-                    # We resolved this symlink already. Use the cached
-                    # value to save recursive calls and node construction.
-                    node = seen_symlink[node]
-                    continue
-                else:
-                    # We are trying to resolve this symlink somewhere in
-                    # our call stack. We reached it again, so we're in a
-                    # symlink loop.
-                    return node, rest(), mkoserror(errno.ELOOP)
-
             if node.stat().filetype == stat_lib.S_IFLNK:
                 symlink = cast(Symlink, node)
+                if symlink in seen_symlink:
+                    maybe_node = seen_symlink.get(symlink)
+                    if maybe_node is not None:
+                        # We resolved this symlink already. Use the cached
+                        # value to save recursive calls and node construction.
+                        node = maybe_node
+                        continue
+                    else:
+                        # We are trying to resolve this symlink somewhere in
+                        # our call stack. We reached it again, so we're in a
+                        # symlink loop.
+                        return symlink, rest(), mkoserror(errno.ELOOP)
                 seen_symlink[symlink] = None
 
                 # Optimization: if symlink.target is a Node, we can use it
@@ -178,9 +181,9 @@ def _partial_traverse(cur_dir:Dir, path:Path, follow_symlinks=True) -> Tuple[Nod
                     return symlink, rest(), e
 
                 # Recurse into the symlink.
-                node, inner_rest, e = inner(cur_dir, target, depth + 1)
-                if e:
-                    return node, inner_rest.joinpath(rest()), e
+                node, inner_rest, exc = inner(cur_dir, target, depth + 1)
+                if exc:
+                    return node, inner_rest.joinpath(rest()), exc
                 seen_symlink[symlink] = node
 
         # Success
@@ -199,7 +202,7 @@ class Dir(Node):
         """Returns a default Stat for this node, with current mtime."""
         assert self.filetype is not None
         assert self.size is not None
-        return Stat(filetype=self.filetype, perms=self.perms, size=self.size, mtime=self.mtime)
+        return Stat(filetype=self.filetype, perms=self.perms or 0, size=self.size, mtime=self.mtime)
 
     def get_node(self, name:str) -> Optional[Node]:
         raise mkoserror(errno.ENOSYS)
@@ -227,7 +230,7 @@ class Dir(Node):
             cur = cur.parent
         return cur
 
-    def traverse(self, path: PathLike, follow_symlinks=True) -> fs.Node:
+    def traverse(self, path: PathLike, follow_symlinks=True) -> Node:
         """Recursively look up a node by path.
 
         Args:
@@ -257,12 +260,13 @@ class Dir(Node):
         base: Optional[Dir] = self
         ups :List[str] = []
         while base:
-            node = other
+            node:Optional[Node] = other
             rparts :List[str] = []
             while node:
                 if node is base:
                     return Path().joinpath(*ups).joinpath(*reversed(rparts))
-                rparts.append(node.name)
+                if node.name is not None:
+                    rparts.append(node.name)
                 node = node.parent
             ups.append("..")
             base = base.parent
@@ -339,12 +343,15 @@ class Symlink(Node):
 
     def stat(self) -> Stat:
         """Returns a minimalist Stat for this node."""
-        return Stat(filetype=self.filetype, perms=self.perms,
+        assert self.filetype is not None
+        return Stat(filetype=self.filetype, perms=self.perms or 0,
                 size=len(str(self.readlink())), mtime=self.mtime)
 
     def readlink(self) -> Path:
         if self.target is None:
             raise mkoserror(errno.ENOSYS)
         if isinstance(self.target, Node):
+            if self.parent is None:
+                raise mkoserror(errno.ENOSYS)
             return self.parent.path_to(self.target)
         return Path(os.fspath(self.target))

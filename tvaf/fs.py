@@ -23,6 +23,10 @@ from typing import cast
 from typing import Union
 
 
+Path = pathlib.PurePosixPath
+PathLike = Union[str, Path]
+
+
 def mkoserror(code: int, *args: Any) -> OSError:
     """Returns OSError with a proper error message."""
     return OSError(code, os.strerror(code), *args)
@@ -102,8 +106,87 @@ class Node:
     def stat(self) -> Stat:
         """Returns a minimalist Stat for this node."""
         assert self.filetype is not None
-        assert self.size is not None
-        return Stat(filetype=self.filetype, perms=self.perms, size=self.size, mtime=self.mtime)
+        return Stat(filetype=self.filetype, perms=self.perms, size=self.size or
+                0, mtime=self.mtime)
+
+    def abspath(self) -> Path:
+        parts : List[str] = []
+        node = self
+        while node.parent:
+            parts.append(node.name)
+            node = node.parent
+        return Path("/").joinpath(*reversed(parts))
+
+
+def _partial_traverse(cur_dir:Dir, path:Path, follow_symlinks=True) -> Tuple[Node, Path, Optional[OSError]]:
+    seen_symlink:Dict[Symlink, Optional[Node]] = {}
+
+    def inner(cur_dir:Dir, path:Path, depth:int) -> Tuple[Node, Path, Optional[OSError]]:
+        if path.is_absolute():
+            cur_dir = cur_dir.get_root()
+            path = path.relative_to("/")
+
+        node = cur_dir
+        for i, part in enumerate(path.parts):
+            # If we fail before lookup, our remainder includes the current part
+            # we failed to lookup.
+            rest = lambda: Path().joinpath(*path.parts[i:])
+
+            if node.stat().filetype != stat_lib.S_IFDIR:
+                return node, rest(), mkoserror(errno.ENOTDIR)
+
+            cur_dir = cast(Dir, node)
+            if part == "..":
+                if cur_dir.parent:
+                    node = cur_dir.parent
+            else:
+                try:
+                    node = cur_dir.lookup(part)
+                except OSError as e:
+                    return cur_dir, rest(), e
+
+            # We looked up the next node. From here on, our remainder is
+            # whatever we would lookup after this.
+            rest = lambda: Path().joinpath(*path.parts[i + 1:])
+
+            # Only do symlink lookup for the final path component if
+            # follow_symlinks=True.
+            if i == len(path.parts) - 1 and depth == 0 and not follow_symlinks:
+                continue
+
+            if node in seen_symlink:
+                if seen_symlink[node] is not None:
+                    # We resolved this symlink already. Use the cached
+                    # value to save recursive calls and node construction.
+                    node = seen_symlink[node]
+                    continue
+                else:
+                    # We are trying to resolve this symlink somewhere in
+                    # our call stack. We reached it again, so we're in a
+                    # symlink loop.
+                    return node, rest(), mkoserror(errno.ELOOP)
+
+            if node.stat().filetype == stat_lib.S_IFLNK:
+                symlink = cast(Symlink, node)
+                seen_symlink[symlink] = None
+
+                # Optimization: if symlink.target is a Node, we can use it
+                # directly, but we must still recurse to check for loops.
+                try:
+                    target = symlink.readlink()
+                except OSError as e:
+                    return symlink, rest(), e
+
+                # Recurse into the symlink.
+                node, inner_rest, e = inner(cur_dir, target, depth + 1)
+                if e:
+                    return node, inner_rest.joinpath(rest()), e
+                seen_symlink[symlink] = node
+
+        # Success
+        return node, Path(), None
+
+    return inner(cur_dir, path, 0)
 
 
 class Dir(Node):
@@ -144,7 +227,7 @@ class Dir(Node):
             cur = cur.parent
         return cur
 
-    def traverse(self, path: Union[str, os.PathLike], follow_symlink=True) -> fs.Node:
+    def traverse(self, path: PathLike, follow_symlinks=True) -> fs.Node:
         """Recursively look up a node by path.
 
         Args:
@@ -160,17 +243,30 @@ class Dir(Node):
                 non-directory.
             OSError: If some other error occurs.
         """
-        node:Node = self
-        path = pathlib.PurePosixPath(path)
-        if path.is_absolute():
-            node = self.get_root()
-            path = path.relative_to("/")
-        for part in path.parts:
-            if node.stat().filetype != stat_lib.S_IFDIR:
-                raise mkoserror(errno.ENOTDIR)
-            cur_dir = cast(Dir, node)
-            node = cur_dir.lookup(part)
+        node, rest, e = _partial_traverse(self, Path(path),
+                follow_symlinks=follow_symlinks)
+        if e:
+            raise e
         return node
+
+    def realpath(self, path: PathLike) -> Path:
+        node, rest, _ = _partial_traverse(self, Path(path))
+        return node.abspath().joinpath(rest)
+
+    def path_to(self, other:Node) -> Path:
+        base: Optional[Dir] = self
+        ups :List[str] = []
+        while base:
+            node = other
+            rparts :List[str] = []
+            while node:
+                if node is base:
+                    return Path().joinpath(*ups).joinpath(*reversed(rparts))
+                rparts.append(node.name)
+                node = node.parent
+            ups.append("..")
+            base = base.parent
+        raise mkoserror(errno.ENOSYS)
 
     def readdir(self) -> Iterator[Dirent]:
         """List the contents of a directory.
@@ -241,27 +337,14 @@ class Symlink(Node):
         super().__init__(filetype=stat_lib.S_IFLNK, perms=perms, mtime=mtime, size=0)
         self.target = target
 
-    def readlink(self) -> pathlib.PurePath:
+    def stat(self) -> Stat:
+        """Returns a minimalist Stat for this node."""
+        return Stat(filetype=self.filetype, perms=self.perms,
+                size=len(str(self.readlink())), mtime=self.mtime)
+
+    def readlink(self) -> Path:
         if self.target is None:
             raise mkoserror(errno.ENOSYS)
         if isinstance(self.target, Node):
-            base = self.parent
-            parts = []
-            while base is not None:
-                node:Optional[Node] = self.target
-                rparts = []
-                while node and (node is not base):
-                    if not node.name:
-                        break
-                    rparts.append(node.name)
-                    node = node.parent
-                if node is base:
-                    break
-                parts.append("..")
-                base = base.parent
-            if base is None:
-                raise mkoserror(errno.ENOSYS)
-            rparts.reverse()
-            parts += rparts
-            return pathlib.PurePath().joinpath(*parts)
-        return pathlib.PurePath(os.fspath(self.target))
+            return self.parent.path_to(self.target)
+        return Path(os.fspath(self.target))

@@ -192,7 +192,7 @@ class TestLibraryService(unittest.TestCase):
         self.assert_is_dir(test_dir)
 
         link = cast(fs.Symlink, self.libs.root.traverse(
-            "browse/test/single"))
+            "browse/test/single", follow_symlinks=False))
         self.assertEqual(str(link.readlink()), f"../../v1/{SINGLE.infohash}")
 
     def test_v1_lookup(self):

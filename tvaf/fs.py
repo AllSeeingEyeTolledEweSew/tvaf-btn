@@ -120,6 +120,15 @@ class Node:
             node = node.parent
         return Path("/").joinpath(*reversed(parts))
 
+    def is_file(self):
+        return self.stat().filetype == stat_lib.S_IFREG
+
+    def is_dir(self):
+        return self.stat().filetype == stat_lib.S_IFDIR
+
+    def is_link(self):
+        return self.stat().filetype == stat_lib.S_IFLNK
+
 
 def _partial_traverse(cur_dir:Dir, path:Path, follow_symlinks=True) -> Tuple[Node, Path, Optional[OSError]]:
     seen_symlink:Dict[Symlink, Optional[Node]] = {}
@@ -135,7 +144,7 @@ def _partial_traverse(cur_dir:Dir, path:Path, follow_symlinks=True) -> Tuple[Nod
             # we failed to lookup.
             rest = lambda: Path().joinpath(*path.parts[i:])
 
-            if node.stat().filetype != stat_lib.S_IFDIR:
+            if not node.is_dir():
                 return node, rest(), mkoserror(errno.ENOTDIR)
 
             cur_dir = cast(Dir, node)
@@ -157,7 +166,7 @@ def _partial_traverse(cur_dir:Dir, path:Path, follow_symlinks=True) -> Tuple[Nod
             if i == len(path.parts) - 1 and depth == 0 and not follow_symlinks:
                 continue
 
-            if node.stat().filetype == stat_lib.S_IFLNK:
+            if node.is_link():
                 symlink = cast(Symlink, node)
                 if symlink in seen_symlink:
                     maybe_node = seen_symlink.get(symlink)

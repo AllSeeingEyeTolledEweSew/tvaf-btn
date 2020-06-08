@@ -174,12 +174,17 @@ class TestRealpath(unittest.TestCase):
 class TestFile(unittest.TestCase):
     """Tests for tvaf.fs.File."""
 
+    def test_file(self):
+        node = fs.File(size=0)
+        self.assertTrue(node.is_file())
+        self.assertFalse(node.is_link())
+        self.assertFalse(node.is_dir())
+
     def test_stat(self):
         stat = fs.File(size=0).stat()
         self.assertEqual(stat.filetype, stat_lib.S_IFREG)
         self.assertEqual(stat.size, 0)
         self.assertIs(stat.mtime, None)
-        self.assertIs(stat.perms, None)
 
 
 class TestGetRoot(unittest.TestCase):
@@ -213,6 +218,11 @@ class TestDir(unittest.TestCase):
 
         self.dir.get_node = get_node
         self.dir.readdir = readdir
+
+    def test_is_dir(self):
+        self.assertTrue(self.dir.is_dir())
+        self.assertFalse(self.dir.is_file())
+        self.assertFalse(self.dir.is_link())
 
     def test_stat(self):
         self.assertEqual(self.dir.filetype, stat_lib.S_IFDIR)
@@ -298,6 +308,12 @@ class TestSymlink(unittest.TestCase):
         self.dir2.mkchild("file", self.file)
         self.symlink = fs.Symlink()
         self.dir1.mkchild("symlink", self.symlink)
+
+    def test_is_link(self):
+        self.symlink.target = "."
+        self.assertTrue(self.symlink.is_link())
+        self.assertFalse(self.symlink.is_file())
+        self.assertFalse(self.symlink.is_dir())
 
     def test_no_target(self):
         with self.assertRaises(OSError):

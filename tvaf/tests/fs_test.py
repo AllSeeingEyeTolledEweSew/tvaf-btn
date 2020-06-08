@@ -186,6 +186,14 @@ class TestFile(unittest.TestCase):
         self.assertEqual(stat.size, 0)
         self.assertIs(stat.mtime, None)
 
+    def test_os_stat(self):
+        os_stat = fs.File(size=123).stat().os()
+        self.assertEqual(stat_lib.S_IFMT(os_stat.st_mode), stat_lib.S_IFREG)
+        self.assertEqual(os_stat.st_size, 123)
+
+        os_stat = fs.File(size=123, mtime=12345).stat().os()
+        self.assertEqual(os_stat.st_mtime, 12345)
+
 
 class TestGetRoot(unittest.TestCase):
 
@@ -227,6 +235,14 @@ class TestDir(unittest.TestCase):
     def test_stat(self):
         self.assertEqual(self.dir.filetype, stat_lib.S_IFDIR)
         self.assertEqual(self.dir.stat().filetype, stat_lib.S_IFDIR)
+
+    def test_os_stat(self):
+        os_stat = self.dir.stat().os()
+        self.assertEqual(stat_lib.S_IFMT(os_stat.st_mode), stat_lib.S_IFDIR)
+
+        self.dir.mtime = 12345
+        os_stat = self.dir.stat().os()
+        self.assertEqual(os_stat.st_mtime, 12345)
 
     def test_lookup(self):
         obj = self.dir.lookup("foo")

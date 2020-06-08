@@ -12,6 +12,7 @@ from __future__ import annotations
 import dataclasses
 import errno
 import os
+import time
 import os.path
 import stat as stat_lib
 import pathlib
@@ -57,6 +58,22 @@ class Stat:
                 self.perms = 0o777
             else:
                 self.perms = 0o444
+
+    def os(self):
+        st_mode = stat_lib.S_IFMT(self.filetype) | stat_lib.S_IMODE(self.perms)
+        st_ino = 0
+        st_dev = 0
+        st_nlink = 1
+        st_uid = 0
+        st_gid = 0
+        st_size = self.size
+        st_atime = 0
+        st_mtime = self.mtime
+        if st_mtime is None:
+            st_mtime = int(time.time())
+        st_ctime = st_mtime
+        return os.stat_result((st_mode, st_ino, st_dev, st_nlink, st_uid,
+            st_gid, st_size, st_atime, st_mtime, st_ctime))
 
 
 @dataclasses.dataclass

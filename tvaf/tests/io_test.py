@@ -5,10 +5,13 @@ import logging
 import os
 import os.path
 import sys
+import io
 import tempfile
+import logging
 import time
 import unittest
 import unittest.mock
+import concurrent.futures
 
 import libtorrent as lt
 
@@ -28,6 +31,7 @@ class IOServiceTestCase(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.config = Config(download_dir=self.tempdir.name)
         self.init_session()
+        self.executor = concurrent.futures.ThreadPoolExecutor()
 
     def init_session(self):
         self.session = test_utils.create_isolated_session()
@@ -36,6 +40,7 @@ class IOServiceTestCase(unittest.TestCase):
 
     def tearDown(self):
         self.tempdir.cleanup()
+        self.executor.shutdown()
 
     def pump_alerts(self, condition, msg="condition", timeout=5):
         condition_deadline = time.monotonic() + timeout
@@ -74,7 +79,7 @@ class IOServiceTestCase(unittest.TestCase):
                 chunk = req.next(timeout=0)
                 if not chunk:
                     break
-                chunks.append(chunk)
+                chunks.append(bytes(chunk))
             return not req.has_next()
 
         self.pump_alerts(read_and_check, msg=msg, timeout=timeout)
@@ -217,12 +222,12 @@ class TestRead(IOServiceTestCase):
                 chunk = req1.next(timeout=0)
                 if not chunk:
                     break
-                chunks1.append(chunk)
+                chunks1.append(bytes(chunk))
             while req2.has_next():
                 chunk = req2.next(timeout=0)
                 if not chunk:
                     break
-                chunks2.append(chunk)
+                chunks2.append(bytes(chunk))
             return not (req1.has_next() or req2.has_next())
 
         self.pump_alerts(read_and_check, msg="read all data")
@@ -567,3 +572,124 @@ class TestLoad(IOServiceTestCase):
 
         self.pump_alerts(lambda: not req.active, msg="request deactivated")
         self.assertIsNone(req.error)
+
+
+class TestBufferedTorrentIO(IOServiceTestCase):
+
+    def open(self):
+        return self.ios.open(
+            infohash=tdummy.INFOHASH, start=0, stop=tdummy.LEN,
+            get_torrent=lambda: lt.bencode(tdummy.DICT), user="tvaf")
+
+    def test_read_some(self):
+        f = self.executor.submit(self.open().read, 1024)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="read")
+        self.assertEqual(f.result(), tdummy.DATA[:1024])
+
+    def test_read_with_explicit_close(self):
+        fp = self.open()
+        f = self.executor.submit(fp.read, 1024)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="read")
+        self.assertEqual(f.result(), tdummy.DATA[:1024])
+        fp.close()
+        self.assertTrue(fp.closed)
+
+    def test_context_manager_with_read(self):
+        with self.open() as fp:
+            f = self.executor.submit(fp.read, 1024)
+            self.feed_pieces()
+            self.pump_alerts(f.done, msg="read")
+            self.assertEqual(f.result(), tdummy.DATA[:1024])
+
+    def test_read_all(self):
+        f = self.executor.submit(self.open().read)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="read")
+        self.assertEqual(f.result(), tdummy.DATA)
+
+    def test_readinto(self):
+        b = bytearray(1024)
+        f = self.executor.submit(self.open().readinto, b)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="readinto")
+        self.assertEqual(f.result(), 1024)
+        self.assertEqual(b, tdummy.DATA[:1024])
+
+    def test_read1(self):
+        f = self.executor.submit(self.open().read1)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="read1")
+        self.assertEqual(f.result(), tdummy.PIECES[0])
+
+    def test_readinto1(self):
+        b = bytearray(tdummy.LEN)
+        f = self.executor.submit(self.open().readinto1, b)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="readinto1")
+        self.assertEqual(f.result(), len(tdummy.PIECES[0]))
+        self.assertEqual(b[:len(tdummy.PIECES[0])], tdummy.PIECES[0])
+
+    def test_misc_methods(self):
+        fp = self.open()
+
+        self.assertTrue(fp.seekable())
+        self.assertTrue(fp.readable())
+        self.assertFalse(fp.writable())
+
+        with self.assertRaises(OSError):
+            fp.fileno()
+        with self.assertRaises(OSError):
+            fp.write(b"data")
+
+    def test_seek_and_read(self):
+        fp = self.open()
+
+        fp.seek(0, io.SEEK_END)
+        self.assertEqual(fp.tell(), tdummy.LEN)
+
+        fp.seek(1024)
+        self.assertEqual(fp.tell(), 1024)
+        f = self.executor.submit(fp.read, 1024)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="read")
+        self.assertEqual(f.result(), tdummy.DATA[1024:2048])
+
+    def test_second_read_buffered(self):
+        fp = self.open()
+        f = self.executor.submit(fp.read, 1024)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="read")
+        self.assertEqual(f.result(), tdummy.DATA[:1024])
+
+        # The data should be buffered, so we shouldn't need to pump_alerts
+        second = fp.read(1024)
+        self.assertEqual(second, tdummy.DATA[1024:2048])
+
+    def test_second_read_partially_buffered(self):
+        fp = self.open()
+        f = self.executor.submit(fp.read, 1024)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="first read")
+        self.assertEqual(f.result(), tdummy.DATA[:1024])
+
+        # The data should be partially buffered. We'll need to pump_alerts
+        # again.
+        f = self.executor.submit(fp.read, tdummy.PIECE_LENGTH)
+        self.pump_alerts(f.done, msg="second read")
+        self.assertEqual(f.result(), tdummy.DATA[1024:tdummy.PIECE_LENGTH + 1024])
+
+    def test_seek_resets_buffer(self):
+        fp = self.open()
+        f = self.executor.submit(fp.read, 1024)
+        self.feed_pieces()
+        self.pump_alerts(f.done, msg="first read")
+        self.assertEqual(f.result(), tdummy.DATA[:1024])
+
+        # Seek back to the start. The buffer should reset, but reads should
+        # work as normal.
+        fp.seek(0)
+        f = self.executor.submit(fp.read, 1024)
+        self.pump_alerts(f.done, msg="second read")
+        self.assertEqual(f.result(), tdummy.DATA[:1024])

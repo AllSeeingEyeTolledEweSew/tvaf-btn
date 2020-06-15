@@ -3,10 +3,13 @@
 """Data access functions for tvaf."""
 from __future__ import annotations
 
+import io
 import collections
+import collections.abc
 import dataclasses
 import enum
 import logging
+import mmap
 import math
 import random
 import re
@@ -17,6 +20,8 @@ from typing import Callable
 from typing import Dict
 from typing import Iterable
 from typing import List
+from typing import Sequence
+from typing import Union
 from typing import Optional
 from typing import Set
 from typing import SupportsFloat
@@ -49,11 +54,14 @@ def _raise_notimplemented():
     raise NotImplementedError
 
 
+GetTorrent = Callable[[], bytes]
+
+
 @dataclasses_json.dataclass_json
 @dataclasses.dataclass(frozen=True)
 class RequestParams:
     infohash: str = ""
-    get_torrent: Callable[[], bytes] = _raise_notimplemented
+    get_torrent: GetTorrent = _raise_notimplemented
     start: int = 0
     stop: int = 0
     acct_params: Any = None
@@ -72,6 +80,48 @@ class RequestParams:
         if not _SHA1_REGEX.match(self.infohash):
             raise Error(f"invalid infohash: {self.infohash}", code=400)
         super().__setattr__("infohash", self.infohash.lower())
+
+
+_MemoryViewTarget = Union[bytes, bytearray, memoryview]
+
+@dataclasses.dataclass(frozen=True)
+class MemoryView(collections.abc.ByteString):
+    # This would be memoryview, if we could access the bounds within the
+    # backing object. BufferedTorrentIO would like to reuse the underlying
+    # object as its buffer.
+    obj: _MemoryViewTarget = b""
+    start: int = 0
+    stop: int =0
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            start, stop, step = index.indices(len(self))
+            if step != 1:
+                raise NotImplementedError
+            start += self.start
+            stop += self.start
+            # The "full" slice is a common case when reading
+            if (start, stop) == (self.start, self.stop):
+                return self
+            return self.__class__(obj=self.obj, start=start, stop=stop)
+        elif isinstance(index, int):
+            # Not sure if I should use __index__ instead of isinstance(...,int)
+            if index >= len(self):
+                raise IndexError()
+            return self.obj[index % len(self)]
+
+    def __len__(self):
+        return self.stop - self.start
+
+    def __bytes__(self) -> bytes:
+        return self.to_memoryview().tobytes()
+
+    def to_memoryview(self) -> memoryview:
+        return memoryview(self.obj)[self.start:self.stop]
+
+
+# Singleton empty MemoryView, to save a malloc
+_EMPTY = MemoryView()
 
 
 class Request:
@@ -122,7 +172,7 @@ class Request:
         self._start_piece = 0
         self._stop_piece = 0
 
-        self._chunks: Dict[int, bytes] = dict()
+        self._chunks: Dict[int, MemoryView] = dict()
         self._read_offset = params.start
         self._read_outstanding = params.stop - params.start
 
@@ -205,7 +255,7 @@ class Request:
     def _add_piece(self, offset: int, piece: bytes):
         assert self.params.mode == RequestMode.READ
         start, stop = self._clamp(offset, offset + len(piece))
-        chunk = piece[start - offset:stop - offset]
+        chunk = MemoryView(piece, start - offset, stop - offset)
         if not chunk:
             return
         with self._condition:
@@ -223,7 +273,7 @@ class Request:
         with self._condition:
             return self._read_offset < self.params.stop
 
-    def next(self, timeout: Optional[float] = None):
+    def next(self, timeout: Optional[float] = None) -> MemoryView:
         assert self.params.mode == RequestMode.READ
         with self._condition:
             assert self.has_next()
@@ -242,7 +292,175 @@ class Request:
                 chunk = self._chunks.pop(self._read_offset)
                 self._read_offset += len(chunk)
                 return chunk
-            return b""
+            return _EMPTY
+
+
+ReadintoTarget = Union[bytearray, mmap.mmap, memoryview]
+
+
+class BufferedTorrentIO(io.BufferedIOBase):
+    # We only implement a BufferedIOBase instead of a BufferedReader around a
+    # "raw" IOBase. BufferedReader reads zero-aligned blocks, and trusts the
+    # caller to specify a good block size. But torrent pieces are much larger
+    # than the typical buffer size and often not zero-aligned.
+
+    # To back up the above claim: I surveyed torrents on BTN, and found 40%
+    # have piece size of 1mb or 2mb; and only 1 uses bep47 padding, which
+    # indicates most files in multi-file torrents are piece-misaligned.
+
+    def __init__(self, *, io_service:IOService=None, infohash:str=None,
+            start:int=None, stop:int=None, get_torrent:GetTorrent=None,
+            user:str=None):
+        assert io_service is not None
+        assert infohash is not None
+        assert start is not None
+        assert stop is not None
+        assert get_torrent is not None
+        assert user is not None
+        self._io_service = io_service
+        self._infohash = infohash
+        self._start = start
+        self._stop = stop
+        self._get_torrent = get_torrent
+        self._user = user
+
+        self._read_lock = threading.RLock()
+        self._offset = 0
+        self._buffer = _EMPTY
+
+    def seekable(self):
+        return True
+
+    def seek(self, offset:int, whence:int=io.SEEK_SET) -> int:
+        with self._read_lock:
+            if whence == io.SEEK_SET:
+                pass
+            elif whence == io.SEEK_CUR:
+                offset += self._offset
+            elif whence == io.SEEK_END:
+                offset += self._stop - self._start
+            else:
+                raise ValueError("Invalid value for whence: %s" % whence)
+
+            if offset != self._offset:
+                # TODO: maybe update readahead logic
+                self._buffer = _EMPTY
+                self._offset = offset
+
+            return self._offset
+
+    def close(self):
+        # TODO: maybe cancel readaheads
+        return super().close()
+
+    def readable(self):
+        return True
+
+    def readvec(self, size:int=-1) -> Sequence[memoryview]:
+        with self._read_lock:
+            return self._readvec_unlocked(size, False)
+
+    def readvec1(self, size:int=-1) -> Sequence[memoryview]:
+        with self._read_lock:
+            return self._readvec_unlocked(size, True)
+
+    def read(self, size:int=None) -> bytes:
+        if size is None:
+            size = -1
+        # This copies twice. Is there a better way?
+        return b"".join(v.tobytes() for v in self.readvec(size))
+
+    def read1(self, size:int=-1) -> bytes:
+        # This copies twice. Is there a better way?
+        return b"".join(v.tobytes() for v in self.readvec1(size))
+
+    def _readvec_unlocked(self, size:int, read1:bool) -> Sequence[memoryview]:
+        # Readahead notes:
+        #  - mediainfo http://...mkv
+        #    - requests whole file, drops connection when probe is done
+        #    - then does range requests, dropping connection on some
+        #  - ffprobe -i http://...mkv
+        #    - does only range requests
+        #    - drops connection on most
+        result:List[memoryview] = []
+
+        # By convention, negative size means read all
+        if size < 0:
+            size = self._stop - self._offset
+
+        # Clamp size
+        size = min(self._stop - self._offset, size)
+
+        # Consume the buffer
+        if self._buffer and size > 0:
+            amount = min(len(self._buffer), size)
+            result.append(self._buffer[:amount].to_memoryview())
+            self._buffer = self._buffer[amount:]
+            self._offset += amount
+            size -= amount
+
+        if size == 0:
+            return result
+
+        # We've consumed the entire buffer, but still need to read more.
+
+        if read1:
+            if result:
+                return result
+            # Only request one byte, which will read exactly one piece.
+            stop = self._offset + 1
+        else:
+            stop = self._offset + size
+
+        # Submit a new request.
+        request = self._io_service.add_request(
+                infohash=self._infohash, get_torrent=self._get_torrent,
+                start=self._offset, stop=stop,
+                acct_params=self._user, mode=RequestMode.READ)
+
+        chunk = _EMPTY
+        while request.has_next():
+            # TODO: timeouts
+            chunk = request.next()
+            if read1:
+                # We requested a 1-byte read. Now expand the chunk, up to the
+                # requested size.
+                stop = chunk.start + min(size, len(chunk.obj) - chunk.start)
+                chunk = MemoryView(obj=chunk.obj, start=chunk.start, stop=stop)
+            result.append(chunk.to_memoryview())
+            self._offset += len(chunk)
+            size -= len(chunk)
+
+        # Save the "leftovers" from the final chunk as our buffer
+        self._buffer = MemoryView(obj=chunk.obj, start=chunk.stop,
+                stop=len(chunk.obj))
+
+        return result
+
+    def readinto(self, out:ReadintoTarget) -> int:
+        return self._readinto(out, False)
+
+    def readinto1(self, out:ReadintoTarget) -> int:
+        return self._readinto(out, True)
+
+    def _readinto(self, out:ReadintoTarget, read1:bool) -> int:
+        if isinstance(out, memoryview):
+            out = out.cast("B")
+
+        with self._read_lock:
+            vec = self._readvec_unlocked(len(out), read1)
+
+        offset = 0
+        for buf in vec:
+            buflen = len(buf)
+            out[offset:offset + buflen] = buf
+            offset += buflen
+        return offset
+
+    # IOBase.readline() checks if peek exists. We could implement it for faster
+    # readline
+
+    # IOBase.fileno() raises OSError, as appropriate
 
 
 # The lifecycle of _Torrent objects has subtle motivation and I keep confusing
@@ -871,7 +1089,7 @@ class _Torrent:
 
     def _maybe_async_fetch_torrent_info(self):
 
-        def fetch(get_torrent:Callable[[], bytes]):
+        def fetch(get_torrent:GetTorrent):
             torrent_info: Optional[lt.torrent_info] = None
             error: Optional[ErrorValue] = None
             try:
@@ -1080,6 +1298,16 @@ class IOService:
             self._post_torrent_updates_deadline = math.inf
             self._tick_deadline = math.inf
 
+    def open(self, *, infohash:str=None, start:int=None, stop:int=None,
+            get_torrent:GetTorrent=None, user:str=None) -> io.BufferedIOBase:
+        assert infohash is not None
+        assert start is not None
+        assert stop is not None
+        assert get_torrent is not None
+        assert user is not None
+        return BufferedTorrentIO(io_service=self, infohash=infohash,
+                start=start, stop=stop, get_torrent=get_torrent, user=user)
+
     @staticmethod
     def get_alert_mask() -> int:
         return (lt.alert_category.status | lt.alert_category.piece_progress)
@@ -1118,7 +1346,7 @@ class IOService:
             *,
             params: Optional[RequestParams] = None,
             infohash: Optional[str] = None,
-            get_torrent: Optional[Callable[[], bytes]] = None,
+            get_torrent: Optional[GetTorrent] = None,
             start: Optional[int] = None,
             stop: Optional[int] = None,
             acct_params: Any = None,

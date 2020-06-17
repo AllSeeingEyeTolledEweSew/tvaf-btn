@@ -36,6 +36,7 @@ from tvaf import util
 from tvaf.config import GetConfig
 from tvaf.exceptions import Error
 from tvaf.exceptions import ErrorValue
+from tvaf import types
 
 _log = logging.getLogger(__name__)
 
@@ -60,26 +61,16 @@ GetTorrent = Callable[[], bytes]
 @dataclasses_json.dataclass_json
 @dataclasses.dataclass(frozen=True)
 class RequestParams:
-    infohash: str = ""
+    ref: types.TorrentRef = types.TorrentRef()
     get_torrent: GetTorrent = _raise_notimplemented
-    start: int = 0
-    stop: int = 0
     acct_params: Any = None
     mode: RequestMode = dataclasses.field(
         default=RequestMode.READ,
         metadata=dataclasses_json.config(encoder=RequestMode))
 
     def __post_init__(self):
-        """Raise ValidationError for any internal inconsistencies."""
-        if self.start < 0:
-            raise Error(f"start: {self.start} < 0", code=400)
-        if self.stop <= 0:
-            raise Error(f"stop: {self.stop} <= 0", code=400)
-        if self.start >= self.stop:
-            raise Error(f"start/stop: {self.start} >= {self.stop}", code=400)
-        if not _SHA1_REGEX.match(self.infohash):
-            raise Error(f"invalid infohash: {self.infohash}", code=400)
-        super().__setattr__("infohash", self.infohash.lower())
+        if len(self.ref) == 0:
+            raise ValueError("can't have a zero-length request")
 
 
 _MemoryViewTarget = Union[bytes, bytearray, memoryview]
@@ -165,7 +156,7 @@ class Request:
 
         self._condition = threading.Condition(torrent._lock)
         self._torrent = torrent
-        self._outstanding = params.stop - params.start
+        self._outstanding = len(params.ref)
         self._have_chunk: Set[int] = set()
 
         self._torrent_info: Optional[lt.torrent_info] = None
@@ -173,8 +164,8 @@ class Request:
         self._stop_piece = 0
 
         self._chunks: Dict[int, MemoryView] = dict()
-        self._read_offset = params.start
-        self._read_outstanding = params.stop - params.start
+        self._read_offset = params.ref.start
+        self._read_outstanding = len(params.ref)
 
     def pieces(self) -> Iterable[int]:
         with self._condition:
@@ -213,7 +204,7 @@ class Request:
         self._torrent._sync()
 
     def _clamp(self, start: int, stop: int) -> Tuple[int, int]:
-        return max(start, self.params.start), min(stop, self.params.stop)
+        return max(start, self.params.ref.start), min(stop, self.params.ref.stop)
 
     def _deactivate(self):
         with self._condition:
@@ -243,8 +234,8 @@ class Request:
                 return
             self._torrent_info = torrent_info
             self._start_piece, self._stop_piece = util.range_to_pieces(
-                self._torrent_info.piece_length(), self.params.start,
-                self.params.stop)
+                self._torrent_info.piece_length(), self.params.ref.start,
+                self.params.ref.stop)
 
     def _set_error(self, error: ErrorValue):
         with self._condition:
@@ -271,7 +262,7 @@ class Request:
     def has_next(self) -> bool:
         assert self.params.mode == RequestMode.READ
         with self._condition:
-            return self._read_offset < self.params.stop
+            return self._read_offset < self.params.ref.stop
 
     def next(self, timeout: Optional[float] = None) -> MemoryView:
         assert self.params.mode == RequestMode.READ
@@ -308,19 +299,15 @@ class BufferedTorrentIO(io.BufferedIOBase):
     # have piece size of 1mb or 2mb; and only 1 uses bep47 padding, which
     # indicates most files in multi-file torrents are piece-misaligned.
 
-    def __init__(self, *, io_service:IOService=None, infohash:str=None,
-            start:int=None, stop:int=None, get_torrent:GetTorrent=None,
+    def __init__(self, *, io_service:IOService=None,
+            ref:types.TorrentRef=None, get_torrent:GetTorrent=None,
             user:str=None):
         assert io_service is not None
-        assert infohash is not None
-        assert start is not None
-        assert stop is not None
+        assert ref is not None
         assert get_torrent is not None
         assert user is not None
         self._io_service = io_service
-        self._infohash = infohash
-        self._start = start
-        self._stop = stop
+        self._ref = ref
         self._get_torrent = get_torrent
         self._user = user
 
@@ -338,7 +325,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
             elif whence == io.SEEK_CUR:
                 offset += self._offset
             elif whence == io.SEEK_END:
-                offset += self._stop - self._start
+                offset += self._ref.stop - self._ref.start
             else:
                 raise ValueError("Invalid value for whence: %s" % whence)
 
@@ -386,10 +373,10 @@ class BufferedTorrentIO(io.BufferedIOBase):
 
         # By convention, negative size means read all
         if size < 0:
-            size = self._stop - self._offset
+            size = self._ref.stop - self._offset
 
         # Clamp size
-        size = min(self._stop - self._offset, size)
+        size = min(self._ref.stop - self._offset, size)
 
         # Consume the buffer
         if self._buffer and size > 0:
@@ -413,10 +400,11 @@ class BufferedTorrentIO(io.BufferedIOBase):
             stop = self._offset + size
 
         # Submit a new request.
-        request = self._io_service.add_request(
-                infohash=self._infohash, get_torrent=self._get_torrent,
-                start=self._offset, stop=stop,
+        ref = types.TorrentRef(info_hash=self._ref.info_hash,
+                start=self._offset, stop=stop)
+        params = RequestParams(ref=ref, get_torrent=self._get_torrent,
                 acct_params=self._user, mode=RequestMode.READ)
+        request = self._io_service.add_request(params)
 
         chunk = _EMPTY
         while request.has_next():
@@ -559,13 +547,13 @@ class _Torrent:
     def __init__(self,
                  *,
                  ios: Optional[IOService] = None,
-                 infohash: Optional[str] = None,
+                 info_hash: Optional[str] = None,
                  add_torrent_params: Optional[lt.add_torrent_params] = None):
         assert ios is not None
 
-        if infohash is None:
+        if info_hash is None:
             assert add_torrent_params is not None
-            infohash = str(add_torrent_params.info_hash)
+            info_hash = str(add_torrent_params.info_hash)
 
         self._ios = ios
         # One lock for both top-level and per-torrent operations. I have not
@@ -573,7 +561,7 @@ class _Torrent:
         # _Torrent. I intend to move to gevent instead of firming up a locking
         # protocol.
         self._lock = ios._lock
-        self._infohash = infohash
+        self._info_hash = info_hash
 
         self._requests: List[Request] = []
         self._readers: List[Request] = []
@@ -670,7 +658,7 @@ class _Torrent:
         if self._torrent_info is not None:
             title = self._torrent_info.name()
         else:
-            title = self._infohash
+            title = self._info_hash
         method(msg, *([title] + list(args)), **kwargs)
 
     def _debug(self, msg: str, *args, **kwargs):
@@ -1115,7 +1103,7 @@ class _Torrent:
             assert reqs
             get_torrent = reqs[0].params.get_torrent
 
-            fetch_thread = threading.Thread(name=f"fetch-{self._infohash}",
+            fetch_thread = threading.Thread(name=f"fetch-{self._info_hash}",
                                             target=fetch,
                                             args=(get_torrent,))
             fetch_thread.start()
@@ -1224,7 +1212,7 @@ class _Torrent:
                 return
 
             self._debug("removing from parent")
-            del self._ios._torrents[self._infohash]
+            del self._ios._torrents[self._info_hash]
 
     def handle_torrent_error_alert(self, alert: lt.torrent_error_alert):
         with self._lock:
@@ -1298,15 +1286,12 @@ class IOService:
             self._post_torrent_updates_deadline = math.inf
             self._tick_deadline = math.inf
 
-    def open(self, *, infohash:str=None, start:int=None, stop:int=None,
+    def open(self, *, ref:types.TorrentRef=None,
             get_torrent:GetTorrent=None, user:str=None) -> io.BufferedIOBase:
-        assert infohash is not None
-        assert start is not None
-        assert stop is not None
+        assert ref is not None
         assert get_torrent is not None
         assert user is not None
-        return BufferedTorrentIO(io_service=self, infohash=infohash,
-                start=start, stop=stop, get_torrent=get_torrent, user=user)
+        return BufferedTorrentIO(io_service=self, ref=ref, get_torrent=get_torrent, user=user)
 
     @staticmethod
     def get_alert_mask() -> int:
@@ -1343,45 +1328,26 @@ class IOService:
 
     def add_request(
             self,
-            *,
-            params: Optional[RequestParams] = None,
-            infohash: Optional[str] = None,
-            get_torrent: Optional[GetTorrent] = None,
-            start: Optional[int] = None,
-            stop: Optional[int] = None,
-            acct_params: Any = None,
-            mode: Optional[RequestMode] = None,
+            params: RequestParams
     ) -> Request:
         with self._lock:
-            if params is None:
-                assert infohash is not None
-                assert start is not None
-                assert stop is not None
-                assert mode is not None
-                assert get_torrent is not None
-                params = RequestParams(infohash=infohash,
-                                       start=start,
-                                       stop=stop,
-                                       mode=mode,
-                                       get_torrent=get_torrent,
-                                       acct_params=acct_params)
-            torrent = self._torrents.get(params.infohash)
+            torrent = self._torrents.get(params.ref.info_hash)
             if not torrent:
-                torrent = _Torrent(ios=self, infohash=params.infohash)
-                self._torrents[params.infohash] = torrent
+                torrent = _Torrent(ios=self, info_hash=params.ref.info_hash)
+                self._torrents[params.ref.info_hash] = torrent
             return torrent.add_request(params)
 
     def add_torrent(self, atp: lt.add_torrent_params):
         with self._lock:
-            infohash = str(atp.info_hash)
-            if infohash in self._torrents:
-                raise KeyError(infohash)
-            self._torrents[infohash] = _Torrent(ios=self,
+            info_hash = str(atp.info_hash)
+            if info_hash in self._torrents:
+                raise KeyError(info_hash)
+            self._torrents[info_hash] = _Torrent(ios=self,
                                                 add_torrent_params=atp)
 
-    def remove_torrent(self, infohash: str, remove_data: bool = False):
+    def remove_torrent(self, info_hash: str, remove_data: bool = False):
         with self._lock:
-            torrent = self._torrents[infohash]
+            torrent = self._torrents[info_hash]
             torrent.request_removal(remove_data=remove_data)
 
     def _filter_alert(self, alert: lt.alert):
@@ -1398,8 +1364,8 @@ class IOService:
         with self._lock:
             torrent = self._torrents_by_handle.get(handle)
             if not torrent:
-                infohash = str(handle.info_hash())
-                torrent = self._torrents.get(infohash)
+                info_hash = str(handle.info_hash())
+                torrent = self._torrents.get(info_hash)
             return torrent
 
     def _handle_state_update_alert(self, alert: lt.state_update_alert):

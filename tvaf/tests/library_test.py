@@ -10,6 +10,7 @@ from tvaf import library
 from typing import Union
 import libtorrent as lt
 from tvaf import fs
+from tvaf import types
 from tvaf import protocol
 from typing import Dict
 
@@ -43,8 +44,8 @@ BAD_PATHS = tdummy.Torrent(files=[
 ])
 
 
-def get_placeholder_data(info_hash:str, start:int, stop:int) -> bytes:
-    data = "%s:%d:%d" % (info_hash, start, stop)
+def get_placeholder_data(ref:types.TorrentRef) -> bytes:
+    data = "%s:%d:%d" % (ref.info_hash, ref.start, ref.stop)
     return data.encode()
 
 
@@ -60,9 +61,9 @@ class TestLibraryService(unittest.TestCase):
             (MULTI.infohash, 1): library.Hints(mime_type="text/plain"),
         }
 
-        def opener(infohash:str, start:int, stop:int,
+        def opener(ref:types.TorrentRef,
                 get_torrent:library.GetTorrent):
-            raw = io.BytesIO(get_placeholder_data(infohash, start, stop))
+            raw = io.BytesIO(get_placeholder_data(ref))
             # opener can normally return a RawIOBase, but we'll mimic
             # IOService returning BufferedTorrentIO here.
             return io.BufferedReader(raw)
@@ -103,16 +104,16 @@ class TestLibraryService(unittest.TestCase):
         assert stop is not None
         assert torrent is not None
 
-        self.assertEqual(tfile.info_hash, info_hash)
-        self.assertEqual(tfile.start, start)
-        self.assertEqual(tfile.stop, stop)
+        self.assertEqual(tfile.ref.info_hash, info_hash)
+        self.assertEqual(tfile.ref.start, start)
+        self.assertEqual(tfile.ref.stop, stop)
         self.assertEqual(tfile.get_torrent(), torrent)
         self.assertEqual(tfile.hints.get("mtime"), mtime)
         self.assertEqual(tfile.hints.get("mime_type"), mime_type)
         self.assertEqual(tfile.hints.get("content_encoding"), content_encoding)
         self.assertEqual(tfile.hints.get("filename"), filename)
         self.assertEqual(tfile.open(mode="rb").read(),
-                get_placeholder_data(info_hash, start, stop))
+                get_placeholder_data(tfile.ref))
 
     def assert_is_dir(self, node:fs.Node):
         self.assertEqual(node.stat().filetype, stat_lib.S_IFDIR)

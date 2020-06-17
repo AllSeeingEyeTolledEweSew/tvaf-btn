@@ -28,6 +28,7 @@ from typing import Any
 from typing import cast
 from tvaf import fs
 from tvaf import util
+from tvaf import types
 
 
 _log = logging.getLogger(__name__)
@@ -42,31 +43,28 @@ class Hints(collections.UserDict):
     pass
 
 
-TorrentFileOpener = Callable[[str, int, int, GetTorrent], io.RawIOBase]
+TorrentFileOpener = Callable[[types.TorrentRef, GetTorrent], io.RawIOBase]
 
 
 class TorrentFile(fs.File):
 
-    def __init__(self, *, opener:TorrentFileOpener=None, info_hash:str=None, start:int=None, stop:int=None,
+    def __init__(self, *, opener:TorrentFileOpener=None,
+            ref:types.TorrentRef=None,
             get_torrent:GetTorrent=None, hints:Hints=None):
         assert opener is not None
-        assert info_hash is not None
-        assert start is not None
-        assert stop is not None
+        assert ref is not None
         assert get_torrent is not None
         assert hints is not None
-        super().__init__(size=stop - start, mtime=hints.get("mtime"))
+        super().__init__(size=len(ref), mtime=hints.get("mtime"))
         self.opener = opener
-        self.info_hash = info_hash
-        self.start = start
-        self.stop = stop
+        self.ref = ref
         self.get_torrent = get_torrent
         self.hints = hints
 
     def open_raw(self, mode:str="r") -> io.RawIOBase:
         if set(mode) & set("wxa+"):
             raise fs.mkoserror(errno.EPERM)
-        return self.opener(self.info_hash, self.start, self.stop, self.get_torrent)
+        return self.opener(self.ref, self.get_torrent)
 
 
 def _is_valid_path(path:List[str]):
@@ -111,7 +109,7 @@ class _V1TorrentAccess(fs.StaticDir):
                         spec.index)
         hints["filename"] = spec.full_path[-1]
         torrent_file = TorrentFile(opener=libs.opener,
-            info_hash=info_hash, start=spec.start, stop=spec.stop,
+            ref=types.TorrentRef(info_hash=info_hash, start=spec.start, stop=spec.stop),
             get_torrent=access.get_torrent, hints=hints)
         self._by_index.mkchild(str(spec.index), torrent_file)
 

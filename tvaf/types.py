@@ -17,12 +17,33 @@ stable part of the interface.
 import dataclasses
 import enum
 from typing import Optional
+import re
+import collections.abc
 
 import dataclasses_json
 
 from tvaf.exceptions import Error
 
 USER_UNKNOWN = "*unknown*"
+
+@dataclasses.dataclass(frozen=True)
+class TorrentRef(collections.abc.Sized):
+
+    info_hash: str = ""
+    start: int = 0
+    stop: int = 0
+
+    def __post_init__(self):
+        if self.start < 0:
+            raise ValueError(f"start: {self.start} < 0")
+        if self.stop < 0:
+            raise ValueError(f"stop: {self.stop} < 0")
+        if self.start > self.stop:
+            raise ValueError(f"start/stop: {self.start} > {self.stop}")
+        super().__setattr__("info_hash", self.info_hash.lower())
+
+    def __len__(self) -> int:
+        return self.stop - self.start
 
 
 class Tracker(enum.Enum):

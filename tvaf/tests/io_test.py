@@ -19,6 +19,8 @@ from tvaf.config import Config
 from tvaf.exceptions import Error
 from tvaf.io import IOService
 from tvaf.io import RequestMode
+from tvaf import types
+import tvaf.io
 
 from . import test_utils
 from . import tdummy
@@ -108,12 +110,10 @@ class IOServiceTestCase(unittest.TestCase):
                 stop=len(tdummy.DATA),
                 acct_params="tvaf",
                 get_torrent=lambda: lt.bencode(tdummy.DICT)):
-        return self.ios.add_request(mode=mode,
-                                    infohash=infohash,
-                                    start=start,
-                                    stop=stop,
-                                    acct_params=acct_params,
-                                    get_torrent=get_torrent)
+        ref = types.TorrentRef(info_hash=infohash, start=start, stop=stop)
+        params = tvaf.io.RequestParams(ref=ref, mode=mode, acct_params=acct_params,
+                get_torrent=get_torrent)
+        return self.ios.add_request(params)
 
     def wait_for_torrent(self):
 
@@ -577,8 +577,10 @@ class TestLoad(IOServiceTestCase):
 class TestBufferedTorrentIO(IOServiceTestCase):
 
     def open(self):
+        ref = types.TorrentRef(info_hash=tdummy.INFOHASH, start=0,
+                stop=tdummy.LEN)
         return self.ios.open(
-            infohash=tdummy.INFOHASH, start=0, stop=tdummy.LEN,
+            ref=ref,
             get_torrent=lambda: lt.bencode(tdummy.DICT), user="tvaf")
 
     def test_read_some(self):

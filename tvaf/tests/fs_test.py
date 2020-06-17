@@ -2,6 +2,7 @@
 
 import stat as stat_lib
 import unittest
+import io
 import errno
 import pathlib
 
@@ -193,6 +194,19 @@ class TestFile(unittest.TestCase):
 
         os_stat = fs.File(size=123, mtime=12345).stat().os()
         self.assertEqual(os_stat.st_mtime, 12345)
+
+
+class TestOpen(unittest.TestCase):
+
+    def test_mode_rb(self):
+        node = fs.File(size=0)
+        contents = b"test contents"
+        def open_raw(mode):
+            self.assertEqual(mode, "r")
+            return io.BufferedReader(io.BytesIO(contents))
+        node.open_raw = open_raw
+        fp = node.open(mode="rb")
+        self.assertEqual(fp.read(), contents)
 
 
 class TestGetRoot(unittest.TestCase):

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 import errno
+import io
 import os
 import time
 import os.path
@@ -357,6 +358,28 @@ class File(Node):
 
     def __init__(self, *, perms:int=None, size: int = None, mtime: int = None):
         super().__init__(filetype=stat_lib.S_IFREG, perms=perms, size=size, mtime=mtime)
+
+    def open_raw(self, mode:str="r") -> io.RawIOBase:
+        raise mkoserror(errno.ENOSYS)
+
+    def open(self, mode:str="r") -> io.RawIOBase:
+        # Only implement binary modes for now
+        if "b" not in mode:
+            raise mkoserror(errno.ENOSYS)
+        # Only implement reading for now
+        if "r" not in mode:
+            raise mkoserror(errno.ENOSYS)
+
+        raw_mode = "".join(sorted(set(mode) & set("rwxa+")))
+        raw = self.open_raw(mode=raw_mode)
+
+        # If the implementation does its own buffering, just use that
+        if isinstance(raw, io.BufferedIOBase):
+            return raw
+
+        # Later, return a buffered reader
+        raise mkoserror(errno.ENOSYS)
+
 
 SymlinkTarget = Union[str, os.PathLike, Node]
 

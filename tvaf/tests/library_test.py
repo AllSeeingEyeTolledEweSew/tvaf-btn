@@ -4,6 +4,7 @@ from typing import Iterable
 from typing import Tuple
 from typing import Optional
 from typing import cast
+import io
 from . import tdummy
 from tvaf import library
 from typing import Union
@@ -42,6 +43,11 @@ BAD_PATHS = tdummy.Torrent(files=[
 ])
 
 
+def get_placeholder_data(info_hash:str, start:int, stop:int) -> bytes:
+    data = "%s:%d:%d" % (info_hash, start, stop)
+    return data.encode()
+
+
 class TestLibraryService(unittest.TestCase):
 
     def setUp(self):
@@ -54,7 +60,14 @@ class TestLibraryService(unittest.TestCase):
             (MULTI.infohash, 1): library.Hints(mime_type="text/plain"),
         }
 
-        self.libs = library.LibraryService()
+        def opener(infohash:str, start:int, stop:int,
+                get_torrent:library.GetTorrent):
+            raw = io.BytesIO(get_placeholder_data(infohash, start, stop))
+            # opener can normally return a RawIOBase, but we'll mimic
+            # IOService returning BufferedTorrentIO here.
+            return io.BufferedReader(raw)
+
+        self.libs = library.LibraryService(opener=opener)
         self.libs.get_layout_info_dict_funcs["test"] = self.get_layout_info_dict
         self.libs.get_hints_funcs["test"] = self.get_hints
         self.libs.get_access_funcs["test"] = self.get_access
@@ -99,6 +112,8 @@ class TestLibraryService(unittest.TestCase):
         self.assertEqual(tfile.stop, stop)
         self.assertEqual(tfile.get_torrent(), torrent)
         self.assertEqual(tfile.hints, hints)
+        self.assertEqual(tfile.open(mode="rb").read(),
+                get_placeholder_data(info_hash, start, stop))
 
     def assert_is_dir(self, node:fs.Node):
         self.assertEqual(node.stat().filetype, stat_lib.S_IFDIR)

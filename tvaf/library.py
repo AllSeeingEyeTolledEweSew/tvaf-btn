@@ -12,6 +12,7 @@ cross-tracker: given file hash, downloads from multiple concrete trackers
 from __future__ import annotations
 
 import dataclasses
+import io
 import pathlib
 from typing import Optional
 from typing import Callable
@@ -55,21 +56,31 @@ class Hints:
             self.mtime = other.mtime
 
 
+TorrentFileOpener = Callable[[str, int, int, GetTorrent], io.RawIOBase]
+
+
 class TorrentFile(fs.File):
 
-    def __init__(self, *, info_hash:str=None, start:int=None, stop:int=None,
+    def __init__(self, *, opener:TorrentFileOpener=None, info_hash:str=None, start:int=None, stop:int=None,
             get_torrent:GetTorrent=None, hints:Hints=None):
+        assert opener is not None
         assert info_hash is not None
         assert start is not None
         assert stop is not None
         assert get_torrent is not None
         assert hints is not None
         super().__init__(size=stop - start, mtime=hints.mtime)
+        self.opener = opener
         self.info_hash = info_hash
         self.start = start
         self.stop = stop
         self.get_torrent = get_torrent
         self.hints = hints
+
+    def open_raw(self, mode:str="r") -> io.RawIOBase:
+        if set(mode) & set("wxa+"):
+            raise fs.mkoserror(errno.EPERM)
+        return self.opener(self.info_hash, self.start, self.stop, self.get_torrent)
 
 
 def _is_valid_path(path:List[str]):
@@ -113,8 +124,9 @@ class _V1TorrentAccess(fs.StaticDir):
                 _log.exception("%s: get_hints(%s, %s)", name, info_hash,
                         spec.index)
         hints.filename = spec.full_path[-1]
-        torrent_file = TorrentFile(info_hash=info_hash, start=spec.start,
-            stop=spec.stop, get_torrent=access.get_torrent, hints=hints)
+        torrent_file = TorrentFile(opener=libs.opener,
+            info_hash=info_hash, start=spec.start, stop=spec.stop,
+            get_torrent=access.get_torrent, hints=hints)
         self._by_index.mkchild(str(spec.index), torrent_file)
 
         if not _is_valid_path(spec.full_path):
@@ -238,7 +250,9 @@ GetHints = Callable[[str, int], Hints]
 
 class LibraryService:
 
-    def __init__(self):
+    def __init__(self, *, opener:TorrentFileOpener=None):
+        assert opener is not None
+        self.opener = opener
         self.root = _Root(libs=self)
         self.get_access_funcs:Dict[str, GetAccess] = {}
         self.get_layout_info_dict_funcs:Dict[str, GetBDict] = {}

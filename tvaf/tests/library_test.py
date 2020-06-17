@@ -86,7 +86,7 @@ class TestLibraryService(unittest.TestCase):
             info_hash:str=None, start:int=None, stop:int=None, torrent:bytes=None,
             dummy:tdummy.Torrent=None, dummy_file:Union[tdummy.File, int]=None,
             mime_type:str=None, content_encoding:str=None, mtime:int=None,
-            filename:str=None, hints:library.Hints=None):
+            filename:str=None):
         if dummy is not None:
             info_hash = dummy.infohash
             torrent = lt.bencode(dummy.dict)
@@ -98,10 +98,6 @@ class TestLibraryService(unittest.TestCase):
             stop = dummy_file.stop
             filename = protocol.decode(dummy_file.path_split[-1])
         assert filename is not None
-        if hints is None:
-            hints = library.Hints(mime_type=mime_type,
-                    content_encoding=content_encoding, mtime=mtime,
-                    filename=filename)
         assert info_hash is not None
         assert start is not None
         assert stop is not None
@@ -111,7 +107,10 @@ class TestLibraryService(unittest.TestCase):
         self.assertEqual(tfile.start, start)
         self.assertEqual(tfile.stop, stop)
         self.assertEqual(tfile.get_torrent(), torrent)
-        self.assertEqual(tfile.hints, hints)
+        self.assertEqual(tfile.hints.get("mtime"), mtime)
+        self.assertEqual(tfile.hints.get("mime_type"), mime_type)
+        self.assertEqual(tfile.hints.get("content_encoding"), content_encoding)
+        self.assertEqual(tfile.hints.get("filename"), filename)
         self.assertEqual(tfile.open(mode="rb").read(),
                 get_placeholder_data(info_hash, start, stop))
 
@@ -188,7 +187,7 @@ class TestLibraryService(unittest.TestCase):
 
         tfile = cast(library.TorrentFile, self.libs.root.traverse(
             f"v1/{SINGLE.infohash}/test/i/0"))
-        self.assertEqual(tfile.hints.mtime, 12345)
+        self.assertEqual(tfile.hints["mtime"], 12345)
         self.assertEqual(tfile.stat().mtime, 12345)
 
         by_index = cast(fs.Dir, self.libs.root.traverse(f"v1/{SINGLE.infohash}/test/i"))

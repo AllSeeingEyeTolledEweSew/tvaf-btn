@@ -19,6 +19,7 @@ from typing import Callable
 import logging
 from tvaf import protocol
 from typing import List
+import collections
 from typing import Dict
 from typing import Iterator
 import stat as stat_lib
@@ -36,24 +37,9 @@ Path = pathlib.PurePosixPath
 GetTorrent = Callable[[], bytes]
 
 
-@dataclasses.dataclass
-class Hints:
+class Hints(collections.UserDict):
 
-    mime_type: Optional[str] = None
-    content_encoding: Optional[str] = None
-    mtime: Optional[int] = None
-    filename: Optional[str] = None
-
-    def merge(self, other:Hints):
-        if self.mime_type is None:
-            self.mime_type = other.mime_type
-        if self.content_encoding is None:
-            self.content_encoding = other.content_encoding
-        if self.filename is None:
-            self.filename = other.filename
-        if self.mtime is None or (other.mtime is not None and other.mtime <
-                self.mtime):
-            self.mtime = other.mtime
+    pass
 
 
 TorrentFileOpener = Callable[[str, int, int, GetTorrent], io.RawIOBase]
@@ -69,7 +55,7 @@ class TorrentFile(fs.File):
         assert stop is not None
         assert get_torrent is not None
         assert hints is not None
-        super().__init__(size=stop - start, mtime=hints.mtime)
+        super().__init__(size=stop - start, mtime=hints.get("mtime"))
         self.opener = opener
         self.info_hash = info_hash
         self.start = start
@@ -117,13 +103,13 @@ class _V1TorrentAccess(fs.StaticDir):
         hints = Hints()
         for name, func in libs.get_hints_funcs.items():
             try:
-                hints.merge(func(info_hash, spec.index))
+                hints.update(func(info_hash, spec.index))
             except KeyError:
                 pass
             except Exception as e:
                 _log.exception("%s: get_hints(%s, %s)", name, info_hash,
                         spec.index)
-        hints.filename = spec.full_path[-1]
+        hints["filename"] = spec.full_path[-1]
         torrent_file = TorrentFile(opener=libs.opener,
             info_hash=info_hash, start=spec.start, stop=spec.stop,
             get_torrent=access.get_torrent, hints=hints)

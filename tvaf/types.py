@@ -22,8 +22,6 @@ import collections.abc
 
 import dataclasses_json
 
-from tvaf.exceptions import Error
-
 USER_UNKNOWN = "*unknown*"
 
 @dataclasses.dataclass(frozen=True)

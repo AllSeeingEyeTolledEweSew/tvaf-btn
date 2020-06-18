@@ -12,6 +12,7 @@ import logging
 import mmap
 import math
 import random
+import errno
 import re
 import threading
 import time
@@ -34,9 +35,8 @@ import libtorrent as lt
 
 from tvaf import util
 from tvaf.config import GetConfig
-from tvaf.exceptions import Error
-from tvaf.exceptions import ErrorValue
 from tvaf import types
+from tvaf import ltpy
 
 _log = logging.getLogger(__name__)
 
@@ -48,11 +48,18 @@ class RequestMode(enum.Enum):
     FILL = "fill"
 
 
-_SHA1_REGEX = re.compile(r"[0-9a-fA-F]{40}")
-
-
 def _raise_notimplemented():
     raise NotImplementedError
+
+
+class Error(Exception):
+
+    pass
+
+
+class Cancelled(Error):
+
+    pass
 
 
 GetTorrent = Callable[[], bytes]
@@ -152,7 +159,7 @@ class Request:
         self._params = params
         self._time = time.time() # uses time.time()
         self._deactivated_at: Optional[SupportsFloat] = None # uses time.time()
-        self._error: Optional[ErrorValue] = None
+        self._exception: Optional[Exception] = None
 
         self._condition = threading.Condition(torrent._lock)
         self._torrent = torrent
@@ -184,8 +191,8 @@ class Request:
         return self._deactivated_at
 
     @property
-    def error(self) -> Optional[ErrorValue]:
-        return self._error
+    def exception(self) -> Optional[Exception]:
+        return self._exception
 
     @property
     def active(self) -> bool:
@@ -199,8 +206,8 @@ class Request:
     def stop_piece(self) -> int:
         return self._stop_piece
 
-    def cancel(self):
-        self._set_error(ErrorValue(message="Operation cancelled", code=499))
+    def cancel(self, message:str="Request cancelled"):
+        self._set_exception(Cancelled(message))
         self._torrent._sync()
 
     def _clamp(self, start: int, stop: int) -> Tuple[int, int]:
@@ -237,10 +244,10 @@ class Request:
                 self._torrent_info.piece_length(), self.params.ref.start,
                 self.params.ref.stop)
 
-    def _set_error(self, error: ErrorValue):
+    def _set_exception(self, exc: Exception):
         with self._condition:
-            if self._error is None:
-                self._error = error
+            if self._exception is None:
+                self._exception = exc
             self._condition.notify_all()
 
     def _add_piece(self, offset: int, piece: bytes):
@@ -272,13 +279,13 @@ class Request:
             def condition():
                 if self._read_offset in self._chunks:
                     return True
-                if self._error is not None:
+                if self._exception is not None:
                     return True
                 return False
 
             value = self._condition.wait_for(condition, timeout=timeout)
-            if self._error is not None:
-                self._error.raise_exception()
+            if self._exception is not None:
+                raise self._exception
             if self._read_offset in self._chunks:
                 chunk = self._chunks.pop(self._read_offset)
                 self._read_offset += len(chunk)
@@ -707,7 +714,7 @@ class _Torrent:
         with self._lock:
             self._removal_requested = True
             self._remove_data_requested = remove_data
-            self._fatal(ErrorValue(message="Delete requested", code=500))
+            self._fatal(Cancelled("Delete requested"))
 
     def _update_priorities(self):
         # Libtorrent strictly downloads time-critical pieces first, in order of
@@ -833,7 +840,7 @@ class _Torrent:
                 self._piece_priorities = want_priorities
 
     def handle_read_piece_alert(self, alert: lt.read_piece_alert):
-        error = ErrorValue.from_alert(alert)
+        exc = ltpy.exception_from_alert(alert)
         data = alert.buffer
         i = alert.piece
 
@@ -841,13 +848,13 @@ class _Torrent:
             assert self._torrent_info is not None
             self._piece_reading.discard(i)
             readers = list(self._piece_readers.pop(i, dict()).values())
-            if error is None:
+            if exc is None:
                 offset = i * self._torrent_info.piece_length()
                 for req in readers:
                     req._add_piece(offset, data)
             else:
                 for req in readers:
-                    req._set_error(error)
+                    req._set_exception(exc)
                 self._sync()
 
     def handle_piece_finished_alert(self, alert: lt.piece_finished_alert):
@@ -922,10 +929,10 @@ class _Torrent:
                 lt.torrent_status.states.checking_files,
             )
 
-    def _fatal(self, error: ErrorValue):
+    def _fatal(self, exc: Exception):
         with self._lock:
             for req in self._requests:
-                req._set_error(error)
+                req._set_exception(exc)
             self._sync()
 
     def _cleanup(self):
@@ -933,9 +940,9 @@ class _Torrent:
             requests = self._requests
             self._requests = []
             for req in requests:
-                self._debug("cleanup: %s: %s, %s", req, req.error,
+                self._debug("cleanup: %s: %s, %s", req, req.exception,
                             req._have_outstanding())
-                if req.error is None and req._have_outstanding():
+                if req.exception is None and req._have_outstanding():
                     self._requests.append(req)
                 else:
                     req._deactivate()
@@ -1079,14 +1086,14 @@ class _Torrent:
 
         def fetch(get_torrent:GetTorrent):
             torrent_info: Optional[lt.torrent_info] = None
-            error: Optional[ErrorValue] = None
+            exception: Optional[Exception] = None
             try:
                 torrent_info = lt.torrent_info(lt.bdecode(get_torrent()))
-            except:
-                error = ErrorValue.from_exc_info()
+            except Exception as e:
+                exception = e
             try:
                 self._handle_fetched_torrent_info(torrent_info=torrent_info,
-                                                  error=error)
+                        exception=exception)
             except:
                 self._exception("during handle_fetched_torrent_info")
 
@@ -1111,15 +1118,15 @@ class _Torrent:
     def _handle_fetched_torrent_info(
         self,
         torrent_info: Optional[lt.torrent_info] = None,
-        error: Optional[ErrorValue] = None):
+        exception: Optional[Exception] = None):
         save_path = str(self._ios.get_config().download_dir)
 
         with self._lock:
             self._remove_pending(_Action.FETCH)
 
-            if error is not None:
-                self._error("while fetching torrent info: %s", error)
-                self._fatal(error)
+            if exception is not None:
+                self._error("while fetching torrent info: %s", exception)
+                self._fatal(exception)
                 return
 
             assert torrent_info is not None
@@ -1148,7 +1155,7 @@ class _Torrent:
             self._ios._session.async_add_torrent(self._add_torrent_params)
 
     def handle_add_torrent_alert(self, alert: lt.add_torrent_alert):
-        error = ErrorValue.from_alert(alert)
+        exc = ltpy.exception_from_alert(alert)
 
         with self._lock:
             self._remove_pending(_Action.ADD)
@@ -1156,9 +1163,9 @@ class _Torrent:
             # Release reference
             self._add_torrent_params = None
 
-            if error is not None:
-                self._error("while adding: %s", error)
-                self._fatal(error)
+            if exc is not None:
+                self._error("while adding: %s", exc)
+                self._fatal(exc)
                 return
 
             self._piece_reading = set()
@@ -1204,7 +1211,7 @@ class _Torrent:
                 self._ios._torrents_by_handle.pop(alert.handle, None)
             # This errors out any existing requests, and syncs to the next
             # step.
-            self._fatal(ErrorValue(message="Unexpectedly removed", code=500))
+            self._fatal(Cancelled("Unexpectedly removed"))
 
     def _maybe_remove_from_parent(self):
         with self._ios._lock:
@@ -1216,9 +1223,9 @@ class _Torrent:
 
     def handle_torrent_error_alert(self, alert: lt.torrent_error_alert):
         with self._lock:
-            error = ErrorValue.from_alert(alert)
-            if error is not None:
-                self._fatal(error)
+            exc = ltpy.exception_from_alert(alert)
+            if exc is not None:
+                self._fatal(exc)
 
     def handle_state_changed_alert(self, alert: lt.state_changed_alert):
         with self._lock:
@@ -1354,9 +1361,8 @@ class IOService:
         # libtorrent fires read_piece_alert with an "Operation cancelled" error
         # whenever we change alert_when_available state. Not useful to us.
         if isinstance(alert, lt.read_piece_alert):
-            error = alert.error
-            if (error.category(), error.value()) == (lt.generic_category(),
-                                                     125):
+            exc = ltpy.exception_from_alert(alert)
+            if isinstance(exc, OSError) and exc.errno == errno.ECANCELED:
                 return False
         return True
 

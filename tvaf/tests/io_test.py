@@ -16,7 +16,6 @@ import concurrent.futures
 import libtorrent as lt
 
 from tvaf.config import Config
-from tvaf.exceptions import Error
 from tvaf.io import IOService
 from tvaf.io import RequestMode
 from tvaf import types
@@ -126,6 +125,11 @@ class IOServiceTestCase(unittest.TestCase):
         return handle
 
 
+class DummyException(Exception):
+
+    pass
+
+
 class TestAddRemove(IOServiceTestCase):
 
     def test_add_remove(self):
@@ -136,17 +140,15 @@ class TestAddRemove(IOServiceTestCase):
                          [tdummy.INFOHASH])
         req.cancel()
         self.pump_alerts(lambda: not self.session.get_torrents(), msg="remove")
-        self.assertIsNotNone(req.error)
-        self.assertEqual(req.error.code, 499)
+        self.assertIsInstance(req.exception, tvaf.io.Cancelled)
 
     def test_fetch_error(self):
-        def _raise_error():
-            raise Error(message="Test error", code=456)
-        req = self.add_req(get_torrent=_raise_error)
-        with self.assertRaises(Error):
+        def raise_dummy():
+            raise DummyException("dummy")
+        req = self.add_req(get_torrent=raise_dummy)
+        with self.assertRaises(DummyException):
             req.next(timeout=5)
-        self.assertIsNotNone(req.error)
-        self.assertEqual(req.error.code, 456)
+        self.assertIsInstance(req.exception, DummyException)
 
 
 class TestRead(IOServiceTestCase):
@@ -160,7 +162,7 @@ class TestRead(IOServiceTestCase):
         self.assertEqual(data, tdummy.DATA)
 
         self.pump_alerts(lambda: not req.active, msg="request deactivated")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
     def test_feed_not_aligned_across_pieces(self):
         start = tdummy.PIECE_LENGTH // 2
@@ -174,7 +176,7 @@ class TestRead(IOServiceTestCase):
         self.assertEqual(data, tdummy.DATA[start:stop])
 
         self.pump_alerts(lambda: not req.active, msg="deactivate")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
     def test_feed_not_aligned_single_piece(self):
         start = tdummy.PIECE_LENGTH // 4
@@ -188,7 +190,7 @@ class TestRead(IOServiceTestCase):
         self.assertEqual(data, tdummy.DATA[start:stop])
 
         self.pump_alerts(lambda: not req.active, msg="deactivate")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
     def test_request_on_existing_torrent(self):
         req = self.add_req()
@@ -198,7 +200,7 @@ class TestRead(IOServiceTestCase):
         self.read_all(req)
 
         self.pump_alerts(lambda: not req.active, msg="deactivate")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
         req = self.add_req()
         data = self.read_all(req, msg="second read")
@@ -206,7 +208,7 @@ class TestRead(IOServiceTestCase):
         self.assertEqual(data, tdummy.DATA)
 
         self.pump_alerts(lambda: not req.active, msg="deactivate")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
     def test_simultaneous(self):
         req1 = self.add_req()
@@ -236,8 +238,8 @@ class TestRead(IOServiceTestCase):
 
         self.pump_alerts(lambda: not (req1.active or req2.active),
                          msg="deactivate")
-        self.assertIsNone(req1.error)
-        self.assertIsNone(req2.error)
+        self.assertIsNone(req1.exception)
+        self.assertIsNone(req2.exception)
 
     def test_two_readers(self):
         req1 = self.add_req()
@@ -253,8 +255,8 @@ class TestRead(IOServiceTestCase):
 
         self.pump_alerts(lambda: not (req1.active or req2.active),
                          msg="deactivate")
-        self.assertIsNone(req1.error)
-        self.assertIsNone(req2.error)
+        self.assertIsNone(req1.exception)
+        self.assertIsNone(req2.exception)
 
     def test_download(self):
         seed = test_utils.create_isolated_session()
@@ -276,7 +278,7 @@ class TestRead(IOServiceTestCase):
         self.assertEqual(data, tdummy.DATA)
 
         self.pump_alerts(lambda: not req.active, msg="deactivate")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
     def test_file_error(self):
         # Create a file in tempdir, try to use it as the save_path
@@ -288,13 +290,11 @@ class TestRead(IOServiceTestCase):
         req = self.add_req()
         self.feed_pieces()
 
-        with self.assertRaises(Error):
+        with self.assertRaises(NotADirectoryError):
             self.read_all(req)
 
         self.assertFalse(req.active)
-        self.assertIsNotNone(req.error)
-        self.assertGreaterEqual(req.error.code, 500)
-        self.assertLessEqual(req.error.code, 599)
+        self.assertIsInstance(req.exception, NotADirectoryError)
 
     def test_read_checked_pieces(self):
         # Download a torrent
@@ -322,7 +322,7 @@ class TestRead(IOServiceTestCase):
         self.assertEqual(data, tdummy.DATA)
 
         self.pump_alerts(lambda: not req.active, msg="deactivate")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
     def test_read_after_cancelled_read(self):
         # Start reading
@@ -355,7 +355,7 @@ class TestRead(IOServiceTestCase):
         self.assertEqual(data, tdummy.DATA)
 
         self.pump_alerts(lambda: not req.active, msg="deactivate")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
 
 class TestPriorities(IOServiceTestCase):
@@ -461,9 +461,7 @@ class TestRemoveTorrent(IOServiceTestCase):
     def test_remove_with_active_requests(self):
         req = self.add_req()
         self.ios.remove_torrent(tdummy.INFOHASH)
-        self.assertIsNotNone(req.error)
-        self.assertGreaterEqual(req.error.code, 500)
-        self.assertLessEqual(req.error.code, 599)
+        self.assertIsInstance(req.exception, tvaf.io.Cancelled)
 
     def test_remove_keep_data(self):
         req = self.add_req()
@@ -472,14 +470,14 @@ class TestRemoveTorrent(IOServiceTestCase):
         self.read_all(req)
 
         self.pump_alerts(lambda: not req.active, msg="deactivate")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
         self.ios.remove_torrent(tdummy.INFOHASH, remove_data=False)
 
         self.pump_alerts(lambda: not self.session.get_torrents(), msg="remove")
 
         self.assertEqual(os.listdir(self.tempdir.name), [tdummy.NAME.decode()])
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
     def test_remove_data(self):
         req = self.add_req()
@@ -488,7 +486,7 @@ class TestRemoveTorrent(IOServiceTestCase):
         self.read_all(req)
 
         self.pump_alerts(lambda: not req.active, msg="deactivate")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
         self.ios.remove_torrent(tdummy.INFOHASH, remove_data=True)
 
@@ -496,7 +494,7 @@ class TestRemoveTorrent(IOServiceTestCase):
             return os.listdir(self.tempdir.name) == []
 
         self.pump_alerts(removed, msg="remove")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
 
 class TestLoad(IOServiceTestCase):
@@ -526,7 +524,7 @@ class TestLoad(IOServiceTestCase):
         self.assertEqual(data, tdummy.DATA)
 
         self.pump_alerts(lambda: not req.active, msg="request deactivated")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
     def test_load_resume_corrupted_and_read(self):
         # Download a torrent
@@ -571,7 +569,7 @@ class TestLoad(IOServiceTestCase):
         self.assertEqual(data, tdummy.DATA)
 
         self.pump_alerts(lambda: not req.active, msg="request deactivated")
-        self.assertIsNone(req.error)
+        self.assertIsNone(req.exception)
 
 
 class TestBufferedTorrentIO(IOServiceTestCase):

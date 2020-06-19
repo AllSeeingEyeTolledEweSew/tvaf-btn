@@ -147,9 +147,9 @@ class TestAddRemove(IOServiceTestCase):
         def raise_dummy():
             raise DummyException("dummy")
         req = self.add_req(get_torrent=raise_dummy)
-        with self.assertRaises(DummyException):
+        with self.assertRaises(tvaf.io.FetchError):
             req.next(timeout=5)
-        self.assertIsInstance(req.exception, DummyException)
+        self.assertIsInstance(req.exception, tvaf.io.FetchError)
 
 
 class TestRead(IOServiceTestCase):

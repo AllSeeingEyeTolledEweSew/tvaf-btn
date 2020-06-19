@@ -62,6 +62,11 @@ class Cancelled(Error):
     pass
 
 
+class FetchError(Error):
+
+    pass
+
+
 GetTorrent = Callable[[], bytes]
 
 
@@ -1085,7 +1090,11 @@ class _Torrent:
     def _maybe_async_fetch_torrent_info(self):
 
         def fetch(get_torrent:GetTorrent):
-            return lt.torrent_info(lt.bdecode(get_torrent()))
+            try:
+                data = get_torrent()
+            except Exception as exc:
+                raise FetchError(str(exc)) from exc
+            return lt.torrent_info(lt.bdecode(data))
 
         with self._lock:
             assert self._add_torrent_params is None

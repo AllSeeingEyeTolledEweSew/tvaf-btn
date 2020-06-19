@@ -1085,17 +1085,7 @@ class _Torrent:
     def _maybe_async_fetch_torrent_info(self):
 
         def fetch(get_torrent:GetTorrent):
-            torrent_info: Optional[lt.torrent_info] = None
-            exception: Optional[Exception] = None
-            try:
-                torrent_info = lt.torrent_info(lt.bdecode(get_torrent()))
-            except Exception as e:
-                exception = e
-            try:
-                self._handle_fetched_torrent_info(torrent_info=torrent_info,
-                        exception=exception)
-            except:
-                self._exception("during handle_fetched_torrent_info")
+            return lt.torrent_info(lt.bdecode(get_torrent()))
 
         with self._lock:
             assert self._add_torrent_params is None
@@ -1110,23 +1100,23 @@ class _Torrent:
             assert reqs
             get_torrent = reqs[0].params.get_torrent
 
-            fetch_thread = threading.Thread(name=f"fetch-{self._info_hash}",
-                                            target=fetch,
-                                            args=(get_torrent,))
-            fetch_thread.start()
+            future = self._ios.executor.submit(fetch, get_torrent)
+            future.add_done_callback(self._handle_fetched_torrent_info)
 
     def _handle_fetched_torrent_info(
         self,
-        torrent_info: Optional[lt.torrent_info] = None,
-        exception: Optional[Exception] = None):
+        future:concurrent.futures.Future):
+        assert future.done()
         save_path = str(self._ios.get_config().download_dir)
 
         with self._lock:
             self._remove_pending(_Action.FETCH)
 
-            if exception is not None:
-                self._error("while fetching torrent info: %s", exception)
-                self._fatal(exception)
+            try:
+                torrent_info = future.result()
+            except Exception as exc:
+                self._exception("while fetching torrent info")
+                self._fatal(exc)
                 return
 
             assert torrent_info is not None
@@ -1273,12 +1263,15 @@ class IOService:
     def __init__(self,
                  *,
                  session: lt.session = None,
-                 get_config: Optional[GetConfig] = None):
+                 get_config: Optional[GetConfig] = None,
+                 executor: concurrent.futures.Executor=None):
         assert session is not None
         assert get_config is not None
+        assert executor is not None
 
         self._session = session
         self.get_config = get_config
+        self.executor = executor
 
         # One lock for both top-level and per-torrent operations. I have not
         # yet implemented a proper locking protocol between IOService and

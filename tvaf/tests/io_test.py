@@ -31,13 +31,14 @@ class IOServiceTestCase(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.config = Config(download_dir=self.tempdir.name)
-        self.init_session()
         self.executor = concurrent.futures.ThreadPoolExecutor()
+        self.init_session()
 
     def init_session(self):
         self.session = test_utils.create_isolated_session()
         self.ios = IOService(session=self.session,
-                             get_config=lambda: self.config)
+                             get_config=lambda: self.config,
+                             executor=self.executor)
 
     def tearDown(self):
         self.tempdir.cleanup()

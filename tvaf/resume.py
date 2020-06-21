@@ -11,6 +11,7 @@ from tvaf import driver as driver_lib
 import re
 import concurrent.futures
 from typing import Any
+from tvaf import ltpy
 
 _log = logging.getLogger(__name__)
 
@@ -30,8 +31,9 @@ def iter_resume_data_from_disk(resume_data_dir:pathlib.Path):
             continue
 
         try:
-            yield lt.read_resume_data(data)
-        except Exception:
+            with ltpy.translate_exceptions():
+                yield lt.read_resume_data(data)
+        except ltpy.Error:
             _log.exception("while parsing %s", path)
             continue
 
@@ -104,9 +106,9 @@ class ResumeService(driver_lib.Ticker):
             if flush:
                 flags |= handle.flush_disk_cache
             try:
-                handle.save_resume_data(flags)
-            except Exception:
-                # ignore invalid handle
+                with ltpy.translate_exceptions():
+                    handle.save_resume_data(flags)
+            except ltpy.InvalidTorrentHandleError:
                 return
             self._inc(infohash)
 
@@ -125,7 +127,8 @@ class ResumeService(driver_lib.Ticker):
 
     def _write_resume_data_inner(self, infohash:str, atp:lt.add_torrent_params):
         path = self._get_resume_data_path(infohash)
-        bencoded_resume_data = lt.bencode(lt.write_resume_data(atp))
+        with ltpy.translate_exceptions():
+            bencoded_resume_data = lt.bencode(lt.write_resume_data(atp))
         tmp_path = path.with_suffix(".tmp")
         self.resume_data_dir.mkdir(parents=True, exist_ok=True)
         try:
@@ -177,7 +180,8 @@ class ResumeService(driver_lib.Ticker):
 
     def handle_alert(self, alert:lt.alert):
         if isinstance(alert, lt.save_resume_data_alert):
-            infohash = str(alert.handle.info_hash())
+            with ltpy.translate_exceptions():
+                infohash = str(alert.handle.info_hash())
             # I have seen this happen in testing, if save_resume_data() is
             # called immediately after remove_torrent().
             with self._condition:
@@ -188,20 +192,24 @@ class ResumeService(driver_lib.Ticker):
             self.executor.submit(self._write_resume_data, infohash,
                     alert.params)
         elif isinstance(alert, lt.save_resume_data_failed_alert):
-            infohash = str(alert.handle.info_hash())
+            with ltpy.translate_exceptions():
+                infohash = str(alert.handle.info_hash())
             self._dec(infohash)
         elif isinstance(alert, lt.add_torrent_alert):
             with self._condition:
                 if self._aborted:
                     _log.warning("torrent added after ResumeService aborted")
                     return
-                infohash = str(alert.handle.info_hash())
+                with ltpy.translate_exceptions():
+                    infohash = str(alert.handle.info_hash())
                 self._handles[infohash] = alert.handle
         elif isinstance(alert, lt.torrent_removed_alert):
-            infohash = str(alert.info_hash)
+            with ltpy.translate_exceptions():
+                infohash = str(alert.info_hash)
             self.executor.submit(self._delete_resume_data, infohash)
         elif isinstance(alert, (lt.file_renamed_alert, lt.torrent_paused_alert,
             lt.torrent_finished_alert, lt.storage_moved_alert,
             lt.cache_flushed_alert)):
-            infohash = str(alert.handle.info_hash())
+            with ltpy.translate_exceptions():
+                infohash = str(alert.handle.info_hash())
             self._save(infohash)

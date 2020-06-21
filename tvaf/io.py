@@ -565,7 +565,8 @@ class _Torrent:
 
         if info_hash is None:
             assert add_torrent_params is not None
-            info_hash = str(add_torrent_params.info_hash)
+            with ltpy.translate_exceptions():
+                info_hash = str(add_torrent_params.info_hash)
 
         self._ios = ios
         # One lock for both top-level and per-torrent operations. I have not
@@ -628,7 +629,8 @@ class _Torrent:
                 "seconds. Force-checking the torrent to recover lost hash "
                 "jobs. You should upgrade to libtorrent>=1.2.7", outstanding,
                 delta)
-            self._handle.force_recheck()
+            with ltpy.translate_exceptions():
+                self._handle.force_recheck()
             self._time_4604_changed = now
 
     def handle_status_update(self, status: lt.torrent_status):
@@ -830,18 +832,21 @@ class _Torrent:
                     deadline = seq * self._DEADLINE_GAP
                     self._debug("set_piece_deadline(%d, %d, %d)", i, deadline,
                                 flags)
-                    # Non-blocking
-                    self._handle.set_piece_deadline(i, deadline, flags)
+                    with ltpy.translate_exceptions():
+                        # Non-blocking
+                        self._handle.set_piece_deadline(i, deadline, flags)
                 else:
                     self._debug("reset_piece_deadline(%d)", i)
-                    # Non-blocking
-                    self._handle.reset_piece_deadline(i)
+                    with ltpy.translate_exceptions():
+                        # Non-blocking
+                        self._handle.reset_piece_deadline(i)
 
             if want_priorities != self._piece_priorities:
                 self._debug("prioritize_pieces(%s)",
                             list(want_priorities.items()))
-                # Non-blocking
-                self._handle.prioritize_pieces(list(want_priorities.items()))
+                with ltpy.translate_exceptions():
+                    # Non-blocking
+                    self._handle.prioritize_pieces(list(want_priorities.items()))
                 self._piece_priorities = want_priorities
 
     def handle_read_piece_alert(self, alert: lt.read_piece_alert):
@@ -965,8 +970,9 @@ class _Torrent:
                     continue
                 if i in self._piece_have and i not in self._piece_reading:
                     self._debug("firing read_piece(%d)", i)
-                    # Non-blocking
-                    self._handle.read_piece(i)
+                    with ltpy.translate_exceptions():
+                        # Non-blocking
+                        self._handle.read_piece(i)
                     self._piece_reading.add(i)
 
     def _update_flags(self):
@@ -1002,8 +1008,9 @@ class _Torrent:
             self._flags &= ~immediate_mask
             self._flags |= (flags & immediate_mask)
 
-            # Non-blocking
-            self._handle.set_flags(flags, mask)
+            with ltpy.translate_exceptions():
+                # Non-blocking
+                self._handle.set_flags(flags, mask)
 
     def handle_torrent_paused_alert(self, alert: lt.torrent_paused_alert):
         with self._lock:
@@ -1066,8 +1073,9 @@ class _Torrent:
 
             flags = lt.torrent_flags.paused
             mask = lt.torrent_flags.paused | lt.torrent_flags.auto_managed
-            # Non-blocking
-            self._handle.set_flags(flags, mask)
+            with ltpy.translate_exceptions():
+                # Non-blocking
+                self._handle.set_flags(flags, mask)
 
             self._flags &= ~lt.torrent_flags.auto_managed
 
@@ -1150,8 +1158,9 @@ class _Torrent:
             self._debug("adding torrent")
             self._mark_pending(_Action.ADD)
 
-            # DOES block (may do disk io to normalize path)
-            self._ios._session.async_add_torrent(self._add_torrent_params)
+            with ltpy.translate_exceptions():
+                # DOES block (may do disk io to normalize path)
+                self._ios._session.async_add_torrent(self._add_torrent_params)
 
     def handle_add_torrent_alert(self, alert: lt.add_torrent_alert):
         exc = ltpy.exception_from_alert(alert)
@@ -1199,8 +1208,9 @@ class _Torrent:
             handle = self._handle
             self._handle = None
             self._add_torrent_params = None
-            # DOES block (checks handle is valid)
-            self._ios._session.remove_torrent(handle, flags)
+            with ltpy.translate_exceptions():
+                # DOES block (checks handle is valid)
+                self._ios._session.remove_torrent(handle, flags)
 
     def handle_torrent_removed_alert(self, alert: lt.torrent_removed_alert):
         with self._lock:
@@ -1348,7 +1358,8 @@ class IOService:
 
     def add_torrent(self, atp: lt.add_torrent_params):
         with self._lock:
-            info_hash = str(atp.info_hash)
+            with ltpy.translate_exceptions():
+                info_hash = str(atp.info_hash)
             if info_hash in self._torrents:
                 raise KeyError(info_hash)
             self._torrents[info_hash] = _Torrent(ios=self,
@@ -1364,7 +1375,7 @@ class IOService:
         # whenever we change alert_when_available state. Not useful to us.
         if isinstance(alert, lt.read_piece_alert):
             exc = ltpy.exception_from_alert(alert)
-            if isinstance(exc, OSError) and exc.errno == errno.ECANCELED:
+            if isinstance(exc, ltpy.CanceledError):
                 return False
         return True
 
@@ -1372,7 +1383,8 @@ class IOService:
         with self._lock:
             torrent = self._torrents_by_handle.get(handle)
             if not torrent:
-                info_hash = str(handle.info_hash())
+                with ltpy.translate_exceptions():
+                    info_hash = str(handle.info_hash())
                 torrent = self._torrents.get(info_hash)
             return torrent
 

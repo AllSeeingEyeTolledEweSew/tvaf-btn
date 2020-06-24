@@ -20,6 +20,7 @@ from typing import Any
 from typing import Callable
 from typing import Dict
 from typing import Iterable
+from typing import Mapping
 from typing import List
 from typing import Sequence
 from typing import Union
@@ -34,11 +35,12 @@ import intervaltree
 import libtorrent as lt
 
 from tvaf import util
-from tvaf.config import GetConfig
 from tvaf import types
 from tvaf import ltpy
 
 _log = logging.getLogger(__name__)
+
+GetConfig = Callable[[], Mapping[str, Any]]
 
 
 class RequestMode(enum.Enum):
@@ -1133,7 +1135,7 @@ class _Torrent:
         self,
         future:concurrent.futures.Future):
         assert future.done()
-        save_path = str(self._ios.get_config().download_dir)
+        save_path = str(self._ios.get_config().get("download_dir", ""))
 
         with self._lock:
             self._remove_pending(_Action.FETCH)

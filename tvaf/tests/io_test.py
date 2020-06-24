@@ -15,7 +15,6 @@ import concurrent.futures
 
 import libtorrent as lt
 
-from tvaf.config import Config
 from tvaf.io import IOService
 from tvaf.io import RequestMode
 from tvaf import types
@@ -30,7 +29,7 @@ class IOServiceTestCase(unittest.TestCase):
 
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
-        self.config = Config(download_dir=self.tempdir.name)
+        self.config = dict(download_dir=self.tempdir.name)
         self.executor = concurrent.futures.ThreadPoolExecutor()
         self.init_session()
 
@@ -286,7 +285,7 @@ class TestRead(IOServiceTestCase):
         path = os.path.join(self.tempdir.name, "file.txt")
         with open(path, mode="w") as f:
             pass
-        self.config = self.config.replace(download_dir=path)
+        self.config["download_dir"] = path
 
         req = self.add_req()
         self.feed_pieces()

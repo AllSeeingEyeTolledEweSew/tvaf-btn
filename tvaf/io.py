@@ -420,8 +420,17 @@ class BufferedTorrentIO(io.BufferedIOBase):
 
         chunk = _EMPTY
         while request.has_next():
-            # TODO: timeouts
-            chunk = request.next()
+            try:
+                # TODO: timeouts
+                chunk = request.next()
+            except OSError:
+                raise
+            except ltpy.Error as exc:
+                raise OSError(errno.EIO, str(exc)) from exc
+            except Cancelled as exc:
+                raise OSError(errno.ECANCELED, str(exc)) from exc
+            except Error as exc:
+                raise OSError(errno.EIO, str(exc)) from exc
             if read1:
                 # We requested a 1-byte read. Now expand the chunk, up to the
                 # requested size.

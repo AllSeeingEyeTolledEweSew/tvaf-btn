@@ -2,6 +2,7 @@
 # accompanying UNLICENSE file.
 
 import logging
+import pathlib
 import os
 import os.path
 import sys
@@ -18,6 +19,7 @@ import libtorrent as lt
 from tvaf.io import IOService
 from tvaf.io import RequestMode
 from tvaf import types
+from tvaf import config as config_lib
 import tvaf.io
 
 from . import test_utils
@@ -29,14 +31,17 @@ class IOServiceTestCase(unittest.TestCase):
 
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
-        self.config = dict(download_dir=self.tempdir.name)
+        self.config_dir = pathlib.Path(self.tempdir.name)
+        self.config = config_lib.Config(
+            torrent_default_save_path=str(self.config_dir))
         self.executor = concurrent.futures.ThreadPoolExecutor()
         self.init_session()
 
     def init_session(self):
         self.session = test_utils.create_isolated_session()
         self.ios = IOService(session=self.session,
-                             get_config=lambda: self.config,
+                             config=self.config,
+                             config_dir=self.config_dir,
                              executor=self.executor)
 
     def tearDown(self):
@@ -285,7 +290,8 @@ class TestRead(IOServiceTestCase):
         path = os.path.join(self.tempdir.name, "file.txt")
         with open(path, mode="w") as f:
             pass
-        self.config["download_dir"] = path
+        self.config["torrent_default_save_path"] = path
+        self.ios.set_config(self.config)
 
         req = self.add_req()
         self.feed_pieces()
@@ -693,3 +699,69 @@ class TestBufferedTorrentIO(IOServiceTestCase):
         f = self.executor.submit(fp.read, 1024)
         self.pump_alerts(f.done, msg="second read")
         self.assertEqual(f.result(), tdummy.DATA[:1024])
+
+
+class TestConfig(unittest.TestCase):
+
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.executor = concurrent.futures.ThreadPoolExecutor()
+        self.config_dir = pathlib.Path(self.tempdir.name)
+        self.config = config_lib.Config()
+        self.session = test_utils.create_isolated_session()
+        self.ios = IOService(session=self.session,
+                             config=self.config,
+                             config_dir=self.config_dir,
+                             executor=self.executor)
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+        self.executor.shutdown()
+
+    def test_config_defaults(self):
+        save_path = str(self.config_dir.joinpath("downloads"))
+        self.assertEqual(self.config, config_lib.Config(
+            torrent_default_save_path=save_path))
+
+        self.assertEqual(self.ios.get_atp_settings(),
+                dict(save_path=save_path))
+
+    def test_set_config(self):
+        # Set all non-default configs
+        self.config["torrent_default_save_path"] = self.tempdir.name
+        self.config["torrent_default_flags_apply_ip_filter"] = False
+        self.config["torrent_default_storage_mode"] = "allocate"
+        self.ios.set_config(self.config)
+
+        self.assertEqual(self.ios.get_atp_settings(), dict(
+            save_path=self.tempdir.name,
+            flags=lt.torrent_flags.default_flags & ~lt.torrent_flags.apply_ip_filter,
+            storage_mode=lt.storage_mode_t.storage_mode_allocate))
+
+        # Set some default configs
+        self.config["torrent_default_flags_apply_ip_filter"] = True
+        self.config["torrent_default_storage_mode"] = "sparse"
+        self.ios.set_config(self.config)
+
+        self.assertEqual(self.ios.get_atp_settings(), dict(
+            save_path=self.tempdir.name,
+            flags=lt.torrent_flags.default_flags | lt.torrent_flags.apply_ip_filter,
+            storage_mode=lt.storage_mode_t.storage_mode_sparse))
+
+    def test_save_path_loop(self):
+        bad_link = self.config_dir.joinpath("bad_link")
+        bad_link.symlink_to(bad_link, target_is_directory=True)
+
+        self.config["torrent_default_save_path"] = str(bad_link)
+        with self.assertRaises(config_lib.InvalidConfigError):
+            self.ios.set_config(self.config)
+
+    def test_flags_apply_ip_filter_null(self):
+        self.config["torrent_default_flags_apply_ip_filter"] = None
+        with self.assertRaises(config_lib.InvalidConfigError):
+            self.ios.set_config(self.config)
+
+    def test_storage_mode_invalid(self):
+        self.config["torrent_default_storage_mode"] = "invalid"
+        with self.assertRaises(config_lib.InvalidConfigError):
+            self.ios.set_config(self.config)

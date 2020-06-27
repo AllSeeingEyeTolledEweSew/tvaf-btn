@@ -10,6 +10,7 @@ import dataclasses
 import enum
 import logging
 import mmap
+import pathlib
 import math
 import random
 import errno
@@ -25,6 +26,7 @@ from typing import List
 from typing import Sequence
 from typing import Union
 from typing import Optional
+from typing import MutableMapping
 from typing import Set
 from typing import SupportsFloat
 from typing import Tuple
@@ -36,12 +38,12 @@ import libtorrent as lt
 
 from tvaf import util
 from tvaf import types
+from tvaf import config as config_lib
 from tvaf import ltpy
 
 _log = logging.getLogger(__name__)
 
-GetConfig = Callable[[], Mapping[str, Any]]
-
+DEFAULT_DOWNLOAD_DIR_NAME = "downloads"
 
 class RequestMode(enum.Enum):
 
@@ -1135,7 +1137,7 @@ class _Torrent:
         self,
         future:concurrent.futures.Future):
         assert future.done()
-        save_path = str(self._ios.get_config().get("download_dir", ""))
+        atp_settings = self._ios._atp_settings
 
         with self._lock:
             self._remove_pending(_Action.FETCH)
@@ -1152,8 +1154,11 @@ class _Torrent:
             self._debug("got torrent info")
 
             atp = lt.add_torrent_params()
-            # NB: async_add_torrent may do disk io to normalize the path
-            atp.save_path = save_path
+
+            # NB: async_add_torrent may do disk io to normalize save_path
+            for key, value in self._ios.get_atp_settings().items():
+                setattr(atp, key, value)
+
             atp.ti = torrent_info
 
             self._set_add_torrent_params(atp)
@@ -1293,14 +1298,16 @@ class IOService:
     def __init__(self,
                  *,
                  session: lt.session = None,
-                 get_config: Optional[GetConfig] = None,
+                 config:config_lib.Config=None,
+                 config_dir:pathlib.Path=None,
                  executor: concurrent.futures.Executor=None):
         assert session is not None
-        assert get_config is not None
+        assert config is not None
+        assert config_dir is not None
         assert executor is not None
 
         self._session = session
-        self.get_config = get_config
+        self.config_dir = config_dir
         self.executor = executor
 
         # One lock for both top-level and per-torrent operations. I have not
@@ -1315,6 +1322,52 @@ class IOService:
         else:
             self._post_torrent_updates_deadline = math.inf
             self._tick_deadline = math.inf
+
+        self._atp_settings:Mapping[str, Any] = {}
+        self.set_config(config)
+
+    def get_atp_settings(self) -> Mapping[str, Any]:
+        return self._atp_settings
+
+    def set_config(self, config:config_lib.Config):
+        config.setdefault("torrent_default_save_path",
+                str(self.config_dir.joinpath(DEFAULT_DOWNLOAD_DIR_NAME)))
+
+        atp_settings:MutableMapping[str, Any] = {}
+
+        save_path = pathlib.Path(config.require_str("torrent_default_save_path"))
+        try:
+            # Raises RuntimeError on symlink loops
+            save_path= save_path.resolve()
+        except RuntimeError as exc:
+            raise config_lib.InvalidConfigError(str(exc)) from exc
+
+        atp_settings["save_path"] = str(save_path)
+
+        name_to_flag = {
+            "apply_ip_filter": lt.torrent_flags.apply_ip_filter,
+        }
+
+        for name, flag in name_to_flag.items():
+            key = f"torrent_default_flags_{name}"
+            value = config.get_bool(key)
+            if value is None:
+                continue
+            atp_settings.setdefault("flags", lt.torrent_flags.default_flags)
+            if value:
+                atp_settings["flags"] |= flag
+            else:
+                atp_settings["flags"] &= ~flag
+
+        maybe_name = config.get_str("torrent_default_storage_mode")
+        if maybe_name is not None:
+            full_name = f"storage_mode_{maybe_name}"
+            value = lt.storage_mode_t.names.get(full_name)
+            if value is None:
+                raise config_lib.InvalidConfigError(f"invalid storage mode {maybe_name}")
+            atp_settings["storage_mode"] = value
+
+        self._atp_settings = atp_settings
 
     def open(self, *, ref:types.TorrentRef=None,
             get_torrent:GetTorrent=None, user:str=None) -> io.BufferedIOBase:

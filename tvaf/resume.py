@@ -15,7 +15,10 @@ from tvaf import ltpy
 
 _log = logging.getLogger(__name__)
 
-def iter_resume_data_from_disk(resume_data_dir:pathlib.Path):
+RESUME_DATA_DIR_NAME = "resume"
+
+def iter_resume_data_from_disk(config_dir:pathlib.Path):
+    resume_data_dir = config_dir.joinpath(RESUME_DATA_DIR_NAME)
     if not resume_data_dir.is_dir():
         return
     for path in resume_data_dir.iterdir():
@@ -51,14 +54,14 @@ class ResumeService(driver_lib.Ticker):
 
     SAVE_ALL_INTERVAL = math.tan(1.5657)  # ~196
     
-    def __init__(self, *, resume_data_dir:Optional[pathlib.Path]=None,
+    def __init__(self, *, config_dir:pathlib.Path=None,
             session:Optional[lt.session]=None,
             executor:Optional[concurrent.futures.Executor]=None):
-        assert resume_data_dir is not None
+        assert config_dir is not None
         assert session is not None
         assert executor is not None
 
-        self.resume_data_dir = resume_data_dir
+        self.resume_data_dir = config_dir.joinpath(RESUME_DATA_DIR_NAME)
         self.session = session
         self.executor = executor
 

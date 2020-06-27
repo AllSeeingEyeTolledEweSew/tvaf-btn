@@ -11,194 +11,103 @@ import pathlib
 from typing import List
 from typing import Any
 from typing import Dict
+from typing import MutableMapping
 from typing import Union
+from typing import Mapping
+from typing import Optional
+from typing import Type
 
-import libtorrent as lt
+
+# Design notes:
+
+# Config is stored as json. This is so external programs can easily manipulate
+# the config if necessary.
+
+# Config is a dict of json-compatible python primitives. I tried using a
+# dataclass to map it, but as of 3.8, translating between dataclasses and json
+# is still quite cumbersome. We either need ad-hoc code in several different
+# places, or complex metaclass code. All type conversion also needs to be
+# centralized, which impacts modularity.
+
+# I considered "staging" config updates, such that e.g. when the FTP port is
+# changed, we would:
+#  - bind a socket to the new port
+#  - attempt any other config changes
+#  - if other changes fail, close the new socket
+#  - if other changes succeed, start the ftp server on the new port and close
+#    the old server.
+# Pros: minimizes operational interruption.
+# Cons: this breaks on changes such as changing the ftp binding from 0.0.0.0:21
+#       to 127.0.0.1:21, as the old server blocks the new binding.
+
+# In Python we prefer to work with "disposable" objects which are configured
+# only once, and re-created as necessary. However, tvaf's top-level App code
+# doesn't know the right life cycle for its various components (for example,
+# should the App re-create the FTP server for a particular config change?).
+# So we design our components to be long-lived objects which can be
+# re-configured over their lifetimes.
 
 
 FILENAME = "config.json"
-RESUME_DATA_DIR_NAME = "resume"
-DEFAULT_DOWNLOAD_DIR_NAME = "downloads"
-
-class SettingsPack(dict):
-
-    @staticmethod
-    def get_overrides():
-        return {
-            "announce_ip": "",
-            "handshake_client_version": "",
-            "enable_lsd": False,
-            "enable_dht": False,
-            # For testing
-            #"peer_fingerprint": lt.generate_fingerprint("DE", 1, 3, 9, 0),
-            # For testing
-            #"user_agent": "Deluge 1.3.9",
-            "alert_queue_size": 2 ** 32 - 1,
-        }
-
-    @staticmethod
-    def get_blacklist():
-        return {
-            "user_agent",
-            "peer_fingerprint",
-        }
-
-    def __setitem__(self, key, value):
-        raise TypeError("SettingsPack is immutable")
-
-    def __delitem__(self, key):
-        raise TypeError("SettingsPack is immutable")
 
 
-def get_libtorrent_alert_categories() -> Dict[str, int]:
-    name_to_mask:Dict[str, int] = {}
-    for name in dir(lt.alert_category):
-        if name.startswith("__"):
-            continue
-        value = getattr(lt.alert_category, name)
-        if not isinstance(value, int):
-            continue
-        # Only return single-bit masks
-        if value & (value - 1) == 0:
-            continue
-        name_to_mask[name] = value
-    return name_to_mask
+class Error(Exception):
+
+    pass
 
 
-_IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-_IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
+class InvalidConfigError(Error):
+
+    pass
 
 
-@dataclasses.dataclass(frozen=True)
-class Config:
-
-    config_dir: pathlib.Path = pathlib.Path()
-
-    sftp_enabled: bool = False
-    sftp_bind_address: _IPAddress = dataclasses.field(default=ipaddress.ip_address("::"))
-    sftp_port: int = 0
-    sftp_ip_whitelist: List[_IPNetwork] = dataclasses.field(default_factory=list)
-
-    http_enabled: bool = False
-    http_bind_address: _IPAddress = dataclasses.field(
-            default=ipaddress.ip_address("::"))
-    http_port:int = 0
-    http_host_whitelist: List[str] = dataclasses.field(
-            default_factory=list)
-    http_ip_whitelist: List[_IPNetwork] = dataclasses.field(
-            default_factory=list)
-
-    download_dir: pathlib.Path = pathlib.Path()
-    libtorrent_settings_base: str = ""
-    libtorrent_settings: SettingsPack = dataclasses.field(
-        default_factory=SettingsPack)
-
-    def __post_init__(self):
-        super().__setattr__("http_enabled", bool(self.http_enabled))
-        super().__setattr__("http_port", int(self.http_port))
-        super().__setattr__("http_bind_address",
-                ipaddress.ip_address(self.http_bind_address))
-        super().__setattr__("http_ip_whitelist",
-                [ipaddress.ip_network(net) for net in self.http_ip_whitelist])
-
-        super().__setattr__("sftp_enabled", bool(self.sftp_enabled))
-        super().__setattr__("sftp_port", int(self.sftp_port))
-        super().__setattr__("sftp_bind_address",
-                ipaddress.ip_address(self.sftp_bind_address))
-        super().__setattr__("sftp_ip_whitelist",
-                [ipaddress.ip_network(net) for net in self.sftp_ip_whitelist])
-
-        super().__setattr__("download_dir",
-                pathlib.Path(self.download_dir).resolve(strict=False))
-        super().__setattr__("libtorrent_settings",
-                SettingsPack(self.libtorrent_settings))
-
-    def replace(self, **changes) -> Config:
-        return dataclasses.replace(self, **changes)
-
-    def get_libtorrent_settings_base(self) -> str:
-        attr = getattr(lt, self.libtorrent_settings_base, None)
-        if callable(attr) and isinstance(attr(), dict):
-            return self.libtorrent_settings_base
-        return "default_settings"
-
-    def get_effective_libtorrent_settings(self) -> SettingsPack:
-        result = getattr(lt, self.get_libtorrent_settings_base())()
-        user_settings = dict(self.libtorrent_settings)
-        for key in SettingsPack.get_blacklist():
-            user_settings.pop(key, None)
-        result.update(user_settings)
-        result.update(SettingsPack.get_overrides())
-        return SettingsPack(result)
-
-    def normalize(self) -> Config:
-        return self.replace(
-            libtorrent_settings_base=self.get_libtorrent_settings_base())
-
-    def to_json(self) -> Dict[str, Any]:
-        result = dataclasses.asdict(self)
-
-        # Don't serialize config_dir
-        result.pop("config_dir", None)
-
-        result["http_bind_address"] = str(result["http_bind_address"])
-        result["http_ip_whitelist"] = [
-            str(net) for net in result["http_ip_whitelist"]]
-
-        result["sftp_bind_address"] = str(result["sftp_bind_address"])
-        result["sftp_ip_whitelist"] = [
-            str(net) for net in result["sftp_ip_whitelist"]]
-
-        result["download_dir"] = str(result["download_dir"])
-
-        return result
+class Config(dict, MutableMapping[str, Any]):
 
     @classmethod
-    def get_default(cls, config_dir:pathlib.Path):
-        return cls(
-            config_dir=config_dir,
-            sftp_enabled=True,
-            sftp_bind_address="::1",
-                sftp_port=7387,
-                sftp_ip_whitelist=["127.0.0.0/8", "::1/128"],
-                http_enabled=True,
-                http_bind_address="::1",
-                http_port=8823,
-                http_host_whitelist=["localhost"],
-                http_ip_whitelist=["127.0.0.0/8"],
-                download_dir=config_dir.joinpath(DEFAULT_DOWNLOAD_DIR_NAME),
-                libtorrent_settings_base="default_settings",
-        )
-
-    @classmethod
-    def load(cls, config_dir:pathlib.Path):
-        config = cls.get_default(config_dir)
-        path = config_dir.joinpath(FILENAME)
-        try:
-            with path.open() as config_file:
-                config_json = json.load(config_file)
-            config = config.replace(**config_json)
-        except FileNotFoundError:
-            pass
-        return config
-
-    def save(self):
-        config_data = self.normalize().to_json()
-        path = self.config_dir.joinpath(FILENAME)
-        path.parent.mkdir(exist_ok=True, parents=True)
-        tmp_path = path.with_suffix(".tmp")
-        try:
-            with tmp_path.open(mode="w") as fp:
-                json.dump(config_data, fp, sort_keys=True, indent=4)
-            tmp_path.replace(path)
-        finally:
+    def from_config_dir(cls, config_dir:pathlib.Path):
+        with config_dir.joinpath(FILENAME).open() as fp:
             try:
-                tmp_path.unlink()
-            except FileNotFoundError:
-                pass
+                data = json.load(fp)
+            except json.JSONDecodeError as exc:
+                raise InvalidConfigError(str(exc)) from exc
+        return cls(data)
 
-    def get_resume_data_dir(self) -> pathlib.Path:
-        return self.config_dir.joinpath(RESUME_DATA_DIR_NAME)
+    def write_config_dir(self, config_dir:pathlib.Path):
+        with config_dir.joinpath(FILENAME).open(mode="w") as fp:
+            json.dump(self, fp, sort_keys=True, indent=4)
+
+    def _get(self, key:str, type_:Type, type_name:str):
+        value = self.get(key)
+        if key in self and not isinstance(value, type_):
+            raise InvalidConfigError(f"\"{key}\": {value!r} is not {type_name}")
+        return value
+
+    def _require(self, key:str, type_:Type, type_name:str):
+        value = self._get(key, type_, type_name)
+        if value is None:
+            raise InvalidConfigError(f"\"{key}\": missing")
+        return value
+
+    def get_int(self, key:str) -> Optional[int]:
+        return self._get(key, int, "int")
+
+    def get_str(self, key:str) -> Optional[str]:
+        return self._get(key, str, "str")
+
+    def get_bool(self, key:str) -> Optional[bool]:
+        return self._get(key, bool, "bool")
+
+    def require_int(self, key:str) -> int:
+        return self._require(key, int, "int")
+
+    def require_str(self, key:str) -> str:
+        return self._require(key, str, "str")
+
+    def require_bool(self, key:str) -> bool:
+        return self._require(key, bool, "bool")
 
 
-GetConfig = Callable[[], Config]
+class HasConfig:
+
+    def set_config(self, config:Config):
+        pass

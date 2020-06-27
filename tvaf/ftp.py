@@ -3,15 +3,21 @@ import time
 import logging
 import threading
 import os
+import contextlib
+from typing import Generator
 from typing import Mapping
 from typing import Any
 from tvaf import library
 from tvaf import auth
 import io
 from typing import List
+from typing import Iterator
 from typing import cast
 import stat as stat_lib
 import errno
+import tvaf.config as config_lib
+from typing import Optional
+from typing import Tuple
 import functools
 import pyftpdlib
 import pyftpdlib.filesystems
@@ -19,9 +25,6 @@ import pyftpdlib.servers
 import pyftpdlib.authorizers
 import pyftpdlib.handlers
 from typing import Callable
-
-
-GetConfig = Callable[[], Mapping[str, Any]]
 
 
 def _partialclass(cls, *args, **kwds):
@@ -222,51 +225,60 @@ class _FTPHandler(pyftpdlib.handlers.FTPHandler):
         self.abstracted_fs = _partialclass(_FS, root=root)
 
 
-class FTPD:
+class FTPD(config_lib.HasConfig):
 
-    def __init__(self, *, get_config:GetConfig=None, root:fs.Dir=None, auth_service:auth.AuthService=None):
+    def __init__(self, *, config:config_lib.Config=None, root:fs.Dir=None, auth_service:auth.AuthService=None):
         assert auth_service is not None
         assert root is not None
-        assert get_config is not None
+        assert config is not None
 
         self.auth_service = auth_service
         self.root = root
-        self.get_config = get_config
 
         self._lock = threading.RLock()
         self.server:Optional[pyftpdlib.servers.FTPServer] = None
         self.thread:Optional[threading.Thread] = None
-        self._address = ("localhost", 0)  # Dummy value
+        self._address:Optional[Tuple] = None
 
-        self.reload()
+        self.set_config(config)
 
-    def reload(self):
-        config = self.get_config()
+    def set_config(self, config:config_lib.Config):
+        config.setdefault("ftp_enabled", True)
+        config.setdefault("ftp_bind_address", "localhost")
+        config.setdefault("ftp_port", 8821)
 
         with self._lock:
-            enabled = bool(config.get("ftp_enabled"))
-            # Only parse address and port if ftp_enabled is true
-            if enabled:
-                address = (config["ftp_bind_address"], int(config["ftp_port"]))
-            else:
-                address = None
+            enabled = config.get_bool("ftp_enabled")
+            address:Optional[Tuple] = None
 
-            # If our config didn't change, do nothing
-            if enabled == (self.server is not None) and address == self._address:
+            # Only parse address and port if enabled
+            if config.require_bool("ftp_enabled"):
+                address = (config.require_str("ftp_bind_address"),
+                        config.require_int("ftp_port"))
+
+            # No change
+            if address == self._address:
                 return
 
-            # Our config changed; shut everything down.
+            # Address changed or shutting down, kill the current server
             self.abort()
             self.wait()
-            if not enabled:
+
+            # Just shutting down
+            if address is None:
                 return
 
-            self._address = address
-
+            # We have a new address
             handler = _partialclass(_FTPHandler, root=self.root,
                     auth_service=self.auth_service)
-            self.server = pyftpdlib.servers.ThreadedFTPServer(address, handler)
+            # ThreadedFTPServer binds its socket in its constructor
+            try:
+                server = pyftpdlib.servers.ThreadedFTPServer(address, handler)
+            except OSError as exc:
+                raise config_lib.InvalidConfigError(str(exc)) from exc
 
+            self._address = address
+            self.server = server
             self.thread = threading.Thread(name="ftpd",
                     target=self.server.serve_forever)
             self.thread.start()
@@ -282,3 +294,4 @@ class FTPD:
                 self.thread.join()
             self.thread = None
             self.server = None
+            self._address = None

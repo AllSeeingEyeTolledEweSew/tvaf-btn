@@ -42,9 +42,10 @@ class BaseTest(unittest.TestCase):
         self.session = test_utils.create_isolated_session()
         self.torrent = tdummy.DEFAULT
         self.tempdir = tempfile.TemporaryDirectory()
-        self.resume_data_dir = pathlib.Path(self.tempdir.name)
+        self.config_dir = pathlib.Path(self.tempdir.name)
+        self.resume_data_dir = self.config_dir.joinpath(resume_lib.RESUME_DATA_DIR_NAME)
         self.resume = resume_lib.ResumeService(session=self.session,
-                resume_data_dir=self.resume_data_dir,
+                config_dir=self.config_dir,
                 executor=InlineExecutor())
         self.driver = test_utils.InlineDriver()
         self.driver.session = self.session
@@ -81,6 +82,7 @@ class IterResumeDataTest(BaseTest):
         super().setUp()
 
         def write(t):
+            self.resume_data_dir.mkdir(parents=True, exist_ok=True)
             path = self.resume_data_dir.joinpath(t.infohash).with_suffix(".resume")
             data = lt.bencode(lt.write_resume_data(t.atp()))
             path.write_bytes(data)
@@ -89,7 +91,7 @@ class IterResumeDataTest(BaseTest):
         write(self.TORRENT2)
 
     def test_normal(self):
-        atps = list(resume_lib.iter_resume_data_from_disk(self.resume_data_dir))
+        atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.assertAtpSetEqual(set(atps), set((self.TORRENT1.atp(),
             self.TORRENT2.atp())))
 
@@ -116,7 +118,7 @@ class IterResumeDataTest(BaseTest):
         path = self.resume_data_dir.joinpath("02"*20).with_suffix(".resume")
         path.symlink_to("does_not_exist.resume")
 
-        atps = list(resume_lib.iter_resume_data_from_disk(self.resume_data_dir))
+        atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.assertAtpSetEqual(set(atps), set((self.TORRENT1.atp(),
             self.TORRENT2.atp())))
 
@@ -143,7 +145,7 @@ class AbortTest(BaseTest):
         self.session.pause()
         self.resume.abort()
         def check_atp():
-            atps = list(resume_lib.iter_resume_data_from_disk(self.resume_data_dir))
+            atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
             if not atps:
                 return False
             atp = atps[0]
@@ -171,7 +173,7 @@ class AbortTest(BaseTest):
         self.session.pause()
         self.resume.abort()
         def check_atp():
-            atps = list(resume_lib.iter_resume_data_from_disk(self.resume_data_dir))
+            atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
             if not atps:
                 return False
             atp = atps[0]
@@ -203,7 +205,7 @@ class AbortTest(BaseTest):
         self.session.pause()
         self.resume.abort()
         def no_resume_data():
-            return not list(resume_lib.iter_resume_data_from_disk(self.resume_data_dir))
+            return not list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.driver.pump(no_resume_data, msg="resume data delete")
         self.driver.pump(self.resume.done, msg="finalize")
         self.resume.wait()

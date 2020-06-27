@@ -1,5 +1,6 @@
 from tvaf import ftp
 import io
+from tvaf import config as config_lib
 import logging
 import ftplib
 import libtorrent as lt
@@ -8,6 +9,8 @@ from . import tdummy
 from tvaf import types
 from tvaf import library
 import unittest
+
+class DummyException(Exception): pass
 
 SINGLE = tdummy.Torrent.single_file(name=b"test.txt", length=16384 * 9 + 1000)
 MULTI = tdummy.Torrent(files=[
@@ -48,9 +51,11 @@ class BaseFTPTest(unittest.TestCase):
         self.libs.get_hints_funcs["test"] = lambda ih, idx: self.hints[(ih, idx)]
 
         self.auth_service = auth.AuthService()
-        self.config = dict(ftp_enabled=True, ftp_bind_address="localhost",
-                ftp_port=0)
-        self.ftpd = ftp.FTPD(get_config=lambda: self.config, root=self.libs.root, auth_service=self.auth_service)
+        # We would normally do an empty config, but we set ftp_port=0 to avoid
+        # collisions with anything else on the system
+        self.config = config_lib.Config(ftp_port=0)
+        self.ftpd = ftp.FTPD(root=self.libs.root,
+                auth_service=self.auth_service, config=self.config)
         self.address = self.ftpd.server.socket.getsockname()
         self.connect()
 
@@ -201,7 +206,7 @@ class TestConfig(BaseFTPTest):
 
     def test_change_binding(self):
         self.config["ftp_bind_address"] = "127.0.0.1"
-        self.ftpd.reload()
+        self.ftpd.set_config(self.config)
         with self.assertRaises(EOFError):
             self.ftp.pwd()
         self.address = self.ftpd.server.socket.getsockname()
@@ -210,7 +215,7 @@ class TestConfig(BaseFTPTest):
 
     def test_disable_enable(self):
         self.config["ftp_enabled"] = False
-        self.ftpd.reload()
+        self.ftpd.set_config(self.config)
 
         with self.assertRaises(EOFError):
             self.ftp.pwd()
@@ -218,8 +223,29 @@ class TestConfig(BaseFTPTest):
         self.assertIsNone(self.ftpd.server)
 
         self.config["ftp_enabled"] = True
-        self.ftpd.reload()
+        self.ftpd.set_config(self.config)
 
         self.address = self.ftpd.server.socket.getsockname()
         self.connect()
         self.assertEqual(self.ftp.pwd(), "/")
+
+    def test_no_changes(self):
+        self.ftpd.set_config(self.config)
+        self.assertEqual(self.ftp.pwd(), "/")
+
+    def test_bad_change(self):
+        self.config["ftp_port"] = -1
+        with self.assertRaises(config_lib.InvalidConfigError):
+            self.ftpd.set_config(self.config)
+
+        # Try reconfigure with good port
+        self.config["ftp_port"] = 0
+        self.ftpd.set_config(self.config)
+        self.address = self.ftpd.server.socket.getsockname()
+        self.connect()
+        self.assertEqual(self.ftp.pwd(), "/")
+
+    def test_default_config(self):
+        # Ensure we set some default values
+        self.assertEqual(self.config["ftp_enabled"], True)
+        self.assertEqual(self.config["ftp_bind_address"], "localhost")

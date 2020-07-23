@@ -18,97 +18,7 @@ from typing import SupportsFloat
 
 import apsw
 
-from tvaf.types import Audit
-from tvaf.types import Request
-from tvaf.types import RequestStatus
-from tvaf.types import TorrentMeta
-from tvaf.types import TorrentStatus
-
-
-class TimeMocker:
-    """A class to assist with mocking time functions for testing.
-
-    mock_time() returns an instance of TimeMocker as part of the context
-    manager protocol.
-
-    The attributes can be changed at any time to change the passage of time
-    while time functions are mocked.
-
-    Attributes:
-        time: The current time, in seconds since epoch.
-        autoincrement: The amount of time to automatically increment time
-            whenever time functions are called.
-    """
-
-    def __init__(self, time: SupportsFloat, autoincrement: SupportsFloat = 0):
-        self.time = float(time)
-        self.monotonic = 0
-        self.autoincrement = float(autoincrement)
-        assert self.autoincrement >= 0
-        self._patches = [
-            unittest.mock.patch("time.time", new=self._time),
-            unittest.mock.patch("time.monotonic", new=self._monotonic),
-            unittest.mock.patch("time.sleep", new=self._sleep),
-            unittest.mock.patch("threading.Condition.wait", new=self._wait),
-        ]
-
-    def _time(self) -> float:
-        """Mock version of time.time()."""
-        self._sleep(0)
-        return self.time
-
-    def _monotonic(self) -> float:
-        """Mock version of time.monotonic()."""
-        self._sleep(0)
-        return self.monotonic
-
-    def _wait(self, timeout=Optional[SupportsFloat]) -> None:
-        assert timeout is not None, "would sleep forever"
-        self._sleep(timeout)
-
-    def _sleep(self, time: SupportsFloat) -> None:
-        """Mock version of time.sleep()."""
-        increment = float(time) + self.autoincrement
-        self.time += increment
-        self.monotonic += increment
-
-    def __enter__(self) -> TimeMocker:
-        """Returns itself after enabling all time function patches."""
-        for patch in self._patches:
-            patch.start()
-        return self
-
-    def __exit__(self, *exc_info) -> None:
-        """Disables all time function patches."""
-        patches = list(self._patches)
-        patches.reverse()
-        for patch in patches:
-            patch.stop()
-
-
-def mock_time(time: SupportsFloat,
-              autoincrement: SupportsFloat = 0) -> ContextManager[TimeMocker]:
-    """Mock out time functions.
-
-    While the returned context is active, the following functions are mocked:
-        time.time
-        time.sleep
-        time.monotonic
-
-    In particular time.sleep will return instantly, and functions like
-    time.time and time.monotonic will return a synthetic value.
-
-    Args:
-        time: The starting synthetic time, in seconds since epoch.
-        autoincrement: If not None, time will automatically increment by this
-            amout whenever time functions are called. This simulates the
-            normal passage of time.
-
-    Returns:
-        A TimeMocker instance. The t and autoincrement functions can be changed
-            at any time to simulate changes in the passage of time.
-    """
-    return TimeMocker(time, autoincrement=autoincrement)
+import tvaf.types
 
 
 def add_fixture_row(conn: apsw.Connection, table: str, **kwargs: Any) -> None:
@@ -126,27 +36,10 @@ def add_fixture_row(conn: apsw.Connection, table: str, **kwargs: Any) -> None:
                           kwargs)
 
 
-def add_fixture_torrent_status(conn: apsw.Connection,
-                               status: TorrentStatus) -> None:
-    """Adds a TorrentStatus to the database."""
-    status_dict = dataclasses.asdict(status)
-    files_dicts = status_dict.pop("files")
-    add_fixture_row(conn, "torrent_status", **status_dict)
-    for file_dict in files_dicts:
-        file_dict["infohash"] = status_dict["infohash"]
-        add_fixture_row(conn, "file", **file_dict)
-
-
-def add_fixture_torrent_meta(conn: apsw.Connection, meta: TorrentMeta) -> None:
+def add_fixture_torrent_meta(conn: apsw.Connection, meta: tvaf.types.TorrentMeta) -> None:
     """Adds a TorrentMeta to the database."""
     meta_dict = dataclasses.asdict(meta)
     add_fixture_row(conn, "torrent_meta", **meta_dict)
-
-
-def add_fixture_request(conn: apsw.Connection, request: Request) -> None:
-    """Adds a Request to the database."""
-    request_dict = dataclasses.asdict(request)
-    add_fixture_row(conn, "request", **request_dict)
 
 
 class TestCase(unittest.TestCase):
@@ -253,34 +146,14 @@ class TestCase(unittest.TestCase):
                                if line.startswith("INSERT "))
         self.assert_golden(output, suffix=suffix)
 
-    def assert_golden_audit(self,
-                            *audits: Audit,
-                            suffix: str = "audits.golden.json") -> None:
-        """Compares a list of Audit records to golden data."""
+    def assert_golden_acct(self,
+                            *audits: tvaf.types.Acct,
+                            suffix: str = "accts.golden.json") -> None:
+        """Compares a list of Acct records to golden data."""
         self.assert_golden_json([a.to_dict() for a in audits], suffix=suffix)
 
-    def assert_golden_request_status(
-            self,
-            *status: RequestStatus,
-            suffix: str = "status.golden.json") -> None:
-        """Compares a list of TorrentStatus to golden data."""
-        self.assert_golden_json([s.to_dict() for s in status], suffix=suffix)
-
-    def assert_golden_requests(self,
-                               *reqs: Request,
-                               suffix: str = "requests.golden.json") -> None:
-        """Compares a list of Requests to golden data."""
-        self.assert_golden_json([r.to_dict() for r in reqs], suffix=suffix)
-
-    def assert_golden_torrent_status(
-            self,
-            *status: TorrentStatus,
-            suffix: str = "status.golden.json") -> None:
-        """Compares a list of TorrentStatuses to golden data."""
-        self.assert_golden_json([s.to_dict() for s in status], suffix=suffix)
-
     def assert_golden_torrent_meta(self,
-                                   *meta: TorrentMeta,
+                                   *meta: tvaf.types.TorrentMeta,
                                    suffix: str = "status.golden.json") -> None:
         """Compares a list of TorrentMetas to golden data."""
         self.assert_golden_json([m.to_dict() for m in meta], suffix=suffix)

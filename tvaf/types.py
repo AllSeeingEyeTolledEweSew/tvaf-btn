@@ -44,32 +44,6 @@ class TorrentRef(collections.abc.Sized):
         return self.stop - self.start
 
 
-class Tracker(enum.Enum):
-
-    BTN = "btn"
-    PTP = "ptp"
-
-
-@dataclasses_json.dataclass_json
-@dataclasses.dataclass
-class FileRef:
-    """A range of data within a file, which is itself part of a collection.
-
-    Attributes:
-        path: The path to this file. Depending on the context, this may be
-            a "suggested path" from a torrent file, or path to a real file on
-            the local filesystem.
-        file_index: The index of this file within the larger collection.
-        start: The first byte referenced within this file.
-        stop: The last byte referenced within this file, plus one.
-    """
-
-    path: str = ""
-    file_index: int = 0
-    start: int = 0
-    stop: int = 0
-
-
 @dataclasses_json.dataclass_json
 @dataclasses.dataclass
 class TorrentMeta:
@@ -132,7 +106,7 @@ class Acct:
     """
 
     user: Optional[str] = None
-    tracker: Optional[Tracker] = None
+    tracker: Optional[str] = None
     infohash: Optional[str] = None
     generation: Optional[int] = None
     num_bytes: int = 0

@@ -662,10 +662,6 @@ class _Torrent:
         with self._lock:
             self._check_4604()
 
-    def _is_paused(self) -> bool:
-        with self._lock:
-            return bool(self._flags & lt.torrent_flags.paused)
-
     def _set_add_torrent_params(self, atp: lt.add_torrent_params):
         assert atp.ti is not None
         atp.file_priorities = []
@@ -1053,53 +1049,6 @@ class _Torrent:
                     self._maybe_remove_torrent()
                 else:
                     self._maybe_remove_from_parent()
-
-    def _should_graceful_pause(self):
-        with self._lock:
-            if self._flags & lt.torrent_flags.paused:
-                return False
-            if self._keep():
-                return False
-            if self._removal_requested:
-                return False
-            return True
-
-    def _should_resume(self):
-        with self._lock:
-            if not (self._flags & lt.torrent_flags.paused):
-                return False
-            if self._flags & lt.torrent_flags.auto_managed:
-                return False
-            if self._is_checking():
-                return False
-            return True
-
-    def _maybe_graceful_pause(self):
-        with self._lock:
-            if self._any_pending():
-                return
-
-            assert self._handle is not None
-
-            self._debug("gracefully pausing torrent")
-            self._mark_pending(_Action.GRACEFUL_PAUSE)
-
-            flags = lt.torrent_flags.paused
-            mask = lt.torrent_flags.paused | lt.torrent_flags.auto_managed
-            with ltpy.translate_exceptions():
-                # Non-blocking
-                self._handle.set_flags(flags, mask)
-
-            self._flags &= ~lt.torrent_flags.auto_managed
-
-    def _maybe_resume(self):
-        with self._lock:
-            if self._any_pending():
-                return
-
-            assert self._handle is not None
-
-            self._debug("resuming torrent")
 
     def _get_preferred_params(self) -> Optional[RequestParams]:
         with self._lock:

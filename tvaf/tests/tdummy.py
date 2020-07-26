@@ -66,9 +66,9 @@ class Torrent:
 
     @classmethod
     def single_file(cls, *, piece_length=16384, length=None, name=None,
-            attr=None):
+            attr=None, data=None):
         return cls(piece_length=piece_length, files=[dict(length=length,
-            path=name, attr=attr)])
+            path=name, attr=attr, data=data)])
 
     def __init__(self, *, piece_length=16384, files=None):
         assert piece_length is not None
@@ -166,3 +166,5 @@ class Torrent:
 
 DEFAULT = Torrent.single_file(piece_length=16384, name=b"test.txt",
         length=16384 * 9 + 1000)
+DEFAULT_STABLE = Torrent.single_file(piece_length=16384, name=b"test.txt",
+        length=16384 * 9 + 1000, data=b"\0" * (16384 * 9 + 1000))

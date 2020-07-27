@@ -6,10 +6,58 @@ from typing import Optional
 from typing import Set
 import libtorrent as lt
 import logging
+from tvaf import ltpy
+from typing import Iterable
+from typing import Any
 
 AlertHandler = Callable[[lt.alert], None]
 
 _log = logging.getLogger(__name__)
+
+
+def dispatch(obj, alert:lt.alert, prefix="handle_"):
+    type_name = alert.__class__.__name__
+    handler = getattr(obj, prefix + type_name, None)
+    if handler:
+        handler(alert)
+
+
+def log_alert(alert: lt.alert,
+               message: str = "",
+               args: Iterable[Any] = (),
+               method=None):
+    prefix = "%s"
+    prefix_args = [alert.__class__.__name__]
+    torrent_name = getattr(alert, "torrent_name", None)
+    error = getattr(alert, "error", None)
+    if torrent_name and torrent_name not in alert.message():
+        prefix += ": %s"
+        prefix_args += [torrent_name]
+    if alert.message():
+        prefix += ": %s"
+        prefix_args += [alert.message()]
+    if error and error.value():
+        prefix += " [%s (%s %d)]"
+        prefix_args += [error.message(), error.category().name(), error.value()]
+        if method is None:
+            method = _log.error
+    if method is None:
+        method = _log.debug
+
+    if message:
+        message = prefix + ": " + message
+    else:
+        message = prefix
+
+    args = prefix_args + list(args)
+
+    method(message, *args)
+
+
+def allow_alert(alert: lt.alert):
+    if isinstance(alert, lt.read_piece_alert):
+        TODO
+    return True
 
 
 class AlertDriver:
@@ -48,8 +96,9 @@ class AlertDriver:
 
     def iter_alerts(self):
         while True:
-            self.session.wait_for_alert(int(self.ABORT_CHECK_INTERVAL * 1000))
-            alerts = self.session.pop_alerts()
+            with ltpy.translate_exceptions():
+                self.session.wait_for_alert(int(self.ABORT_CHECK_INTERVAL * 1000))
+                alerts = self.session.pop_alerts()
             if not alerts and self._aborted:
                 return
             yield from alerts

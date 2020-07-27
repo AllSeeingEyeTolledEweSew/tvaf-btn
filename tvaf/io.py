@@ -40,6 +40,7 @@ from tvaf import util
 from tvaf import types
 from tvaf import config as config_lib
 from tvaf import ltpy
+from tvaf import driver as driver_lib
 
 _log = logging.getLogger(__name__)
 
@@ -863,6 +864,12 @@ class _Torrent:
         data = alert.buffer
         i = alert.piece
 
+        # When we change alert_when_available state, libtorrent fires
+        # read_piece_alert with an "Operation canceled" error code. Not
+        # useful to us.
+        if isinstance(exc, ltpy.CanceledError):
+            return
+
         with self._lock:
             assert self._torrent_info is not None
             self._piece_reading.discard(i)
@@ -1210,38 +1217,6 @@ class _Torrent:
             self._sync()
 
 
-def _log_alert(alert: lt.alert,
-               message: str = "",
-               args: Iterable[Any] = (),
-               method=None):
-    prefix = "%s"
-    prefix_args = [alert.__class__.__name__]
-    torrent_name = getattr(alert, "torrent_name", None)
-    error = getattr(alert, "error", None)
-    if torrent_name and torrent_name not in alert.message():
-        prefix += ": %s"
-        prefix_args += [torrent_name]
-    if alert.message():
-        prefix += ": %s"
-        prefix_args += [alert.message()]
-    if error and error.value():
-        prefix += " [%s (%s %d)]"
-        prefix_args += [error.message(), error.category().name(), error.value()]
-        if method is None:
-            method = _log.error
-    if method is None:
-        method = _log.debug
-
-    if message:
-        message = prefix + ": " + message
-    else:
-        message = prefix
-
-    args = prefix_args + list(args)
-
-    method(message, *args)
-
-
 class IOService:
 
     def __init__(self,
@@ -1383,15 +1358,6 @@ class IOService:
             torrent = self._torrents[info_hash]
             torrent.request_removal(remove_data=remove_data)
 
-    def _filter_alert(self, alert: lt.alert):
-        # libtorrent fires read_piece_alert with an "Operation cancelled" error
-        # whenever we change alert_when_available state. Not useful to us.
-        if isinstance(alert, lt.read_piece_alert):
-            exc = ltpy.exception_from_alert(alert)
-            if isinstance(exc, ltpy.CanceledError):
-                return False
-        return True
-
     def _get_torrent_for_handle(self, handle: lt.torrent_handle):
         with self._lock:
             torrent = self._torrents_by_handle.get(handle)
@@ -1402,6 +1368,7 @@ class IOService:
             return torrent
 
     def _handle_state_update_alert(self, alert: lt.state_update_alert):
+        # NB: state_update_alert is *not* a torrent_alert
         with self._lock:
             for status in alert.status:
                 torrent = self._get_torrent_for_handle(status.handle)
@@ -1412,9 +1379,6 @@ class IOService:
                 torrent.handle_status_update(status)
 
     def handle_alert(self, alert: lt.alert):
-        if not self._filter_alert(alert):
-            return
-        type_name = alert.__class__.__name__
         if isinstance(alert, lt.torrent_alert):
             handle = alert.handle
             with self._lock:
@@ -1425,14 +1389,9 @@ class IOService:
                     if not isinstance(
                             alert,
                         (lt.torrent_deleted_alert, lt.torrent_log_alert)):
-                        _log_alert(alert,
-                                   method=_log.warning,
-                                   message="alert for torrent we don't have?")
+                        _log.warning("alert for torrent we don't have?")
                     return
                 self._torrents_by_handle[handle] = torrent
-            handler = getattr(torrent, "handle_" + type_name, None)
+            driver_lib.dispatch(torrent, alert)
         else:
-            handler = getattr(self, "_handle_" + type_name, None)
-        _log_alert(alert)
-        if handler:
-            handler(alert)
+            driver_lib.dispatch(self, alert, prefix="_handle")

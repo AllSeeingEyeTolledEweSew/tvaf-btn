@@ -21,6 +21,7 @@ from tvaf.io import RequestMode
 from tvaf import types
 from tvaf import config as config_lib
 import tvaf.io
+from tvaf import driver as driver_lib
 
 from . import test_utils
 from . import tdummy
@@ -59,6 +60,7 @@ class IOServiceTestCase(unittest.TestCase):
             a = self.session.wait_for_alert(int(timeout_ms))
 
             for a in self.session.pop_alerts():
+                driver_lib.log_alert(a)
                 self.ios.handle_alert(a)
             now = time.monotonic()
             self.assertLess(now, condition_deadline, msg=f"{msg} timed out")

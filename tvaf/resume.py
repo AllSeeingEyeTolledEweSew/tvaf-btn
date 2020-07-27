@@ -181,38 +181,49 @@ class ResumeService(driver_lib.Ticker):
     def get_alert_mask() -> int:
         return (lt.alert_category.status | lt.alert_category.storage)
 
+    def handle_save_resume_data_alert(self, alert:lt.save_resume_data_alert):
+        with ltpy.translate_exceptions():
+            infohash = str(alert.handle.info_hash())
+        # I have seen this happen in testing, if save_resume_data() is
+        # called immediately after remove_torrent().
+        with self._condition:
+            if infohash not in self._handles:
+                _log.debug("dropping resume data for missing torrent: %s",
+                        infohash)
+                return
+        self.executor.submit(self._write_resume_data, infohash,
+                alert.params)
+
+    def handle_save_resume_data_failed_alert(
+            self, alert:lt.save_resume_data_failed_alert):
+        with ltpy.translate_exceptions():
+            infohash = str(alert.handle.info_hash())
+        self._dec(infohash)
+
+    def handle_add_torrent_alert(self, alert:lt.add_torrent_alert):
+        with self._condition:
+            if self._aborted:
+                _log.warning("torrent added after ResumeService aborted")
+                return
+            with ltpy.translate_exceptions():
+                infohash = str(alert.handle.info_hash())
+            self._handles[infohash] = alert.handle
+
+    def handle_torrent_removed_alert(self, alert:lt.torrent_removed_alert):
+        with ltpy.translate_exceptions():
+            infohash = str(alert.info_hash)
+        self.executor.submit(self._delete_resume_data, infohash)
+
+    def _save_on_alert(self, alert:lt.torrent_alert):
+        with ltpy.translate_exceptions():
+            infohash = str(alert.handle.info_hash())
+        self._save(infohash)
+
+    handle_file_renamed_alert = _save_on_alert
+    handle_torrent_paused_alert = _save_on_alert
+    handle_torrent_finished_alert = _save_on_alert
+    handle_storage_moved_alert = _save_on_alert
+    handle_cache_flushed_alert = _save_on_alert
+
     def handle_alert(self, alert:lt.alert):
-        if isinstance(alert, lt.save_resume_data_alert):
-            with ltpy.translate_exceptions():
-                infohash = str(alert.handle.info_hash())
-            # I have seen this happen in testing, if save_resume_data() is
-            # called immediately after remove_torrent().
-            with self._condition:
-                if infohash not in self._handles:
-                    _log.debug("dropping resume data for missing torrent: %s",
-                            infohash)
-                    return
-            self.executor.submit(self._write_resume_data, infohash,
-                    alert.params)
-        elif isinstance(alert, lt.save_resume_data_failed_alert):
-            with ltpy.translate_exceptions():
-                infohash = str(alert.handle.info_hash())
-            self._dec(infohash)
-        elif isinstance(alert, lt.add_torrent_alert):
-            with self._condition:
-                if self._aborted:
-                    _log.warning("torrent added after ResumeService aborted")
-                    return
-                with ltpy.translate_exceptions():
-                    infohash = str(alert.handle.info_hash())
-                self._handles[infohash] = alert.handle
-        elif isinstance(alert, lt.torrent_removed_alert):
-            with ltpy.translate_exceptions():
-                infohash = str(alert.info_hash)
-            self.executor.submit(self._delete_resume_data, infohash)
-        elif isinstance(alert, (lt.file_renamed_alert, lt.torrent_paused_alert,
-            lt.torrent_finished_alert, lt.storage_moved_alert,
-            lt.cache_flushed_alert)):
-            with ltpy.translate_exceptions():
-                infohash = str(alert.handle.info_hash())
-            self._save(infohash)
+        driver_lib.dispatch(self, alert)

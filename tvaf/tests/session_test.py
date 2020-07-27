@@ -98,16 +98,16 @@ class TestSession(unittest.TestCase):
         self.config["session_settings_base"] = "invalid"
 
         with self.assertRaises(config_lib.InvalidConfigError):
-            session_service = self.create_session_service()
+            self.create_session_service()
 
     def test_setting_invalid_type(self):
         self.config["session_cache_size"] = "invalid"
 
         with self.assertRaises(config_lib.InvalidConfigError):
-            session_service = self.create_session_service()
+            self.create_session_service()
 
     def test_alert_mask_invalid_type(self):
         self.config["session_alert_mask"] = "invalid"
 
         with self.assertRaises(config_lib.InvalidConfigError):
-            session_service = self.create_session_service()
+            self.create_session_service()

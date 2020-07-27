@@ -1098,7 +1098,6 @@ class _Torrent:
 
     def _handle_fetched_torrent_info(self, future: concurrent.futures.Future):
         assert future.done()
-        atp_settings = self._ios._atp_settings
 
         with self._lock:
             self._remove_pending(_Action.FETCH)

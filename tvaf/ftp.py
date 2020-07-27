@@ -250,7 +250,6 @@ class FTPD(config_lib.HasConfig):
         config.setdefault("ftp_port", 8821)
 
         with self._lock:
-            enabled = config.get_bool("ftp_enabled")
             address: Optional[Tuple] = None
 
             # Only parse address and port if enabled

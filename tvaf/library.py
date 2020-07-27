@@ -105,7 +105,7 @@ class _V1TorrentAccess(fs.StaticDir):
                 hints.update(func(info_hash, spec.index))
             except KeyError:
                 pass
-            except Exception as e:
+            except Exception:
                 _log.exception("%s: get_hints(%s, %s)", name, info_hash,
                                spec.index)
         hints["filename"] = spec.full_path[-1]
@@ -199,7 +199,7 @@ class _V1(fs.Dir):
                 break
             except KeyError:
                 pass
-            except Exception as e:
+            except Exception:
                 _log.exception("%s: get_layout_info_dict(%s)", name, info_hash)
         if not info_dict:
             return None

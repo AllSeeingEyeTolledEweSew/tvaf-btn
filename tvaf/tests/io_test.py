@@ -116,8 +116,8 @@ class IOServiceTestCase(unittest.TestCase):
                 stop=len(tdummy.DATA),
                 acct_params="tvaf",
                 get_torrent=lambda: lt.bencode(tdummy.DICT)):
-        ref = types.TorrentRef(info_hash=infohash, start=start, stop=stop)
-        params = tvaf.io.RequestParams(ref=ref, mode=mode, acct_params=acct_params,
+        tslice = types.TorrentSlice(info_hash=infohash, start=start, stop=stop)
+        params = tvaf.io.RequestParams(tslice=tslice, mode=mode, acct_params=acct_params,
                 get_torrent=get_torrent)
         return self.ios.add_request(params)
 
@@ -583,10 +583,10 @@ class TestLoad(IOServiceTestCase):
 class TestBufferedTorrentIO(IOServiceTestCase):
 
     def open(self):
-        ref = types.TorrentRef(info_hash=tdummy.INFOHASH, start=0,
+        tslice = types.TorrentSlice(info_hash=tdummy.INFOHASH, start=0,
                 stop=tdummy.LEN)
         return self.ios.open(
-            ref=ref,
+            tslice=tslice,
             get_torrent=lambda: lt.bencode(tdummy.DICT), user="tvaf")
 
     def test_read_some(self):

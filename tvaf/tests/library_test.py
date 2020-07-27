@@ -44,8 +44,8 @@ BAD_PATHS = tdummy.Torrent(files=[
 ])
 
 
-def get_placeholder_data(ref:types.TorrentRef) -> bytes:
-    data = "%s:%d:%d" % (ref.info_hash, ref.start, ref.stop)
+def get_placeholder_data(tslice:types.TorrentSlice) -> bytes:
+    data = "%s:%d:%d" % (tslice.info_hash, tslice.start, tslice.stop)
     return data.encode()
 
 
@@ -61,9 +61,9 @@ class TestLibraryService(unittest.TestCase):
             (MULTI.infohash, 1): library.Hints(mime_type="text/plain"),
         }
 
-        def opener(ref:types.TorrentRef,
+        def opener(tslice:types.TorrentSlice,
                 get_torrent:library.GetTorrent):
-            raw = io.BytesIO(get_placeholder_data(ref))
+            raw = io.BytesIO(get_placeholder_data(tslice))
             # opener can normally return a RawIOBase, but we'll mimic
             # IOService returning BufferedTorrentIO here.
             return io.BufferedReader(raw)
@@ -104,16 +104,16 @@ class TestLibraryService(unittest.TestCase):
         assert stop is not None
         assert torrent is not None
 
-        self.assertEqual(tfile.ref.info_hash, info_hash)
-        self.assertEqual(tfile.ref.start, start)
-        self.assertEqual(tfile.ref.stop, stop)
+        self.assertEqual(tfile.tslice.info_hash, info_hash)
+        self.assertEqual(tfile.tslice.start, start)
+        self.assertEqual(tfile.tslice.stop, stop)
         self.assertEqual(tfile.get_torrent(), torrent)
         self.assertEqual(tfile.hints.get("mtime"), mtime)
         self.assertEqual(tfile.hints.get("mime_type"), mime_type)
         self.assertEqual(tfile.hints.get("content_encoding"), content_encoding)
         self.assertEqual(tfile.hints.get("filename"), filename)
         self.assertEqual(tfile.open(mode="rb").read(),
-                get_placeholder_data(tfile.ref))
+                get_placeholder_data(tfile.tslice))
 
     def assert_is_dir(self, node:fs.Node):
         self.assertEqual(node.stat().filetype, stat_lib.S_IFDIR)

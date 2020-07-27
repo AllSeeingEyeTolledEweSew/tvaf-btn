@@ -43,28 +43,28 @@ class Hints(collections.UserDict):
     pass
 
 
-TorrentFileOpener = Callable[[types.TorrentRef, GetTorrent], io.RawIOBase]
+TorrentFileOpener = Callable[[types.TorrentSlice, GetTorrent], io.RawIOBase]
 
 
 class TorrentFile(fs.File):
 
     def __init__(self, *, opener:TorrentFileOpener=None,
-            ref:types.TorrentRef=None,
+            tslice:types.TorrentSlice=None,
             get_torrent:GetTorrent=None, hints:Hints=None):
         assert opener is not None
-        assert ref is not None
+        assert tslice is not None
         assert get_torrent is not None
         assert hints is not None
-        super().__init__(size=len(ref), mtime=hints.get("mtime"))
+        super().__init__(size=len(tslice), mtime=hints.get("mtime"))
         self.opener = opener
-        self.ref = ref
+        self.tslice = tslice
         self.get_torrent = get_torrent
         self.hints = hints
 
     def open_raw(self, mode:str="r") -> io.RawIOBase:
         if set(mode) & set("wxa+"):
             raise fs.mkoserror(errno.EPERM)
-        return self.opener(self.ref, self.get_torrent)
+        return self.opener(self.tslice, self.get_torrent)
 
 
 def _is_valid_path(path:List[str]):
@@ -109,7 +109,7 @@ class _V1TorrentAccess(fs.StaticDir):
                         spec.index)
         hints["filename"] = spec.full_path[-1]
         torrent_file = TorrentFile(opener=libs.opener,
-            ref=types.TorrentRef(info_hash=info_hash, start=spec.start, stop=spec.stop),
+            tslice=types.TorrentSlice(info_hash=info_hash, start=spec.start, stop=spec.stop),
             get_torrent=access.get_torrent, hints=hints)
         self._by_index.mkchild(str(spec.index), torrent_file)
 

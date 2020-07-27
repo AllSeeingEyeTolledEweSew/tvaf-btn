@@ -25,9 +25,9 @@ class BaseFTPTest(unittest.TestCase):
     def setUp(self):
         self.torrents = {t.infohash: t for t in (SINGLE,MULTI)}
 
-        def opener(ref:types.TorrentRef,
+        def opener(tslice:types.TorrentSlice,
                 get_torrent:library.GetTorrent):
-            data = self.torrents[ref.info_hash].data[ref.start:ref.stop]
+            data = self.torrents[tslice.info_hash].data[tslice.start:tslice.stop]
             raw = io.BytesIO(data)
             # bug in pyftpdlib: tries to access fileobj.name for debug logging
             raw.name = "<bytes>"

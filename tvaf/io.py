@@ -78,7 +78,7 @@ GetTorrent = Callable[[], bytes]
 @dataclasses_json.dataclass_json
 @dataclasses.dataclass(frozen=True)
 class RequestParams:
-    ref: types.TorrentRef = types.TorrentRef()
+    tslice: types.TorrentSlice = types.TorrentSlice()
     get_torrent: GetTorrent = _raise_notimplemented
     acct_params: Any = None
     mode: RequestMode = dataclasses.field(
@@ -86,7 +86,7 @@ class RequestParams:
         metadata=dataclasses_json.config(encoder=RequestMode))
 
     def __post_init__(self):
-        if len(self.ref) == 0:
+        if len(self.tslice) == 0:
             raise ValueError("can't have a zero-length request")
 
 
@@ -173,7 +173,7 @@ class Request:
 
         self._condition = threading.Condition(torrent._lock)
         self._torrent = torrent
-        self._outstanding = len(params.ref)
+        self._outstanding = len(params.tslice)
         self._have_chunk: Set[int] = set()
 
         self._torrent_info: Optional[lt.torrent_info] = None
@@ -181,8 +181,8 @@ class Request:
         self._stop_piece = 0
 
         self._chunks: Dict[int, MemoryView] = dict()
-        self._read_offset = params.ref.start
-        self._read_outstanding = len(params.ref)
+        self._read_offset = params.tslice.start
+        self._read_outstanding = len(params.tslice)
 
     def pieces(self) -> Iterable[int]:
         with self._condition:
@@ -221,7 +221,8 @@ class Request:
         self._torrent._sync()
 
     def _clamp(self, start: int, stop: int) -> Tuple[int, int]:
-        return max(start, self.params.ref.start), min(stop, self.params.ref.stop)
+        return max(start, self.params.tslice.start), min(stop,
+                self.params.tslice.stop)
 
     def _deactivate(self):
         with self._condition:
@@ -251,8 +252,8 @@ class Request:
                 return
             self._torrent_info = torrent_info
             self._start_piece, self._stop_piece = util.range_to_pieces(
-                self._torrent_info.piece_length(), self.params.ref.start,
-                self.params.ref.stop)
+                self._torrent_info.piece_length(), self.params.tslice.start,
+                self.params.tslice.stop)
 
     def _set_exception(self, exc: Exception):
         with self._condition:
@@ -279,7 +280,7 @@ class Request:
     def has_next(self) -> bool:
         assert self.params.mode == RequestMode.READ
         with self._condition:
-            return self._read_offset < self.params.ref.stop
+            return self._read_offset < self.params.tslice.stop
 
     def next(self, timeout: Optional[float] = None) -> MemoryView:
         assert self.params.mode == RequestMode.READ
@@ -317,14 +318,14 @@ class BufferedTorrentIO(io.BufferedIOBase):
     # indicates most files in multi-file torrents are piece-misaligned.
 
     def __init__(self, *, io_service:IOService=None,
-            ref:types.TorrentRef=None, get_torrent:GetTorrent=None,
+            tslice:types.TorrentSlice=None, get_torrent:GetTorrent=None,
             user:str=None):
         assert io_service is not None
-        assert ref is not None
+        assert tslice is not None
         assert get_torrent is not None
         assert user is not None
         self._io_service = io_service
-        self._ref = ref
+        self._tslice = tslice
         self._get_torrent = get_torrent
         self._user = user
 
@@ -342,7 +343,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
             elif whence == io.SEEK_CUR:
                 offset += self._offset
             elif whence == io.SEEK_END:
-                offset += self._ref.stop - self._ref.start
+                offset += self._tslice.stop - self._tslice.start
             else:
                 raise ValueError("Invalid value for whence: %s" % whence)
 
@@ -390,10 +391,10 @@ class BufferedTorrentIO(io.BufferedIOBase):
 
         # By convention, negative size means read all
         if size < 0:
-            size = self._ref.stop - self._offset
+            size = self._tslice.stop - self._offset
 
         # Clamp size
-        size = min(self._ref.stop - self._offset, size)
+        size = min(self._tslice.stop - self._offset, size)
 
         # Consume the buffer
         if self._buffer and size > 0:
@@ -417,9 +418,9 @@ class BufferedTorrentIO(io.BufferedIOBase):
             stop = self._offset + size
 
         # Submit a new request.
-        ref = types.TorrentRef(info_hash=self._ref.info_hash,
+        tslice = types.TorrentSlice(info_hash=self._tslice.info_hash,
                 start=self._offset, stop=stop)
-        params = RequestParams(ref=ref, get_torrent=self._get_torrent,
+        params = RequestParams(tslice=tslice, get_torrent=self._get_torrent,
                 acct_params=self._user, mode=RequestMode.READ)
         request = self._io_service.add_request(params)
 
@@ -1293,12 +1294,12 @@ class IOService:
 
         self._atp_settings = atp_settings
 
-    def open(self, *, ref:types.TorrentRef=None,
+    def open(self, *, tslice:types.TorrentSlice=None,
             get_torrent:GetTorrent=None, user:str=None) -> io.BufferedIOBase:
-        assert ref is not None
+        assert tslice is not None
         assert get_torrent is not None
         assert user is not None
-        return BufferedTorrentIO(io_service=self, ref=ref, get_torrent=get_torrent, user=user)
+        return BufferedTorrentIO(io_service=self, tslice=tslice, get_torrent=get_torrent, user=user)
 
     @staticmethod
     def get_alert_mask() -> int:
@@ -1338,10 +1339,10 @@ class IOService:
             params: RequestParams
     ) -> Request:
         with self._lock:
-            torrent = self._torrents.get(params.ref.info_hash)
+            torrent = self._torrents.get(params.tslice.info_hash)
             if not torrent:
-                torrent = _Torrent(ios=self, info_hash=params.ref.info_hash)
-                self._torrents[params.ref.info_hash] = torrent
+                torrent = _Torrent(ios=self, info_hash=params.tslice.info_hash)
+                self._torrents[params.tslice.info_hash] = torrent
             return torrent.add_request(params)
 
     def add_torrent(self, atp: lt.add_torrent_params):

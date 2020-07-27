@@ -25,7 +25,7 @@ import dataclasses_json
 USER_UNKNOWN = "*unknown*"
 
 @dataclasses.dataclass(frozen=True)
-class TorrentRef(collections.abc.Sized):
+class TorrentSlice(collections.abc.Sized):
 
     info_hash: str = ""
     start: int = 0

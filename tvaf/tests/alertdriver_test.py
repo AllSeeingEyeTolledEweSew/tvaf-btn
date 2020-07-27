@@ -26,13 +26,15 @@ class IterAlertsTest(unittest.TestCase):
             if type_name == "torrent_removed_alert":
                 break
 
-        self.assertEqual(seen_alerts, ["add_torrent_alert",
-            "torrent_removed_alert"])
+        self.assertEqual(seen_alerts,
+                         ["add_torrent_alert", "torrent_removed_alert"])
 
     def test_iter_alerts_fed_by_thread(self):
+
         def run():
             h = self.session.add_torrent(tdummy.DEFAULT.atp())
             self.session.remove_torrent(h)
+
         thread = threading.Thread(target=run)
         started = False
 
@@ -49,8 +51,8 @@ class IterAlertsTest(unittest.TestCase):
 
         thread.join()
 
-        self.assertEqual(seen_alerts, ["add_torrent_alert",
-            "torrent_removed_alert"])
+        self.assertEqual(seen_alerts,
+                         ["add_torrent_alert", "torrent_removed_alert"])
 
     def test_iter_alerts_and_abort(self):
         h = self.session.add_torrent(tdummy.DEFAULT.atp())
@@ -58,7 +60,7 @@ class IterAlertsTest(unittest.TestCase):
 
         seen_alerts = []
         with unittest.mock.patch.object(self.driver, "ABORT_CHECK_INTERVAL",
-                0.1):
+                                        0.1):
             for alert in self.driver.iter_alerts():
                 type_name = alert.__class__.__name__
                 if type_name in ("add_torrent_alert", "torrent_removed_alert"):
@@ -66,8 +68,8 @@ class IterAlertsTest(unittest.TestCase):
                 if type_name == "torrent_removed_alert":
                     self.driver.abort()
 
-        self.assertEqual(seen_alerts, ["add_torrent_alert",
-            "torrent_removed_alert"])
+        self.assertEqual(seen_alerts,
+                         ["add_torrent_alert", "torrent_removed_alert"])
 
 
 class RunTest(unittest.TestCase):
@@ -81,28 +83,33 @@ class RunTest(unittest.TestCase):
         self.session.remove_torrent(h)
 
         seen_alerts = []
+
         def handler(alert):
             type_name = alert.__class__.__name__
             if type_name in ("add_torrent_alert", "torrent_removed_alert"):
                 seen_alerts.append(type_name)
             if type_name == "torrent_removed_alert":
                 self.driver.abort()
+
         self.driver.add(handler)
 
         with unittest.mock.patch.object(self.driver, "ABORT_CHECK_INTERVAL",
-                0.1):
+                                        0.1):
             self.driver.run()
 
-        self.assertEqual(seen_alerts, ["add_torrent_alert",
-            "torrent_removed_alert"])
+        self.assertEqual(seen_alerts,
+                         ["add_torrent_alert", "torrent_removed_alert"])
 
     def test_run_fed_by_thread(self):
+
         def run_in_thread():
             h = self.session.add_torrent(tdummy.DEFAULT.atp())
             self.session.remove_torrent(h)
+
         thread = threading.Thread(target=run_in_thread)
 
         seen_alerts = []
+
         def handler(alert):
             if thread.ident is None:
                 thread.start()
@@ -111,38 +118,43 @@ class RunTest(unittest.TestCase):
                 seen_alerts.append(type_name)
             if type_name == "torrent_removed_alert":
                 self.driver.abort()
+
         self.driver.add(handler)
 
         with unittest.mock.patch.object(self.driver, "ABORT_CHECK_INTERVAL",
-                0.1):
+                                        0.1):
             self.driver.run()
         thread.join()
 
-        self.assertEqual(seen_alerts, ["add_torrent_alert",
-            "torrent_removed_alert"])
+        self.assertEqual(seen_alerts,
+                         ["add_torrent_alert", "torrent_removed_alert"])
 
     def test_run_with_failer(self):
         h = self.session.add_torrent(tdummy.DEFAULT.atp())
         self.session.remove_torrent(h)
 
         seen_alerts = []
+
         def handler(alert):
             type_name = alert.__class__.__name__
             if type_name in ("add_torrent_alert", "torrent_removed_alert"):
                 seen_alerts.append(type_name)
             if type_name == "torrent_removed_alert":
                 self.driver.abort()
+
         self.driver.add(handler)
+
         def failer(alert):
             raise Exception("whoopsie")
+
         self.driver.add(failer)
 
         with unittest.mock.patch.object(self.driver, "ABORT_CHECK_INTERVAL",
-                0.1):
+                                        0.1):
             self.driver.run()
 
-        self.assertEqual(seen_alerts, ["add_torrent_alert",
-            "torrent_removed_alert"])
+        self.assertEqual(seen_alerts,
+                         ["add_torrent_alert", "torrent_removed_alert"])
 
 
 class ThreadTest(unittest.TestCase):
@@ -156,29 +168,34 @@ class ThreadTest(unittest.TestCase):
         self.session.remove_torrent(h)
 
         seen_alerts = []
+
         def handler(alert):
             type_name = alert.__class__.__name__
             if type_name in ("add_torrent_alert", "torrent_removed_alert"):
                 seen_alerts.append(type_name)
             if type_name == "torrent_removed_alert":
                 self.driver.abort()
+
         self.driver.add(handler)
 
         with unittest.mock.patch.object(self.driver, "ABORT_CHECK_INTERVAL",
-                0.1):
+                                        0.1):
             self.driver.start()
             self.driver.wait()
 
-        self.assertEqual(seen_alerts, ["add_torrent_alert",
-            "torrent_removed_alert"])
+        self.assertEqual(seen_alerts,
+                         ["add_torrent_alert", "torrent_removed_alert"])
 
     def test_thread_fed_by_thread(self):
+
         def run_in_thread():
             h = self.session.add_torrent(tdummy.DEFAULT.atp())
             self.session.remove_torrent(h)
+
         thread = threading.Thread(target=run_in_thread)
 
         seen_alerts = []
+
         def handler(alert):
             if thread.ident is None:
                 thread.start()
@@ -187,13 +204,14 @@ class ThreadTest(unittest.TestCase):
                 seen_alerts.append(type_name)
             if type_name == "torrent_removed_alert":
                 self.driver.abort()
+
         self.driver.add(handler)
 
         with unittest.mock.patch.object(self.driver, "ABORT_CHECK_INTERVAL",
-                0.1):
+                                        0.1):
             self.driver.start()
             self.driver.wait()
         thread.join()
 
-        self.assertEqual(seen_alerts, ["add_torrent_alert",
-            "torrent_removed_alert"])
+        self.assertEqual(seen_alerts,
+                         ["add_torrent_alert", "torrent_removed_alert"])

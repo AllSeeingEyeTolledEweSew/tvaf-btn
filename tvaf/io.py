@@ -46,6 +46,7 @@ _log = logging.getLogger(__name__)
 
 DEFAULT_DOWNLOAD_DIR_NAME = "downloads"
 
+
 class RequestMode(enum.Enum):
 
     READ = "read"
@@ -89,6 +90,7 @@ class RequestParams:
 
 _MemoryViewTarget = Union[bytes, bytearray, memoryview]
 
+
 @dataclasses.dataclass(frozen=True)
 class MemoryView(collections.abc.ByteString):
     # This would be memoryview, if we could access the bounds within the
@@ -96,7 +98,7 @@ class MemoryView(collections.abc.ByteString):
     # object as its buffer.
     obj: _MemoryViewTarget = b""
     start: int = 0
-    stop: int =0
+    stop: int = 0
 
     def __getitem__(self, index):
         if isinstance(index, slice):
@@ -164,8 +166,8 @@ class Request:
         assert torrent is not None
 
         self._params = params
-        self._time = time.time() # uses time.time()
-        self._deactivated_at: Optional[SupportsFloat] = None # uses time.time()
+        self._time = time.time()  # uses time.time()
+        self._deactivated_at: Optional[SupportsFloat] = None  # uses time.time()
         self._exception: Optional[Exception] = None
 
         self._condition = threading.Condition(torrent._lock)
@@ -213,13 +215,13 @@ class Request:
     def stop_piece(self) -> int:
         return self._stop_piece
 
-    def cancel(self, message:str="Request cancelled"):
+    def cancel(self, message: str = "Request cancelled"):
         self._set_exception(Cancelled(message))
         self._torrent._sync()
 
     def _clamp(self, start: int, stop: int) -> Tuple[int, int]:
-        return max(start, self.params.tslice.start), min(stop,
-                self.params.tslice.stop)
+        return max(start,
+                   self.params.tslice.start), min(stop, self.params.tslice.stop)
 
     def _deactivate(self):
         with self._condition:
@@ -314,9 +316,12 @@ class BufferedTorrentIO(io.BufferedIOBase):
     # have piece size of 1mb or 2mb; and only 1 uses bep47 padding, which
     # indicates most files in multi-file torrents are piece-misaligned.
 
-    def __init__(self, *, io_service:IOService=None,
-            tslice:types.TorrentSlice=None, get_torrent:GetTorrent=None,
-            user:str=None):
+    def __init__(self,
+                 *,
+                 io_service: IOService = None,
+                 tslice: types.TorrentSlice = None,
+                 get_torrent: GetTorrent = None,
+                 user: str = None):
         assert io_service is not None
         assert tslice is not None
         assert get_torrent is not None
@@ -333,7 +338,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
     def seekable(self):
         return True
 
-    def seek(self, offset:int, whence:int=io.SEEK_SET) -> int:
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
         with self._read_lock:
             if whence == io.SEEK_SET:
                 pass
@@ -358,25 +363,25 @@ class BufferedTorrentIO(io.BufferedIOBase):
     def readable(self):
         return True
 
-    def readvec(self, size:int=-1) -> Sequence[memoryview]:
+    def readvec(self, size: int = -1) -> Sequence[memoryview]:
         with self._read_lock:
             return self._readvec_unlocked(size, False)
 
-    def readvec1(self, size:int=-1) -> Sequence[memoryview]:
+    def readvec1(self, size: int = -1) -> Sequence[memoryview]:
         with self._read_lock:
             return self._readvec_unlocked(size, True)
 
-    def read(self, size:int=None) -> bytes:
+    def read(self, size: int = None) -> bytes:
         if size is None:
             size = -1
         # This copies twice. Is there a better way?
         return b"".join(v.tobytes() for v in self.readvec(size))
 
-    def read1(self, size:int=-1) -> bytes:
+    def read1(self, size: int = -1) -> bytes:
         # This copies twice. Is there a better way?
         return b"".join(v.tobytes() for v in self.readvec1(size))
 
-    def _readvec_unlocked(self, size:int, read1:bool) -> Sequence[memoryview]:
+    def _readvec_unlocked(self, size: int, read1: bool) -> Sequence[memoryview]:
         # Readahead notes:
         #  - mediainfo http://...mkv
         #    - requests whole file, drops connection when probe is done
@@ -384,7 +389,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
         #  - ffprobe -i http://...mkv
         #    - does only range requests
         #    - drops connection on most
-        result:List[memoryview] = []
+        result: List[memoryview] = []
 
         # By convention, negative size means read all
         if size < 0:
@@ -416,9 +421,12 @@ class BufferedTorrentIO(io.BufferedIOBase):
 
         # Submit a new request.
         tslice = types.TorrentSlice(info_hash=self._tslice.info_hash,
-                start=self._offset, stop=stop)
-        params = RequestParams(tslice=tslice, get_torrent=self._get_torrent,
-                acct_params=self._user, mode=RequestMode.READ)
+                                    start=self._offset,
+                                    stop=stop)
+        params = RequestParams(tslice=tslice,
+                               get_torrent=self._get_torrent,
+                               acct_params=self._user,
+                               mode=RequestMode.READ)
         request = self._io_service.add_request(params)
 
         chunk = _EMPTY
@@ -444,18 +452,19 @@ class BufferedTorrentIO(io.BufferedIOBase):
             size -= len(chunk)
 
         # Save the "leftovers" from the final chunk as our buffer
-        self._buffer = MemoryView(obj=chunk.obj, start=chunk.stop,
-                stop=len(chunk.obj))
+        self._buffer = MemoryView(obj=chunk.obj,
+                                  start=chunk.stop,
+                                  stop=len(chunk.obj))
 
         return result
 
-    def readinto(self, out:ReadintoTarget) -> int:
+    def readinto(self, out: ReadintoTarget) -> int:
         return self._readinto(out, False)
 
-    def readinto1(self, out:ReadintoTarget) -> int:
+    def readinto1(self, out: ReadintoTarget) -> int:
         return self._readinto(out, True)
 
-    def _readinto(self, out:ReadintoTarget, read1:bool) -> int:
+    def _readinto(self, out: ReadintoTarget, read1: bool) -> int:
         if isinstance(out, memoryview):
             out = out.cast("B")
 
@@ -560,7 +569,7 @@ def _have_bug_4604():
         _cache_have_bug_4604 = (version < (1, 2, 7))
         if _cache_have_bug_4604:
             _log.warning("libtorrent with bug #4604 detected. "
-                    "Please upgrade to libtorrent 1.2.7 or later.")
+                         "Please upgrade to libtorrent 1.2.7 or later.")
     return _cache_have_bug_4604
 
 
@@ -585,7 +594,7 @@ class _Torrent:
         # yet implemented a proper locking protocol between IOService and
         # _Torrent. I intend to move to gevent instead of firming up a locking
         # protocol.
-        self._lock:threading.RLock = ios._lock
+        self._lock: threading.RLock = ios._lock
         self._info_hash = info_hash
 
         self._requests: List[Request] = []
@@ -612,7 +621,7 @@ class _Torrent:
 
         # State to work around libtorrent bug 4604
         self._pieces_downloaded = 0
-        self._time_4604_changed = -math.inf # Uses time.monotonic()
+        self._time_4604_changed = -math.inf  # Uses time.monotonic()
 
         if add_torrent_params is not None:
             self._set_add_torrent_params(add_torrent_params)
@@ -854,7 +863,8 @@ class _Torrent:
                             list(want_priorities.items()))
                 with ltpy.translate_exceptions():
                     # Non-blocking
-                    self._handle.prioritize_pieces(list(want_priorities.items()))
+                    self._handle.prioritize_pieces(list(
+                        want_priorities.items()))
                 self._piece_priorities = want_priorities
 
     def handle_read_piece_alert(self, alert: lt.read_piece_alert):
@@ -1064,7 +1074,7 @@ class _Torrent:
 
     def _maybe_async_fetch_torrent_info(self):
 
-        def fetch(get_torrent:GetTorrent):
+        def fetch(get_torrent: GetTorrent):
             try:
                 data = get_torrent()
             except Exception as exc:
@@ -1087,9 +1097,7 @@ class _Torrent:
             future = self._ios.executor.submit(fetch, get_torrent)
             future.add_done_callback(self._handle_fetched_torrent_info)
 
-    def _handle_fetched_torrent_info(
-        self,
-        future:concurrent.futures.Future):
+    def _handle_fetched_torrent_info(self, future: concurrent.futures.Future):
         assert future.done()
         atp_settings = self._ios._atp_settings
 
@@ -1220,9 +1228,9 @@ class IOService:
     def __init__(self,
                  *,
                  session: lt.session = None,
-                 config:config_lib.Config=None,
-                 config_dir:pathlib.Path=None,
-                 executor: concurrent.futures.Executor=None):
+                 config: config_lib.Config = None,
+                 config_dir: pathlib.Path = None,
+                 executor: concurrent.futures.Executor = None):
         assert session is not None
         assert config is not None
         assert config_dir is not None
@@ -1245,22 +1253,24 @@ class IOService:
             self._post_torrent_updates_deadline = math.inf
             self._tick_deadline = math.inf
 
-        self._atp_settings:Mapping[str, Any] = {}
+        self._atp_settings: Mapping[str, Any] = {}
         self.set_config(config)
 
     def get_atp_settings(self) -> Mapping[str, Any]:
         return self._atp_settings
 
-    def set_config(self, config:config_lib.Config):
-        config.setdefault("torrent_default_save_path",
-                str(self.config_dir.joinpath(DEFAULT_DOWNLOAD_DIR_NAME)))
+    def set_config(self, config: config_lib.Config):
+        config.setdefault(
+            "torrent_default_save_path",
+            str(self.config_dir.joinpath(DEFAULT_DOWNLOAD_DIR_NAME)))
 
-        atp_settings:MutableMapping[str, Any] = {}
+        atp_settings: MutableMapping[str, Any] = {}
 
-        save_path = pathlib.Path(config.require_str("torrent_default_save_path"))
+        save_path = pathlib.Path(
+            config.require_str("torrent_default_save_path"))
         try:
             # Raises RuntimeError on symlink loops
-            save_path= save_path.resolve()
+            save_path = save_path.resolve()
         except RuntimeError as exc:
             raise config_lib.InvalidConfigError(str(exc)) from exc
 
@@ -1286,22 +1296,29 @@ class IOService:
             full_name = f"storage_mode_{maybe_name}"
             value = lt.storage_mode_t.names.get(full_name)
             if value is None:
-                raise config_lib.InvalidConfigError(f"invalid storage mode {maybe_name}")
+                raise config_lib.InvalidConfigError(
+                    f"invalid storage mode {maybe_name}")
             atp_settings["storage_mode"] = value
 
         self._atp_settings = atp_settings
 
-    def open(self, *, tslice:types.TorrentSlice=None,
-            get_torrent:GetTorrent=None, user:str=None) -> io.BufferedIOBase:
+    def open(self,
+             *,
+             tslice: types.TorrentSlice = None,
+             get_torrent: GetTorrent = None,
+             user: str = None) -> io.BufferedIOBase:
         assert tslice is not None
         assert get_torrent is not None
         assert user is not None
-        return BufferedTorrentIO(io_service=self, tslice=tslice, get_torrent=get_torrent, user=user)
+        return BufferedTorrentIO(io_service=self,
+                                 tslice=tslice,
+                                 get_torrent=get_torrent,
+                                 user=user)
 
     @staticmethod
     def get_alert_mask() -> int:
-        status:int = lt.alert_category.status
-        piece_progress:int = lt.alert_category.piece_progress
+        status: int = lt.alert_category.status
+        piece_progress: int = lt.alert_category.piece_progress
         return status | piece_progress
 
     def get_post_torrent_updates_deadline(self) -> float:
@@ -1333,10 +1350,7 @@ class IOService:
             for torrent in self._torrents.values():
                 torrent.tick()
 
-    def add_request(
-            self,
-            params: RequestParams
-    ) -> Request:
+    def add_request(self, params: RequestParams) -> Request:
         with self._lock:
             torrent = self._torrents.get(params.tslice.info_hash)
             if not torrent:
@@ -1351,7 +1365,7 @@ class IOService:
             if info_hash in self._torrents:
                 raise KeyError(info_hash)
             self._torrents[info_hash] = _Torrent(ios=self,
-                                                add_torrent_params=atp)
+                                                 add_torrent_params=atp)
 
     def remove_torrent(self, info_hash: str, remove_data: bool = False):
         with self._lock:

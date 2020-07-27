@@ -49,9 +49,12 @@ TorrentFileOpener = Callable[[types.TorrentSlice, GetTorrent], io.IOBase]
 
 class TorrentFile(fs.File):
 
-    def __init__(self, *, opener:TorrentFileOpener=None,
-            tslice:types.TorrentSlice=None,
-            get_torrent:GetTorrent=None, hints:Hints=None):
+    def __init__(self,
+                 *,
+                 opener: TorrentFileOpener = None,
+                 tslice: types.TorrentSlice = None,
+                 get_torrent: GetTorrent = None,
+                 hints: Hints = None):
         assert opener is not None
         assert tslice is not None
         assert get_torrent is not None
@@ -62,13 +65,13 @@ class TorrentFile(fs.File):
         self.get_torrent = get_torrent
         self.hints = hints
 
-    def open_raw(self, mode:str="r") -> io.IOBase:
+    def open_raw(self, mode: str = "r") -> io.IOBase:
         if set(mode) & set("wxa+"):
             raise fs.mkoserror(errno.EPERM)
         return self.opener(self.tslice, self.get_torrent)
 
 
-def _is_valid_path(path:List[str]):
+def _is_valid_path(path: List[str]):
     for part in path:
         if "/" in part:
             return False
@@ -79,7 +82,8 @@ def _is_valid_path(path:List[str]):
 
 class _V1TorrentAccess(fs.StaticDir):
 
-    def __init__(self, libs:LibraryService, info_hash:str, info:protocol.Info, access:Access):
+    def __init__(self, libs: LibraryService, info_hash: str,
+                 info: protocol.Info, access: Access):
         assert access.redirect_to is None
         super().__init__()
 
@@ -91,8 +95,8 @@ class _V1TorrentAccess(fs.StaticDir):
         for spec in info.iter_files():
             self._add_torrent_file(libs, info_hash, spec, access)
 
-    def _add_torrent_file(self, libs:LibraryService, info_hash:str, spec:protocol.FileSpec,
-            access:Access):
+    def _add_torrent_file(self, libs: LibraryService, info_hash: str,
+                          spec: protocol.FileSpec, access: Access):
         if spec.is_pad:
             return
         if spec.is_symlink:
@@ -107,11 +111,15 @@ class _V1TorrentAccess(fs.StaticDir):
                 pass
             except Exception as e:
                 _log.exception("%s: get_hints(%s, %s)", name, info_hash,
-                        spec.index)
+                               spec.index)
         hints["filename"] = spec.full_path[-1]
         torrent_file = TorrentFile(opener=libs.opener,
-            tslice=types.TorrentSlice(info_hash=info_hash, start=spec.start, stop=spec.stop),
-            get_torrent=access.get_torrent, hints=hints)
+                                   tslice=types.TorrentSlice(
+                                       info_hash=info_hash,
+                                       start=spec.start,
+                                       stop=spec.stop),
+                                   get_torrent=access.get_torrent,
+                                   hints=hints)
         self._by_index.mkchild(str(spec.index), torrent_file)
 
         if not _is_valid_path(spec.full_path):
@@ -122,7 +130,7 @@ class _V1TorrentAccess(fs.StaticDir):
             return
         parent.mkchild(spec.full_path[-1], fs.Symlink(target=torrent_file))
 
-    def _try_mkdirs(self, dirnames:List[str]) -> Optional[fs.StaticDir]:
+    def _try_mkdirs(self, dirnames: List[str]) -> Optional[fs.StaticDir]:
         parent = self._by_path
         for name in dirnames:
             child = parent.children.get(name)
@@ -137,13 +145,15 @@ class _V1TorrentAccess(fs.StaticDir):
 
 class _V1Torrent(fs.Dir):
 
-    def __init__(self, libs:LibraryService, info_hash:str, info:protocol.Info):
+    def __init__(self, libs: LibraryService, info_hash: str,
+                 info: protocol.Info):
         super().__init__()
         self.libs = libs
         self.info_hash = info_hash
         self.info = info
 
-    def _get_one_access(self, info_hash:str, accessor_name:str) -> Optional[Access]:
+    def _get_one_access(self, info_hash: str,
+                        accessor_name: str) -> Optional[Access]:
         func = self.libs.get_access_funcs.get(accessor_name)
         if not func:
             return None
@@ -156,7 +166,7 @@ class _V1Torrent(fs.Dir):
             _log.exception("%s: get_access(%s)", accessor_name, info_hash)
         return None
 
-    def get_node(self, name:str) -> Optional[fs.Node]:
+    def get_node(self, name: str) -> Optional[fs.Node]:
         access = self._get_one_access(self.info_hash, name)
         if not access:
             return None
@@ -164,7 +174,7 @@ class _V1Torrent(fs.Dir):
             return fs.Symlink(target=access.redirect_to)
         else:
             return _V1TorrentAccess(self.libs, self.info_hash, self.info,
-                    access)
+                                    access)
 
     def readdir(self) -> Iterator[fs.Dirent]:
         for name in self.libs.get_access_funcs:
@@ -173,15 +183,15 @@ class _V1Torrent(fs.Dir):
                 continue
             if access.redirect_to:
                 yield fs.Dirent(name=name,
-                        stat=fs.Stat(filetype=stat_lib.S_IFLNK))
+                                stat=fs.Stat(filetype=stat_lib.S_IFLNK))
             else:
                 yield fs.Dirent(name=name,
-                        stat=fs.Stat(filetype=stat_lib.S_IFDIR))
+                                stat=fs.Stat(filetype=stat_lib.S_IFDIR))
 
 
 class _V1(fs.Dir):
 
-    def __init__(self, libs:LibraryService):
+    def __init__(self, libs: LibraryService):
         super().__init__(perms=0o444)
         self.libs = libs
 
@@ -202,7 +212,7 @@ class _V1(fs.Dir):
 
 class _Browse(fs.DictDir):
 
-    def __init__(self, libs:LibraryService):
+    def __init__(self, libs: LibraryService):
         super().__init__()
         self.libs = libs
 
@@ -212,7 +222,7 @@ class _Browse(fs.DictDir):
 
 class _Root(fs.StaticDir):
 
-    def __init__(self, libs:LibraryService):
+    def __init__(self, libs: LibraryService):
         super().__init__()
         self.mkchild("v1", _V1(libs))
         self.mkchild("browse", _Browse(libs))
@@ -221,7 +231,7 @@ class _Root(fs.StaticDir):
 @dataclasses.dataclass
 class Access:
 
-    redirect_to :Optional[str] = None
+    redirect_to: Optional[str] = None
     seeders: Optional[int] = None
     get_torrent: Optional[GetTorrent] = None
 
@@ -233,20 +243,21 @@ GetAccess = Callable[[str], Access]
 GetBDict = Callable[[str], protocol.BDict]
 GetHints = Callable[[str, int], Hints]
 
+
 class LibraryService:
 
-    def __init__(self, *, opener:TorrentFileOpener=None):
+    def __init__(self, *, opener: TorrentFileOpener = None):
         assert opener is not None
         self.opener = opener
         self.root = _Root(libs=self)
-        self.get_access_funcs:Dict[str, GetAccess] = {}
-        self.get_layout_info_dict_funcs:Dict[str, GetBDict] = {}
-        self.get_hints_funcs:Dict[str, GetHints] = {}
-        self.browse_nodes : Dict[str, fs.Node] = {}
+        self.get_access_funcs: Dict[str, GetAccess] = {}
+        self.get_layout_info_dict_funcs: Dict[str, GetBDict] = {}
+        self.get_hints_funcs: Dict[str, GetHints] = {}
+        self.browse_nodes: Dict[str, fs.Node] = {}
 
     @staticmethod
-    def get_torrent_path(info_hash:str) -> Path:
+    def get_torrent_path(info_hash: str) -> Path:
         return Path().joinpath("v1", info_hash)
 
-    def lookup_torrent(self, info_hash:str) -> fs.Node:
+    def lookup_torrent(self, info_hash: str) -> fs.Node:
         return self.root.traverse(self.get_torrent_path(info_hash))

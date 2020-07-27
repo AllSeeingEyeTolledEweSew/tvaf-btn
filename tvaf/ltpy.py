@@ -33,13 +33,13 @@ class LibtorrentErrorValue(enum.IntEnum):
 
 class Error(RuntimeError):
 
-    def __new__(cls, ec:lt.error_code):
+    def __new__(cls, ec: lt.error_code):
         cls = _CATEGORY_NAME_TO_SUBCLASS.get(ec.category().name(), cls)
         if cls is OSError:
             return cls.__new__(cls, ec)
         if cls is LibtorrentError:
             return cls.__new__(cls, ec)
-        return super().__new__(cls, ec) # type: ignore
+        return super().__new__(cls, ec)  # type: ignore
 
     def __init__(self, ec):
         super().__init__(ec.value(), ec.message())
@@ -54,7 +54,7 @@ class Error(RuntimeError):
 
 class OSError(Error, builtins.OSError):
 
-    def __new__(cls, ec:lt.error_code):
+    def __new__(cls, ec: lt.error_code):
         # generic_category uses "portable" errno values, with the same
         # semantics as OSError. libtorrent uses this for errors in
         # platform-independent code.
@@ -72,8 +72,8 @@ class OSError(Error, builtins.OSError):
             # it as a "winerror", and will derive an "approximate translation"
             # value for errno, ignoring the 1st arg
             errno_ = builtins.OSError(0, "", None, ec.value()).errno
-        elif cat == GENERIC_CATEGORY or (os.name != "nt" and cat ==
-                SYSTEM_CATEGORY):
+        elif cat == GENERIC_CATEGORY or (os.name != "nt" and
+                                         cat == SYSTEM_CATEGORY):
             errno_ = ec.value()
         else:
             # Always instantiate this class directly
@@ -83,16 +83,16 @@ class OSError(Error, builtins.OSError):
         # protection) all don't work here. builtins.OSError.__new__ is the only
         # thing that works and I don't understand why.
         # Furthermore, when __new__ and __init__ are overridden in an OSError
-        # subclass, then it expects to be initialized using __new__, and 
+        # subclass, then it expects to be initialized using __new__, and
         # super(builtins.OSError, self).__init__.
-        args:Tuple = ()
+        args: Tuple = ()
         if os.name == "nt" and cat == SYSTEM_CATEGORY:
             args = (0, ec.message(), None, ec.value())
         else:
             args = (ec.value(), ec.message())
         return builtins.OSError.__new__(cls, *args)
 
-    def __init__(self, ec:lt.error_code):
+    def __init__(self, ec: lt.error_code):
         # This does nothing. Why?
         # super(builtins.OSError, self).__init__(*args)
         self.ec = ec
@@ -105,53 +105,123 @@ class OSError(Error, builtins.OSError):
 
 
 # From pep3151
-class BlockingIOError(OSError, builtins.BlockingIOError): pass
-class ChildProcessError(OSError, builtins.ChildProcessError): pass
-class ConnectionError(OSError, builtins.ConnectionError): pass
-class BrokenPipeError(ConnectionError, builtins.BrokenPipeError): pass
-class ConnectionAbortedError(ConnectionError, builtins.ConnectionAbortedError): pass
-class ConnectionRefusedError(ConnectionError, builtins.ConnectionRefusedError): pass
-class ConnectionResetError(ConnectionError, builtins.ConnectionResetError): pass
-class FileExistsError(OSError, builtins.FileExistsError): pass
-class FileNotFoundError(OSError, builtins.FileNotFoundError): pass
-class InterruptedError(OSError, builtins.InterruptedError): pass
-class IsADirectoryError(OSError, builtins.IsADirectoryError): pass
-class NotADirectoryError(OSError, builtins.NotADirectoryError): pass
-class PermissionError(OSError, builtins.PermissionError): pass
-class ProcessLookupError(OSError, builtins.ProcessLookupError): pass
-class TimeoutError(OSError, builtins.TimeoutError): pass
+class BlockingIOError(OSError, builtins.BlockingIOError):
+    pass
+
+
+class ChildProcessError(OSError, builtins.ChildProcessError):
+    pass
+
+
+class ConnectionError(OSError, builtins.ConnectionError):
+    pass
+
+
+class BrokenPipeError(ConnectionError, builtins.BrokenPipeError):
+    pass
+
+
+class ConnectionAbortedError(ConnectionError, builtins.ConnectionAbortedError):
+    pass
+
+
+class ConnectionRefusedError(ConnectionError, builtins.ConnectionRefusedError):
+    pass
+
+
+class ConnectionResetError(ConnectionError, builtins.ConnectionResetError):
+    pass
+
+
+class FileExistsError(OSError, builtins.FileExistsError):
+    pass
+
+
+class FileNotFoundError(OSError, builtins.FileNotFoundError):
+    pass
+
+
+class InterruptedError(OSError, builtins.InterruptedError):
+    pass
+
+
+class IsADirectoryError(OSError, builtins.IsADirectoryError):
+    pass
+
+
+class NotADirectoryError(OSError, builtins.NotADirectoryError):
+    pass
+
+
+class PermissionError(OSError, builtins.PermissionError):
+    pass
+
+
+class ProcessLookupError(OSError, builtins.ProcessLookupError):
+    pass
+
+
+class TimeoutError(OSError, builtins.TimeoutError):
+    pass
+
+
 # ltpy-specific
-class CanceledError(OSError): pass
+class CanceledError(OSError):
+    pass
+
 
 class LibtorrentError(Error):
 
-    def __new__(cls, ec:lt.error_code):
+    def __new__(cls, ec: lt.error_code):
         if ec.category() == LIBTORRENT_CATEGORY:
             cls = _LIBTORRENT_CODE_TO_SUBCLASS.get(ec.value(), cls)
-        return RuntimeError.__new__(cls, ec) # type: ignore
+        return RuntimeError.__new__(cls, ec)  # type: ignore
 
-class DuplicateTorrentError(LibtorrentError): pass
-class InvalidTorrentHandleError(LibtorrentError): pass
-class InvalidSessionHandleError(LibtorrentError): pass
 
-class UPNPError(Error): pass
-class HTTPError(Error): pass
-class SOCKSError(Error): pass
-class BDecodeError(Error): pass
-class I2PError(Error): pass
+class DuplicateTorrentError(LibtorrentError):
+    pass
+
+
+class InvalidTorrentHandleError(LibtorrentError):
+    pass
+
+
+class InvalidSessionHandleError(LibtorrentError):
+    pass
+
+
+class UPNPError(Error):
+    pass
+
+
+class HTTPError(Error):
+    pass
+
+
+class SOCKSError(Error):
+    pass
+
+
+class BDecodeError(Error):
+    pass
+
+
+class I2PError(Error):
+    pass
+
 
 # As of libtorrent 1.2.6, error_category.__hash__ functions aren't consistent
 # between instances, so we can't use them as dict keys. Use the names as keys
 # instead.
 _CATEGORY_NAME_TO_SUBCLASS = {
-        GENERIC_CATEGORY.name(): OSError,
-        SYSTEM_CATEGORY.name(): OSError,
-        LIBTORRENT_CATEGORY.name(): LibtorrentError,
-        UPNP_CATEGORY.name(): UPNPError,
-        HTTP_CATEGORY.name(): HTTPError,
-        SOCKS_CATEGORY.name(): SOCKSError,
-        I2P_CATEGORY.name(): I2PError,
-        BDECODE_CATEGORY.name(): BDecodeError,
+    GENERIC_CATEGORY.name(): OSError,
+    SYSTEM_CATEGORY.name(): OSError,
+    LIBTORRENT_CATEGORY.name(): LibtorrentError,
+    UPNP_CATEGORY.name(): UPNPError,
+    HTTP_CATEGORY.name(): HTTPError,
+    SOCKS_CATEGORY.name(): SOCKSError,
+    I2P_CATEGORY.name(): I2PError,
+    BDECODE_CATEGORY.name(): BDecodeError,
 }
 
 _LIBTORRENT_CODE_TO_SUBCLASS = {
@@ -159,7 +229,6 @@ _LIBTORRENT_CODE_TO_SUBCLASS = {
     LibtorrentErrorValue.INVALID_TORRENT_HANDLE: InvalidTorrentHandleError,
     LibtorrentErrorValue.INVALID_SESSION_HANDLE: InvalidSessionHandleError,
 }
-
 
 _ERRNO_TO_OSERROR = {
     # From pep3151
@@ -186,6 +255,7 @@ _ERRNO_TO_OSERROR = {
     errno.ECANCELED: CanceledError,
 }
 
+
 def exception_from_error_code(ec: lt.error_code) -> Optional[Exception]:
     # libtorrent represents non-errors as a non-None error_code object with a
     # value of 0
@@ -202,14 +272,15 @@ def exception_from_alert(alert: lt.alert) -> Optional[Exception]:
     return exception_from_error_code(ec)
 
 
-_error_code_msg_lookup:Dict[str, Dict[lt.error_category, int]] = {}
+_error_code_msg_lookup: Dict[str, Dict[lt.error_category, int]] = {}
+
 
 def _init_error_code_msg_lookup():
     # There's no way to enumerate all error categories. Check all the ones we
     # know about.
     for category in (GENERIC_CATEGORY, SYSTEM_CATEGORY, LIBTORRENT_CATEGORY,
-            BDECODE_CATEGORY, HTTP_CATEGORY, I2P_CATEGORY, SOCKS_CATEGORY,
-            UPNP_CATEGORY):
+                     BDECODE_CATEGORY, HTTP_CATEGORY, I2P_CATEGORY,
+                     SOCKS_CATEGORY, UPNP_CATEGORY):
         # There's no way to enumerate all error codes covered by an
         # error_category. So our strategy is to get the message string for
         # error code #1, and keep incrementing the error code until the
@@ -219,7 +290,8 @@ def _init_error_code_msg_lookup():
         value = 1
         while True:
             msg = lt.error_code(value, category).message()
-            _error_code_msg_lookup.setdefault(msg, {}).setdefault(category, value)
+            _error_code_msg_lookup.setdefault(msg,
+                                              {}).setdefault(category, value)
             # At least http_category and upnp_category yield messages for
             # unknown error codes like "unknown code 123". We do map these
             # messages, but for stop condition testing we strip the decimal
@@ -243,7 +315,7 @@ def _init_error_code_msg_lookup():
 _init_error_code_msg_lookup()
 
 
-def error_code_from_exception(exc:Exception) -> Optional[lt.error_code]:
+def error_code_from_exception(exc: Exception) -> Optional[lt.error_code]:
     if not isinstance(exc, RuntimeError):
         return None
     msg = str(exc)
@@ -268,7 +340,8 @@ def error_code_from_exception(exc:Exception) -> Optional[lt.error_code]:
         return {
             GENERIC_CATEGORY: 0,
             LIBTORRENT_CATEGORY: 2,
-            }.get(category, 1)
+        }.get(category, 1)
+
     items = sorted(lookup.items(), key=lambda item: cat_key(item[0]))
     if not items:
         return None
@@ -276,13 +349,14 @@ def error_code_from_exception(exc:Exception) -> Optional[lt.error_code]:
     return lt.error_code(value, category)
 
 
-def _translate_exception(exc:Exception) -> Optional[Exception]:
+def _translate_exception(exc: Exception) -> Optional[Exception]:
     if not isinstance(exc, RuntimeError):
         return None
     ec = error_code_from_exception(exc)
     if not ec:
         return None
     return exception_from_error_code(ec)
+
 
 @contextlib.contextmanager
 def translate_exceptions() -> Generator:

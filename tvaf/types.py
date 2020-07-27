@@ -18,6 +18,7 @@ from typing import Optional
 
 USER_UNKNOWN = "*unknown*"
 
+
 @dataclasses.dataclass(frozen=True)
 class TorrentSlice(collections.abc.Sized):
 

@@ -36,7 +36,8 @@ def add_fixture_row(conn: apsw.Connection, table: str, **kwargs: Any) -> None:
                           kwargs)
 
 
-def add_fixture_torrent_meta(conn: apsw.Connection, meta: tvaf.types.TorrentMeta) -> None:
+def add_fixture_torrent_meta(conn: apsw.Connection,
+                             meta: tvaf.types.TorrentMeta) -> None:
     """Adds a TorrentMeta to the database."""
     meta_dict = dataclasses.asdict(meta)
     add_fixture_row(conn, "torrent_meta", **meta_dict)
@@ -147,13 +148,15 @@ class TestCase(unittest.TestCase):
         self.assert_golden(output, suffix=suffix)
 
     def assert_golden_acct(self,
-                            *audits: tvaf.types.Acct,
-                            suffix: str = "accts.golden.json") -> None:
+                           *audits: tvaf.types.Acct,
+                           suffix: str = "accts.golden.json") -> None:
         """Compares a list of Acct records to golden data."""
-        self.assert_golden_json([dataclasses.asdict(a) for a in audits], suffix=suffix)
+        self.assert_golden_json([dataclasses.asdict(a) for a in audits],
+                                suffix=suffix)
 
     def assert_golden_torrent_meta(self,
                                    *meta: tvaf.types.TorrentMeta,
                                    suffix: str = "status.golden.json") -> None:
         """Compares a list of TorrentMetas to golden data."""
-        self.assert_golden_json([dataclasses.asdict(m) for m in meta], suffix=suffix)
+        self.assert_golden_json([dataclasses.asdict(m) for m in meta],
+                                suffix=suffix)

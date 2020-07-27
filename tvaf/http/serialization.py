@@ -10,14 +10,13 @@ from typing import Set
 import libtorrent as lt
 
 
-def serialize_error_code(ec:lt.error_code) -> Mapping[str, Any]:
-    return dict(
-        category=ec.category().name(),
-        value=ec.value(),
-        message=ec.message())
+def serialize_error_code(ec: lt.error_code) -> Mapping[str, Any]:
+    return dict(category=ec.category().name(),
+                value=ec.value(),
+                message=ec.message())
 
 
-def serialize_bit_list(bit_list:Sequence[bool]) -> str:
+def serialize_bit_list(bit_list: Sequence[bool]) -> str:
     bitfield_bytes = bytearray()
     b = 0
     l = len(bit_list)
@@ -49,43 +48,46 @@ _FLAG_FIELDS = {
     "flag_disable_pex": lt.torrent_flags.disable_pex,
 }
 
+
 class TorrentStatusSerializer:
 
-    _SIMPLE_FIELDS = frozenset(("name", "save_path", "error_file", "progress",
-    "has_metadata", "progress_ppm", "current_tracker", "total_download", "total_upload",
-    "total_payload_download", "total_payload_upload", "total_failed_bytes",
-    "total_redundant_bytes", "download_rate", "upload_rate",
-    "download_payload_rate", "upload_payload_rate", "num_seeds", "num_peers",
-    "num_complete", "num_incomplete", "list_seeds", "list_peers",
-    "connect_candidates", "num_pieces", "total_done", "total_wanted_done",
-    "total_wanted", "distributed_full_copies", "distributed_fraction",
-    "distributed_copies", "block_size", "num_uploads", "num_connections",
-    "uploads_limit", "connections_limit", "up_bandwidth_queue",
-    "all_time_upload", "all_time_download", "seed_rank", "has_incoming",
-    "added_time", "completed_time", "last_seen_complete", "queue_position",
-    "need_save_resume", "moving_storage", "announcing_to_trackers",
-    "announcing_to_lsd", "announcing_to_dht", "flags"))
+    _SIMPLE_FIELDS = frozenset(
+        ("name", "save_path", "error_file", "progress", "has_metadata",
+         "progress_ppm", "current_tracker", "total_download", "total_upload",
+         "total_payload_download", "total_payload_upload", "total_failed_bytes",
+         "total_redundant_bytes", "download_rate", "upload_rate",
+         "download_payload_rate", "upload_payload_rate", "num_seeds",
+         "num_peers", "num_complete", "num_incomplete", "list_seeds",
+         "list_peers", "connect_candidates", "num_pieces", "total_done",
+         "total_wanted_done", "total_wanted", "distributed_full_copies",
+         "distributed_fraction", "distributed_copies", "block_size",
+         "num_uploads", "num_connections", "uploads_limit", "connections_limit",
+         "up_bandwidth_queue", "all_time_upload", "all_time_download",
+         "seed_rank", "has_incoming", "added_time", "completed_time",
+         "last_seen_complete", "queue_position", "need_save_resume",
+         "moving_storage", "announcing_to_trackers", "announcing_to_lsd",
+         "announcing_to_dht", "flags"))
     _FIELD_SERIALIZERS = {
-            "pieces":serialize_bit_list,
-            "verified_pieces":serialize_bit_list,
-            "errc":serialize_error_code,
-        }
+        "pieces": serialize_bit_list,
+        "verified_pieces": serialize_bit_list,
+        "errc": serialize_error_code,
+    }
 
-    FIELDS = (_SIMPLE_FIELDS | frozenset(_FIELD_SERIALIZERS.keys()) | 
-        frozenset(_FLAG_FIELDS.keys()) | frozenset((
-        "info_hashes", "state", "storage_mode")))
+    FIELDS = (_SIMPLE_FIELDS | frozenset(_FIELD_SERIALIZERS.keys()) |
+              frozenset(_FLAG_FIELDS.keys()) | frozenset(
+                  ("info_hashes", "state", "storage_mode")))
 
-    def __init__(self, fields:Collection[str]=None):
+    def __init__(self, fields: Collection[str] = None):
         if fields is None:
             fields = self.FIELDS
         self.fields = fields
 
-    def serialize(self, status:lt.torrent_status) -> Mapping[str, Any]:
+    def serialize(self, status: lt.torrent_status) -> Mapping[str, Any]:
         simple_fields = self._SIMPLE_FIELDS
         field_serializers = self._FIELD_SERIALIZERS
         flag_fields = _FLAG_FIELDS
 
-        result:Dict[str, Any] = {}
+        result: Dict[str, Any] = {}
 
         for field in self.fields:
             if field in simple_fields:
@@ -107,16 +109,16 @@ class TorrentStatusSerializer:
 
 
 class _FileListSerializer:
-    
-    def serialize(self, storage:lt.file_storage) -> Sequence[Mapping[str, Any]]:
-        result:List[Dict[str, Any]] = []
+
+    def serialize(self,
+                  storage: lt.file_storage) -> Sequence[Mapping[str, Any]]:
+        result: List[Dict[str, Any]] = []
 
         for i in range(storage.num_files()):
-            file_entry = dict(
-                index=i,
-                offset=storage.file_offset(i),
-                path=storage.file_path(i),
-                size=storage.file_size(i))
+            file_entry = dict(index=i,
+                              offset=storage.file_offset(i),
+                              path=storage.file_path(i),
+                              size=storage.file_size(i))
             # TODO: symlink() seems to crash
             # TODO: mtime() not mapped on python bindings
             ih = storage.hash(i)
@@ -143,26 +145,25 @@ class _FileListSerializer:
 class TorrentInfoSerializer:
     # Unused fields: trackers, web_seeds, nodes
 
-    _SIMPLE_CALLABLE_FIELDS = frozenset((
-        "collections", "piece_length", "num_pieces",
-        "total_size", "priv", "is_i2p", "name",
-        "creation_date", "creator", "comment"))
+    _SIMPLE_CALLABLE_FIELDS = frozenset(
+        ("collections", "piece_length", "num_pieces", "total_size", "priv",
+         "is_i2p", "name", "creation_date", "creator", "comment"))
 
-    FIELDS = _SIMPLE_CALLABLE_FIELDS | frozenset((
-        "files", "orig_files", "merkle_tree", "similar_torrents", "metadata",
-        "hash_for_piece", "info_hashes"))
+    FIELDS = _SIMPLE_CALLABLE_FIELDS | frozenset(
+        ("files", "orig_files", "merkle_tree", "similar_torrents", "metadata",
+         "hash_for_piece", "info_hashes"))
 
-    def __init__(self, fields:Collection[str]=None):
+    def __init__(self, fields: Collection[str] = None):
         if fields is None:
             fields = self.FIELDS
         self.fields = fields
 
         self._file_list_serializer = _FileListSerializer()
 
-    def serialize(self, info:lt.torrent_info) -> Mapping[str, Any]:
+    def serialize(self, info: lt.torrent_info) -> Mapping[str, Any]:
         simple_callable_fields = self._SIMPLE_CALLABLE_FIELDS
 
-        result:Dict[str, Any] = {}
+        result: Dict[str, Any] = {}
 
         for field in self.fields:
             if field in simple_callable_fields:
@@ -170,17 +171,17 @@ class TorrentInfoSerializer:
             elif field == "info_hashes":
                 result[field] = dict(v1=str(info.info_hash()))
             elif field in ("files", "orig_files"):
-                result[field] = self._file_list_serializer.serialize(getattr(info,
-                    field)())
+                result[field] = self._file_list_serializer.serialize(
+                    getattr(info, field)())
             elif field in ("merkle_tree", "similar_torrents"):
-                result[field] = [
-                    str(ih) for ih in getattr(info, field)()]
+                result[field] = [str(ih) for ih in getattr(info, field)()]
             elif field == "metadata":
                 result[field] = base64.b64encode(info.metadata()).decode()
             elif field == "hash_for_piece":
                 result[field] = [
                     info.hash_for_piece(i).hex()
-                    for i in range(info.num_pieces())]
+                    for i in range(info.num_pieces())
+                ]
             # TODO: ssl_cert returns string instead of bytes
 
         return result
@@ -188,22 +189,22 @@ class TorrentInfoSerializer:
 
 class TorrentHandleSerializer:
 
-    _SIMPLE_CALLABLE_FIELDS = frozenset((
-        "file_progress", "trackers", "url_seeds", "http_seeds", "flags",
-        "need_save_resume_data", "queue_position", "piece_availability",
-        "piece_priorities", "file_priorities", "download_limit",
-        "upload_limit", "max_uploads", "max_connections"))
+    _SIMPLE_CALLABLE_FIELDS = frozenset(
+        ("file_progress", "trackers", "url_seeds", "http_seeds", "flags",
+         "need_save_resume_data", "queue_position", "piece_availability",
+         "piece_priorities", "file_priorities", "download_limit",
+         "upload_limit", "max_uploads", "max_connections"))
 
-    FIELDS = _SIMPLE_CALLABLE_FIELDS | frozenset(_FLAG_FIELDS.keys()) | frozenset((
-        "info_hashes",))
+    FIELDS = _SIMPLE_CALLABLE_FIELDS | frozenset(
+        _FLAG_FIELDS.keys()) | frozenset(("info_hashes",))
 
-    def __init__(self, fields:Collection[str]=None):
+    def __init__(self, fields: Collection[str] = None):
         if fields is None:
             fields = self.FIELDS
         self.fields = fields
 
-    def serialize(self, handle:lt.torrent_handle) -> Mapping[str, Any]:
-        result:Dict[str, Any] = {}
+    def serialize(self, handle: lt.torrent_handle) -> Mapping[str, Any]:
+        result: Dict[str, Any] = {}
         simple_callable_fields = self._SIMPLE_CALLABLE_FIELDS
         flag_fields = _FLAG_FIELDS
 

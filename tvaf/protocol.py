@@ -14,11 +14,11 @@ BDict = Dict[bytes, Any]
 BList = List[Any]
 
 
-def decode(bytes_:bytes) -> str:
+def decode(bytes_: bytes) -> str:
     return bytes_.decode("utf-8", "surrogateescape")
 
 
-def encode(str_:str) -> bytes:
+def encode(str_: str) -> bytes:
     return str_.encode("utf-8", "surrogateescape")
 
 
@@ -62,8 +62,7 @@ class FileSpec:
     @property
     def path(self):
         if not hasattr(self, "_path"):
-            setattr(self, "_path", [decode(elem) for elem in
-                self.path_bytes])
+            setattr(self, "_path", [decode(elem) for elem in self.path_bytes])
         return self._path
 
     @property
@@ -83,8 +82,8 @@ class FileSpec:
     @property
     def target(self):
         if not hasattr(self, "_target"):
-            setattr(self, "_target", [decode(elem) for elem in
-                self.target_bytes])
+            setattr(self, "_target",
+                    [decode(elem) for elem in self.target_bytes])
         return self._target
 
     @property
@@ -98,7 +97,7 @@ class FileSpec:
 
 class Info:
 
-    def __init__(self, info_dict:BDict):
+    def __init__(self, info_dict: BDict):
         self.dict = info_dict
 
     def iter_files(self) -> Iterator[FileSpec]:
@@ -116,14 +115,19 @@ class Info:
                     target_bytes = file_dict.get(b"symlink path", [])
                 else:
                     target_bytes = []
-                yield FileSpec(index=index, start=offset, stop=offset + length,
-                        base_name_bytes=base_name_bytes,
-                        path_bytes=path_bytes,
-                        attr_bytes=attr_bytes,
-                        target_bytes=target_bytes)
+                yield FileSpec(index=index,
+                               start=offset,
+                               stop=offset + length,
+                               base_name_bytes=base_name_bytes,
+                               path_bytes=path_bytes,
+                               attr_bytes=attr_bytes,
+                               target_bytes=target_bytes)
                 offset += length
         else:
             length = self.dict[b"length"]
             attr_bytes = self.dict.get(b"attr", b"")
-            yield FileSpec(index=0, start=0, stop=length,
-                    base_name_bytes=base_name_bytes, attr_bytes=attr_bytes)
+            yield FileSpec(index=0,
+                           start=0,
+                           stop=length,
+                           base_name_bytes=base_name_bytes,
+                           attr_bytes=attr_bytes)

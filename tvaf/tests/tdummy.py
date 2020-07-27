@@ -13,11 +13,11 @@ DATA = bytes(random.getrandbits(7) for _ in range(LEN))
 PIECES = [DATA[i:i + PIECE_LENGTH] for i in range(0, LEN, PIECE_LENGTH)]
 
 INFO_DICT = {
-        b"name": NAME,
-        b"piece length": PIECE_LENGTH,
-        b"length": len(DATA),
-        b"pieces": b"".join(hashlib.sha1(p).digest() for p in PIECES),
-    }
+    b"name": NAME,
+    b"piece length": PIECE_LENGTH,
+    b"length": len(DATA),
+    b"pieces": b"".join(hashlib.sha1(p).digest() for p in PIECES),
+}
 
 DICT = {
     b"info": INFO_DICT,
@@ -30,8 +30,13 @@ SHA1_HASH = lt.sha1_hash(INFOHASH_BYTES)
 
 class File:
 
-    def __init__(self, *, data=None, length=None, path=None, path_split=None,
-            attr=None):
+    def __init__(self,
+                 *,
+                 data=None,
+                 length=None,
+                 path=None,
+                 path_split=None,
+                 attr=None):
         assert length is not None
         assert path or path_split
 
@@ -57,18 +62,23 @@ class File:
             return b"\x00" * self.length
         if self._data is None:
             # 7-bit data to make it easy to work around libtorrent bug #4612
-            self._data = bytes(random.getrandbits(7) for _ in
-                    range(self.length))
+            self._data = bytes(
+                random.getrandbits(7) for _ in range(self.length))
         return self._data
 
 
 class Torrent:
 
     @classmethod
-    def single_file(cls, *, piece_length=16384, length=None, name=None,
-            attr=None, data=None):
-        return cls(piece_length=piece_length, files=[dict(length=length,
-            path=name, attr=attr, data=data)])
+    def single_file(cls,
+                    *,
+                    piece_length=16384,
+                    length=None,
+                    name=None,
+                    attr=None,
+                    data=None):
+        return cls(piece_length=piece_length,
+                   files=[dict(length=length, path=name, attr=attr, data=data)])
 
     def __init__(self, *, piece_length=16384, files=None):
         assert piece_length is not None
@@ -99,18 +109,22 @@ class Torrent:
     @property
     def pieces(self):
         if self._pieces is None:
-            self._pieces = [self.data[i:i + self.piece_length] for i in
-                    range(0, self.length, self.piece_length)]
+            self._pieces = [
+                self.data[i:i + self.piece_length]
+                for i in range(0, self.length, self.piece_length)
+            ]
         return self._pieces
 
     @property
     def info(self):
         if self._info is None:
             self._info = {
-                b"piece length": self.piece_length,
-                b"length": self.length,
-                b"pieces": b"".join(hashlib.sha1(p).digest() for p in
-                    self.pieces),
+                b"piece length":
+                    self.piece_length,
+                b"length":
+                    self.length,
+                b"pieces":
+                    b"".join(hashlib.sha1(p).digest() for p in self.pieces),
             }
 
             if len(self.files) == 1:
@@ -164,7 +178,10 @@ class Torrent:
         return atp
 
 
-DEFAULT = Torrent.single_file(piece_length=16384, name=b"test.txt",
-        length=16384 * 9 + 1000)
-DEFAULT_STABLE = Torrent.single_file(piece_length=16384, name=b"test.txt",
-        length=16384 * 9 + 1000, data=b"\0" * (16384 * 9 + 1000))
+DEFAULT = Torrent.single_file(piece_length=16384,
+                              name=b"test.txt",
+                              length=16384 * 9 + 1000)
+DEFAULT_STABLE = Torrent.single_file(piece_length=16384,
+                                     name=b"test.txt",
+                                     length=16384 * 9 + 1000,
+                                     data=b"\0" * (16384 * 9 + 1000))

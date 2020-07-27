@@ -17,7 +17,7 @@ class NormalTicker(driver_lib.Ticker):
         self.calls = []
         self.interval = interval
 
-    def tick(self, now:float):
+    def tick(self, now: float):
         self.calls.append(now)
         self.last = now
 
@@ -27,27 +27,35 @@ class NormalTicker(driver_lib.Ticker):
 
 class AbortingTicker(NormalTicker):
 
-    def __init__(self, driver:driver_lib.TickDriver, *, last=None,
-            interval=60,
-            abort_at=120):
+    def __init__(self,
+                 driver: driver_lib.TickDriver,
+                 *,
+                 last=None,
+                 interval=60,
+                 abort_at=120):
         super().__init__(last=last, interval=interval)
         self.driver = driver
         self.abort_at = abort_at
 
-    def tick(self, now:float):
+    def tick(self, now: float):
         super().tick(now)
         if now >= self.abort_at:
             self.driver.abort()
 
+
 class FailTicker(NormalTicker):
 
-    def __init__(self, *, last=None, interval=60, fail_tick=True,
-            fail_get_tick_deadline=True):
+    def __init__(self,
+                 *,
+                 last=None,
+                 interval=60,
+                 fail_tick=True,
+                 fail_get_tick_deadline=True):
         super().__init__(last=last, interval=interval)
         self.fail_tick = fail_tick
         self.fail_get_tick_deadline = fail_get_tick_deadline
 
-    def tick(self, now:float):
+    def tick(self, now: float):
         super().tick(now)
         if self.fail_tick:
             raise Exception("whoops")
@@ -135,8 +143,10 @@ class TickDriverRunTest(TickDriverTestBase):
     def test_run_with_progression(self):
         driver = driver_lib.TickDriver()
         with self.mock_time(driver):
-            ticker = AbortingTicker(driver=driver, last=0, interval=60,
-                    abort_at=360)
+            ticker = AbortingTicker(driver=driver,
+                                    last=0,
+                                    interval=60,
+                                    abort_at=360)
             driver.add(ticker)
             driver.run()
         self.assertEqual(ticker.calls, [60, 120, 180, 240, 300, 360])
@@ -145,8 +155,10 @@ class TickDriverRunTest(TickDriverTestBase):
         driver = driver_lib.TickDriver()
         # need autoincrement due to infinite spin
         with self.mock_time(driver, autoincrement=1):
-            ticker = AbortingTicker(driver=driver, last=0, interval=60,
-                    abort_at=360)
+            ticker = AbortingTicker(driver=driver,
+                                    last=0,
+                                    interval=60,
+                                    abort_at=360)
             driver.add(ticker)
             driver.add(FailTicker())
             driver.run()
@@ -158,8 +170,10 @@ class TickDriverRunTest(TickDriverTestBase):
     def test_run_with_progression_in_thread(self):
         driver = driver_lib.TickDriver()
         with self.mock_time(driver):
-            ticker = AbortingTicker(driver=driver, last=0, interval=60,
-                    abort_at=360)
+            ticker = AbortingTicker(driver=driver,
+                                    last=0,
+                                    interval=60,
+                                    abort_at=360)
             driver.add(ticker)
             driver.start()
             driver.wait()
@@ -169,8 +183,10 @@ class TickDriverRunTest(TickDriverTestBase):
         driver = driver_lib.TickDriver()
         # need autoincrement due to infinite spin
         with self.mock_time(driver, autoincrement=1):
-            ticker = AbortingTicker(driver=driver, last=0, interval=60,
-                    abort_at=360)
+            ticker = AbortingTicker(driver=driver,
+                                    last=0,
+                                    interval=60,
+                                    abort_at=360)
             driver.add(ticker)
             driver.add(FailTicker())
             driver.start()

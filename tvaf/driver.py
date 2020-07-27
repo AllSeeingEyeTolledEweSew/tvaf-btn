@@ -18,7 +18,7 @@ AlertHandler = Callable[[lt.alert], None]
 _log = logging.getLogger(__name__)
 
 
-def dispatch(obj, alert:lt.alert, prefix="handle_"):
+def dispatch(obj, alert: lt.alert, prefix="handle_"):
     type_name = alert.__class__.__name__
     handler = getattr(obj, prefix + type_name, None)
     if handler:
@@ -26,9 +26,9 @@ def dispatch(obj, alert:lt.alert, prefix="handle_"):
 
 
 def log_alert(alert: lt.alert,
-               message: str = "",
-               args: Iterable[Any] = (),
-               method=None):
+              message: str = "",
+              args: Iterable[Any] = (),
+              method=None):
     prefix = "%s"
     prefix_args = [alert.__class__.__name__]
     torrent_name = getattr(alert, "torrent_name", None)
@@ -59,7 +59,8 @@ def log_alert(alert: lt.alert,
 
 def allow_alert(alert: lt.alert):
     if isinstance(alert, lt.read_piece_alert):
-        if alert.error.category() == lt.generic_category() and alert.error.value() == errno.ECANCELED:
+        if (alert.error.category() == lt.generic_category() and
+                alert.error.value() == errno.ECANCELED):
             return False
     return True
 
@@ -68,22 +69,22 @@ class AlertDriver:
 
     ABORT_CHECK_INTERVAL = 1.0
 
-    def __init__(self, *, session:Optional[lt.session]=None):
+    def __init__(self, *, session: Optional[lt.session] = None):
         assert session is not None
 
         self.session = session
 
-        self._handlers :Set[AlertHandler] = set()
-        self._thread:Optional[threading.Thread] = None
+        self._handlers: Set[AlertHandler] = set()
+        self._thread: Optional[threading.Thread] = None
         self._aborted = False
 
-    def add(self, handler:AlertHandler):
+    def add(self, handler: AlertHandler):
         self._handlers.add(handler)
 
-    def remove(self, handler:AlertHandler):
+    def remove(self, handler: AlertHandler):
         self._handlers.remove(handler)
 
-    def discard(self, handler:AlertHandler):
+    def discard(self, handler: AlertHandler):
         self._handlers.discard(handler)
 
     def start(self):
@@ -101,7 +102,8 @@ class AlertDriver:
     def iter_alerts(self):
         while True:
             with ltpy.translate_exceptions():
-                self.session.wait_for_alert(int(self.ABORT_CHECK_INTERVAL * 1000))
+                self.session.wait_for_alert(
+                    int(self.ABORT_CHECK_INTERVAL * 1000))
                 alerts = self.session.pop_alerts()
             if not alerts and self._aborted:
                 return
@@ -129,29 +131,29 @@ class Ticker:
     def get_tick_deadline(self) -> float:
         return math.inf
 
-    def tick(self, now:float):
+    def tick(self, now: float):
         pass
 
 
 class TickDriver:
 
     def __init__(self):
-        self._tickers:Set[Ticker] = set()
-        self._thread:Optional[threading.Thread] = None
+        self._tickers: Set[Ticker] = set()
+        self._thread: Optional[threading.Thread] = None
         self._condition = threading.Condition(threading.RLock())
         self._aborted = False
 
-    def add(self, ticker:Ticker):
+    def add(self, ticker: Ticker):
         with self._condition:
             self._tickers.add(ticker)
             self._condition.notify_all()
 
-    def remove(self, ticker:Ticker):
+    def remove(self, ticker: Ticker):
         with self._condition:
             self._tickers.remove(ticker)
             self._condition.notify_all()
 
-    def discard(self, ticker:Ticker):
+    def discard(self, ticker: Ticker):
         with self._condition:
             self._tickers.discard(ticker)
             self._condition.notify_all()
@@ -171,7 +173,7 @@ class TickDriver:
         assert self._thread is not None
         self._thread.join()
 
-    def tick(self, now:float):
+    def tick(self, now: float):
         with self._condition:
             for ticker in list(self._tickers):
                 try:
@@ -182,6 +184,7 @@ class TickDriver:
 
     def get_tick_deadline(self):
         with self._condition:
+
             def iter_deadlines():
                 yield math.inf
                 for ticker in self._tickers:
@@ -190,6 +193,7 @@ class TickDriver:
                     except Exception:
                         _log.exception("while getting deadline")
                         yield -math.inf
+
             return float(min(iter_deadlines()))
 
     def notify(self):

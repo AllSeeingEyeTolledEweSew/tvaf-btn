@@ -58,11 +58,12 @@ class TestTraverse(unittest.TestCase):
         self.assertIs(self.directory.traverse("symlink"), self.file)
 
     def test_symlink_follow(self):
-        self.assertIs(self.directory.traverse("symlink", follow_symlinks=True), self.file)
+        self.assertIs(self.directory.traverse("symlink", follow_symlinks=True),
+                      self.file)
 
     def test_symlink_no_follow(self):
-        self.assertIs(self.directory.traverse("symlink",
-            follow_symlinks=False), self.symlink)
+        self.assertIs(self.directory.traverse("symlink", follow_symlinks=False),
+                      self.symlink)
 
     def test_symlink_follow_self_loop(self):
         self.loop = fs.Symlink()
@@ -76,7 +77,7 @@ class TestTraverse(unittest.TestCase):
         self.loop.target = self.loop
         self.directory.mkchild("loop", self.loop)
         self.assertIs(self.directory.traverse("loop", follow_symlinks=False),
-                self.loop)
+                      self.loop)
         with self.assertRaises(OSError):
             self.directory.traverse("loop/a", follow_symlinks=False)
 
@@ -100,9 +101,9 @@ class TestTraverse(unittest.TestCase):
         self.directory.mkchild("loop1", self.loop1)
         self.directory.mkchild("loop2", self.loop2)
         self.assertIs(self.directory.traverse("loop1", follow_symlinks=False),
-                self.loop1)
+                      self.loop1)
         self.assertIs(self.directory.traverse("loop2", follow_symlinks=False),
-                self.loop2)
+                      self.loop2)
         with self.assertRaises(OSError):
             self.directory.traverse("loop1/a", follow_symlinks=False)
         with self.assertRaises(OSError):
@@ -115,8 +116,8 @@ class TestTraverse(unittest.TestCase):
 
     def test_readlink_error_no_follow(self):
         self.symlink.target = None
-        self.assertIs(self.directory.traverse("symlink",
-            follow_symlinks=False), self.symlink)
+        self.assertIs(self.directory.traverse("symlink", follow_symlinks=False),
+                      self.symlink)
 
     def test_dotdot(self):
         self.assertIs(self.root.traverse(".."), self.root)
@@ -125,8 +126,8 @@ class TestTraverse(unittest.TestCase):
     def test_symlink_repeat_no_loop(self):
         self.dir_symlink = fs.Symlink(target=self.directory)
         self.root.mkchild("dir_symlink", self.dir_symlink)
-        self.assertIs(
-            self.root.traverse("dir_symlink/../dir_symlink/file"), self.file)
+        self.assertIs(self.root.traverse("dir_symlink/../dir_symlink/file"),
+                      self.file)
 
 
 class TestRealpath(unittest.TestCase):
@@ -142,14 +143,14 @@ class TestRealpath(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(self.root.realpath(""), fs.Path("/"))
-    
+
     def test_matches_nothing(self):
         self.assertEqual(self.root.realpath("does/not/exist"),
-        fs.Path("/does/not/exist"))
+                         fs.Path("/does/not/exist"))
 
     def test_symlink(self):
         self.assertEqual(self.root.realpath("directory/symlink/a"),
-                fs.Path("/directory/file/a"))
+                         fs.Path("/directory/file/a"))
 
     def test_symlink_follow_self_loop(self):
         self.loop = fs.Symlink()
@@ -201,9 +202,11 @@ class TestOpen(unittest.TestCase):
     def test_mode_rb(self):
         node = fs.File(size=0)
         contents = b"test contents"
+
         def open_raw(mode):
             self.assertEqual(mode, "r")
             return io.BufferedReader(io.BytesIO(contents))
+
         node.open_raw = open_raw
         fp = node.open(mode="rb")
         self.assertEqual(fp.read(), contents)
@@ -359,4 +362,4 @@ class TestSymlink(unittest.TestCase):
         self.root.traverse("dir2/file")
         self.symlink.target = self.file
         self.assertEqual(self.symlink.readlink(),
-                pathlib.PurePath("../dir2/file"))
+                         pathlib.PurePath("../dir2/file"))

@@ -37,8 +37,7 @@ class InlineDriver:
                         method = logging.error
                     else:
                         method = logging.info
-                    method("%s: %s", alert.__class__.__name__,
-                            alert.message())
+                    method("%s: %s", alert.__class__.__name__, alert.message())
                     for handler in self.handlers:
                         handler(alert)
             for ticker in self.tickers:

@@ -31,7 +31,7 @@ class MockTime:
         self._monotonic = 0.0
         self._autoincrement = float(autoincrement)
         assert self._autoincrement >= 0
-        self._patches:List[unittest.mock._patch] = []
+        self._patches: List[unittest.mock._patch] = []
         self._started = False
 
     def get_mock_time(self) -> float:

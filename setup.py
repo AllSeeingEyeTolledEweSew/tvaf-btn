@@ -22,7 +22,7 @@ class FormatCommand(distutils.cmd.Command):
         subprocess.check_call(["isort", "-rc", "-y"])
 
     def run_yapf(self):
-        subprocess.check_call(["yapf", "-i", "-r", "--style=google", "."])
+        subprocess.check_call(["yapf", "-i", "-r", "."])
 
     def run_autoflake(self):
         subprocess.check_call([

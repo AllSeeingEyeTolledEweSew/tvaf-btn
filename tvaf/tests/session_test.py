@@ -11,12 +11,13 @@ class TestSession(unittest.TestCase):
     def setUp(self):
         self.config = config_lib.Config(session_listen_interfaces="127.0.0.1:0")
         self.required_alert_mask = (lt.alert_category.error |
-                lt.alert_category.peer)
+                                    lt.alert_category.peer)
         self.get_required_alert_mask = lambda: self.required_alert_mask
 
     def create_session_service(self):
-        return session_lib.SessionService(get_required_alert_mask=self.get_required_alert_mask,
-                config=self.config)
+        return session_lib.SessionService(
+            get_required_alert_mask=self.get_required_alert_mask,
+            config=self.config)
 
     def test_session(self):
         session_service = self.create_session_service()
@@ -24,14 +25,14 @@ class TestSession(unittest.TestCase):
 
         # Test required alert mask is applied
         self.assertEqual(settings["alert_mask"] & self.required_alert_mask,
-                self.required_alert_mask)
+                         self.required_alert_mask)
 
         # Test overrides are applied
         self.assertEqual(settings["enable_dht"], False)
 
         # Test default config is added
         self.assertEqual(self.config["session_settings_base"],
-        "default_settings")
+                         "default_settings")
 
     def test_alert_mask(self):
         self.config["session_alert_mask"] = lt.alert_category.session_log
@@ -87,11 +88,11 @@ class TestSession(unittest.TestCase):
 
         # Check settings pack was applied as default
         self.assertEqual(settings["cache_size"],
-                lt.high_performance_seed()["cache_size"])
+                         lt.high_performance_seed()["cache_size"])
 
         # Check base pack name didn't get overwritten
         self.assertEqual(self.config["session_settings_base"],
-                "high_performance_seed")
+                         "high_performance_seed")
 
     def test_settings_base_invalid(self):
         self.config["session_settings_base"] = "invalid"

@@ -95,8 +95,8 @@ class IOServiceTestCase(unittest.TestCase):
     def pump_and_find_first_alert(self, condition, timeout=5):
         deadline = time.monotonic() + timeout
         while True:
-            a = self.session.wait_for_alert(int(
-                (deadline - time.monotonic()) * 1000))
+            a = self.session.wait_for_alert(
+                int((deadline - time.monotonic()) * 1000))
             if not a:
                 assert False, f"condition timed out"
             saved = None
@@ -115,8 +115,10 @@ class IOServiceTestCase(unittest.TestCase):
                 acct_params="tvaf",
                 get_torrent=lambda: lt.bencode(tdummy.DICT)):
         tslice = types.TorrentSlice(info_hash=infohash, start=start, stop=stop)
-        params = tvaf.io.RequestParams(tslice=tslice, mode=mode, acct_params=acct_params,
-                get_torrent=get_torrent)
+        params = tvaf.io.RequestParams(tslice=tslice,
+                                       mode=mode,
+                                       acct_params=acct_params,
+                                       get_torrent=get_torrent)
         return self.ios.add_request(params)
 
     def wait_for_torrent(self):
@@ -148,8 +150,10 @@ class TestAddRemove(IOServiceTestCase):
         self.assertIsInstance(req.exception, tvaf.io.Cancelled)
 
     def test_fetch_error(self):
+
         def raise_dummy():
             raise DummyException("dummy")
+
         req = self.add_req(get_torrent=raise_dummy)
         with self.assertRaises(tvaf.io.FetchError):
             req.next(timeout=5)
@@ -581,11 +585,12 @@ class TestLoad(IOServiceTestCase):
 class TestBufferedTorrentIO(IOServiceTestCase):
 
     def open(self):
-        tslice = types.TorrentSlice(info_hash=tdummy.INFOHASH, start=0,
-                stop=tdummy.LEN)
-        return self.ios.open(
-            tslice=tslice,
-            get_torrent=lambda: lt.bencode(tdummy.DICT), user="tvaf")
+        tslice = types.TorrentSlice(info_hash=tdummy.INFOHASH,
+                                    start=0,
+                                    stop=tdummy.LEN)
+        return self.ios.open(tslice=tslice,
+                             get_torrent=lambda: lt.bencode(tdummy.DICT),
+                             user="tvaf")
 
     def test_read_some(self):
         f = self.executor.submit(self.open().read, 1024)
@@ -684,7 +689,8 @@ class TestBufferedTorrentIO(IOServiceTestCase):
         # again.
         f = self.executor.submit(fp.read, tdummy.PIECE_LENGTH)
         self.pump_alerts(f.done, msg="second read")
-        self.assertEqual(f.result(), tdummy.DATA[1024:tdummy.PIECE_LENGTH + 1024])
+        self.assertEqual(f.result(),
+                         tdummy.DATA[1024:tdummy.PIECE_LENGTH + 1024])
 
     def test_seek_resets_buffer(self):
         fp = self.open()
@@ -720,11 +726,10 @@ class TestConfig(unittest.TestCase):
 
     def test_config_defaults(self):
         save_path = str(self.config_dir.joinpath("downloads"))
-        self.assertEqual(self.config, config_lib.Config(
-            torrent_default_save_path=save_path))
+        self.assertEqual(self.config,
+                         config_lib.Config(torrent_default_save_path=save_path))
 
-        self.assertEqual(self.ios.get_atp_settings(),
-                dict(save_path=save_path))
+        self.assertEqual(self.ios.get_atp_settings(), dict(save_path=save_path))
 
     def test_set_config(self):
         # Set all non-default configs
@@ -733,20 +738,24 @@ class TestConfig(unittest.TestCase):
         self.config["torrent_default_storage_mode"] = "allocate"
         self.ios.set_config(self.config)
 
-        self.assertEqual(self.ios.get_atp_settings(), dict(
-            save_path=self.tempdir.name,
-            flags=lt.torrent_flags.default_flags & ~lt.torrent_flags.apply_ip_filter,
-            storage_mode=lt.storage_mode_t.storage_mode_allocate))
+        self.assertEqual(
+            self.ios.get_atp_settings(),
+            dict(save_path=self.tempdir.name,
+                 flags=lt.torrent_flags.default_flags &
+                 ~lt.torrent_flags.apply_ip_filter,
+                 storage_mode=lt.storage_mode_t.storage_mode_allocate))
 
         # Set some default configs
         self.config["torrent_default_flags_apply_ip_filter"] = True
         self.config["torrent_default_storage_mode"] = "sparse"
         self.ios.set_config(self.config)
 
-        self.assertEqual(self.ios.get_atp_settings(), dict(
-            save_path=self.tempdir.name,
-            flags=lt.torrent_flags.default_flags | lt.torrent_flags.apply_ip_filter,
-            storage_mode=lt.storage_mode_t.storage_mode_sparse))
+        self.assertEqual(
+            self.ios.get_atp_settings(),
+            dict(save_path=self.tempdir.name,
+                 flags=lt.torrent_flags.default_flags |
+                 lt.torrent_flags.apply_ip_filter,
+                 storage_mode=lt.storage_mode_t.storage_mode_sparse))
 
     def test_save_path_loop(self):
         bad_link = self.config_dir.joinpath("bad_link")

@@ -1,5 +1,6 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
+# pylint: skip-file
 
 
 def create_schema(conn: apsw.Connection) -> None:

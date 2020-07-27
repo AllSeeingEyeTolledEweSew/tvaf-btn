@@ -18,19 +18,15 @@ import io
 import logging
 import pathlib
 import stat as stat_lib
-from typing import Any
 from typing import Callable
 from typing import Dict
 from typing import Iterator
 from typing import List
 from typing import Optional
-from typing import cast
 
-from tvaf import config as config_lib
 from tvaf import fs
 from tvaf import protocol
 from tvaf import types
-from tvaf import util
 
 _log = logging.getLogger(__name__)
 

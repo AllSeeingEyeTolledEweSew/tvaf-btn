@@ -1,4 +1,3 @@
-import dataclasses
 import unittest
 
 from tvaf import protocol

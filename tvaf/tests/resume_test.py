@@ -1,6 +1,4 @@
 import concurrent.futures
-import logging
-import os
 import pathlib
 import tempfile
 import unittest

@@ -2,13 +2,9 @@ import builtins
 import contextlib
 import enum
 import errno
-import functools
 import os
-import sys
-from typing import Container
 from typing import Dict
 from typing import Generator
-from typing import Iterable
 from typing import Optional
 from typing import Tuple
 

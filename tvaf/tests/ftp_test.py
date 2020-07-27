@@ -1,6 +1,5 @@
 import ftplib
 import io
-import logging
 import unittest
 
 import libtorrent as lt

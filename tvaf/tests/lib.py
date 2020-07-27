@@ -13,8 +13,6 @@ import re
 import unittest
 import unittest.mock
 from typing import Any
-from typing import ContextManager
-from typing import SupportsFloat
 
 import apsw
 

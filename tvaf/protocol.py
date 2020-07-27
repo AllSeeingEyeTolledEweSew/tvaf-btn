@@ -3,8 +3,6 @@ from typing import Any
 from typing import Dict
 from typing import Iterator
 from typing import List
-from typing import Optional
-from typing import Union
 
 # mypy currently doesn't support cyclic definitions.
 #BAny = Union["BDict", "BList", bytes, int]

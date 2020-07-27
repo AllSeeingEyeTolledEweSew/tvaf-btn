@@ -5,7 +5,6 @@ from typing import Dict
 from typing import List
 from typing import Mapping
 from typing import Sequence
-from typing import Set
 
 import libtorrent as lt
 

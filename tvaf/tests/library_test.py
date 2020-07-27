@@ -1,7 +1,6 @@
 import io
 import stat as stat_lib
 import unittest
-from typing import Dict
 from typing import Iterable
 from typing import Optional
 from typing import Tuple

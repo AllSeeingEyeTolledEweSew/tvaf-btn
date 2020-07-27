@@ -12,8 +12,6 @@ what you see when inserting into or selecting from the table.
 
 import collections.abc
 import dataclasses
-import enum
-import re
 from typing import Optional
 
 USER_UNKNOWN = "*unknown*"

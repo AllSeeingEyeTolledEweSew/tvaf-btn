@@ -1,18 +1,10 @@
-import contextlib
 import errno
 import functools
 import io
-import logging
 import os
-import stat as stat_lib
 import threading
 import time
-from typing import Any
-from typing import Callable
-from typing import Generator
-from typing import Iterator
 from typing import List
-from typing import Mapping
 from typing import Optional
 from typing import Tuple
 from typing import cast
@@ -26,7 +18,6 @@ import pyftpdlib.servers
 import tvaf.config as config_lib
 from tvaf import auth
 from tvaf import fs
-from tvaf import library
 
 
 def _partialclass(cls, *args, **kwds):

@@ -334,11 +334,12 @@ class TestTranslateExceptions(unittest.TestCase):
             with ltpy.translate_exceptions():
                 lt.torrent_info("does-not-exist")
 
-    def test_fake_runtimeerrors(self):
+    def test_enoent(self):
         with self.assertRaises(FileNotFoundError):
             with ltpy.translate_exceptions():
                 raise RuntimeError(lt.generic_category().message(errno.ENOENT))
 
+    def test_duplicate_torrent(self):
         with self.assertRaises(ltpy.DuplicateTorrentError):
             with ltpy.translate_exceptions():
                 raise RuntimeError(lt.libtorrent_category().message(ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT))

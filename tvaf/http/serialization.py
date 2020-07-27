@@ -1,6 +1,7 @@
 import base64
 import libtorrent as lt
 from typing import Mapping
+from typing import Collection
 from typing import Sequence
 from typing import Dict
 from typing import Set
@@ -73,7 +74,7 @@ class TorrentStatusSerializer:
         frozenset(_FLAG_FIELDS.keys()) | frozenset((
         "info_hashes", "state", "storage_mode")))
 
-    def __init__(self, fields:Sequence[str]=None):
+    def __init__(self, fields:Collection[str]=None):
         if fields is None:
             fields = self.FIELDS
         self.fields = fields
@@ -150,7 +151,7 @@ class TorrentInfoSerializer:
         "files", "orig_files", "merkle_tree", "similar_torrents", "metadata",
         "hash_for_piece", "info_hashes"))
 
-    def __init__(self, fields:Sequence[str]=None):
+    def __init__(self, fields:Collection[str]=None):
         if fields is None:
             fields = self.FIELDS
         self.fields = fields
@@ -195,7 +196,7 @@ class TorrentHandleSerializer:
     FIELDS = _SIMPLE_CALLABLE_FIELDS | frozenset(_FLAG_FIELDS.keys()) | frozenset((
         "info_hashes",))
 
-    def __init__(self, fields:Sequence[str]=None):
+    def __init__(self, fields:Collection[str]=None):
         if fields is None:
             fields = self.FIELDS
         self.fields = fields

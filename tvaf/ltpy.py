@@ -9,6 +9,7 @@ from typing import Optional
 import functools
 from typing import Dict
 from typing import Container
+from typing import Tuple
 from typing import Iterable
 from typing import Generator
 
@@ -38,7 +39,7 @@ class Error(RuntimeError):
             return cls.__new__(cls, ec)
         if cls is LibtorrentError:
             return cls.__new__(cls, ec)
-        return super().__new__(cls, ec)
+        return super().__new__(cls, ec) # type: ignore
 
     def __init__(self, ec):
         super().__init__(ec.value(), ec.message())
@@ -84,6 +85,7 @@ class OSError(Error, builtins.OSError):
         # Furthermore, when __new__ and __init__ are overridden in an OSError
         # subclass, then it expects to be initialized using __new__, and 
         # super(builtins.OSError, self).__init__.
+        args:Tuple = ()
         if os.name == "nt" and cat == SYSTEM_CATEGORY:
             args = (0, ec.message(), None, ec.value())
         else:
@@ -126,7 +128,7 @@ class LibtorrentError(Error):
     def __new__(cls, ec:lt.error_code):
         if ec.category() == LIBTORRENT_CATEGORY:
             cls = _LIBTORRENT_CODE_TO_SUBCLASS.get(ec.value(), cls)
-        return RuntimeError.__new__(cls, ec)
+        return RuntimeError.__new__(cls, ec) # type: ignore
 
 class DuplicateTorrentError(LibtorrentError): pass
 class InvalidTorrentHandleError(LibtorrentError): pass

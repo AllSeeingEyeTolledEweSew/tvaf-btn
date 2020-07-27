@@ -60,7 +60,7 @@ class Stat:
             else:
                 self.perms = 0o444
 
-    def os(self):
+    def os(self) -> os.stat_result:
         st_mode = stat_lib.S_IFMT(self.filetype) | stat_lib.S_IMODE(self.perms)
         st_ino = 0
         st_dev = 0
@@ -138,13 +138,13 @@ class Node:
             node = node.parent
         return Path("/").joinpath(*reversed(parts))
 
-    def is_file(self):
+    def is_file(self) -> bool:
         return self.stat().filetype == stat_lib.S_IFREG
 
-    def is_dir(self):
+    def is_dir(self) -> bool:
         return self.stat().filetype == stat_lib.S_IFDIR
 
-    def is_link(self):
+    def is_link(self) -> bool:
         return self.stat().filetype == stat_lib.S_IFLNK
 
 
@@ -359,10 +359,10 @@ class File(Node):
     def __init__(self, *, perms:int=None, size: int = None, mtime: int = None):
         super().__init__(filetype=stat_lib.S_IFREG, perms=perms, size=size, mtime=mtime)
 
-    def open_raw(self, mode:str="r") -> io.RawIOBase:
+    def open_raw(self, mode:str="r") -> io.IOBase:
         raise mkoserror(errno.ENOSYS)
 
-    def open(self, mode:str="r") -> io.RawIOBase:
+    def open(self, mode:str="r") -> io.BufferedIOBase:
         # Only implement binary modes for now
         if "b" not in mode:
             raise mkoserror(errno.ENOSYS)
@@ -371,11 +371,11 @@ class File(Node):
             raise mkoserror(errno.ENOSYS)
 
         raw_mode = "".join(sorted(set(mode) & set("rwxa+")))
-        raw = self.open_raw(mode=raw_mode)
+        base = self.open_raw(mode=raw_mode)
 
         # If the implementation does its own buffering, just use that
-        if isinstance(raw, io.BufferedIOBase):
-            return raw
+        if isinstance(base, io.BufferedIOBase):
+            return base
 
         # Later, return a buffered reader
         raise mkoserror(errno.ENOSYS)

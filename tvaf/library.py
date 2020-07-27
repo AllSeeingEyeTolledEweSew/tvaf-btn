@@ -14,6 +14,7 @@ from __future__ import annotations
 import dataclasses
 import io
 import pathlib
+import errno
 from typing import Optional
 from typing import Callable
 import logging
@@ -43,7 +44,7 @@ class Hints(collections.UserDict):
     pass
 
 
-TorrentFileOpener = Callable[[types.TorrentSlice, GetTorrent], io.RawIOBase]
+TorrentFileOpener = Callable[[types.TorrentSlice, GetTorrent], io.IOBase]
 
 
 class TorrentFile(fs.File):
@@ -61,7 +62,7 @@ class TorrentFile(fs.File):
         self.get_torrent = get_torrent
         self.hints = hints
 
-    def open_raw(self, mode:str="r") -> io.RawIOBase:
+    def open_raw(self, mode:str="r") -> io.IOBase:
         if set(mode) & set("wxa+"):
             raise fs.mkoserror(errno.EPERM)
         return self.opener(self.tslice, self.get_torrent)

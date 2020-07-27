@@ -12,6 +12,7 @@ from typing import List
 from typing import Any
 from typing import Dict
 from typing import MutableMapping
+from typing import TypeVar
 from typing import Union
 from typing import Mapping
 from typing import Optional
@@ -61,6 +62,9 @@ class InvalidConfigError(Error):
     pass
 
 
+_T = TypeVar("_T")
+
+
 class Config(dict, MutableMapping[str, Any]):
 
     @classmethod
@@ -76,13 +80,13 @@ class Config(dict, MutableMapping[str, Any]):
         with config_dir.joinpath(FILENAME).open(mode="w") as fp:
             json.dump(self, fp, sort_keys=True, indent=4)
 
-    def _get(self, key:str, type_:Type, type_name:str):
+    def _get(self, key:str, type_:Type[_T], type_name:str) -> Optional[_T]:
         value = self.get(key)
         if key in self and not isinstance(value, type_):
             raise InvalidConfigError(f"\"{key}\": {value!r} is not {type_name}")
         return value
 
-    def _require(self, key:str, type_:Type, type_name:str):
+    def _require(self, key:str, type_:Type[_T], type_name:str) -> _T:
         value = self._get(key, type_, type_name)
         if value is None:
             raise InvalidConfigError(f"\"{key}\": missing")

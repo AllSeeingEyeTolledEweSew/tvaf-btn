@@ -2,6 +2,7 @@ from __future__ import annotations
 import unittest.mock
 from typing import SupportsFloat
 from typing import Optional
+from typing import List
 
 class WaitForever(Exception):
 
@@ -25,10 +26,10 @@ class MockTime:
 
     def __init__(self, time: SupportsFloat, autoincrement: SupportsFloat = 0):
         self._time = float(time)
-        self._monotonic = 0
+        self._monotonic = 0.0
         self._autoincrement = float(autoincrement)
         assert self._autoincrement >= 0
-        self._patches = []
+        self._patches:List[unittest.mock._patch] = []
         self._started = False
 
     def get_mock_time(self) -> float:
@@ -47,7 +48,7 @@ class MockTime:
         self.sleep(0)
         return self._monotonic
 
-    def wait(self, timeout=Optional[SupportsFloat]) -> None:
+    def wait(self, timeout=Optional[SupportsFloat]) -> bool:
         if timeout is None:
             raise WaitForever()
         self.sleep(timeout)

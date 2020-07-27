@@ -100,7 +100,6 @@ class IOServiceTestCase(unittest.TestCase):
                 (deadline - time.monotonic()) * 1000))
             if not a:
                 assert False, f"condition timed out"
-                break
             saved = None
             for a in self.session.pop_alerts():
                 self.ios.handle_alert(a)

@@ -1,5 +1,6 @@
 import threading
 import time
+import errno
 import math
 from typing import Callable
 from typing import Optional
@@ -56,7 +57,8 @@ def log_alert(alert: lt.alert,
 
 def allow_alert(alert: lt.alert):
     if isinstance(alert, lt.read_piece_alert):
-        TODO
+        if alert.error.category() == lt.generic_category() and alert.error.value() == errno.ECANCELED:
+            return False
     return True
 
 

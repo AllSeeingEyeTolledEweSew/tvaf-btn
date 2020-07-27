@@ -48,7 +48,7 @@ class SessionService:
         if settings_base_name not in ("default_settings",
                 "high_performance_seed"):
             raise config_lib.InvalidConfigError(f"no settings pack named \"{settings_base_name}\"")
-        settings = getattr(lt, settings_base_name)()
+        settings:Dict[str, Any] = getattr(lt, settings_base_name)()
 
         for key, value in config.items():
             if not key.startswith("session_"):

@@ -62,11 +62,8 @@ class TestLibraryService(unittest.TestCase):
         }
 
         def opener(tslice:types.TorrentSlice,
-                get_torrent:library.GetTorrent):
-            raw = io.BytesIO(get_placeholder_data(tslice))
-            # opener can normally return a RawIOBase, but we'll mimic
-            # IOService returning BufferedTorrentIO here.
-            return io.BufferedReader(raw)
+                get_torrent:library.GetTorrent) -> io.BytesIO:
+            return io.BytesIO(get_placeholder_data(tslice))
 
         self.libs = library.LibraryService(opener=opener)
         self.libs.get_layout_info_dict_funcs["test"] = self.get_layout_info_dict
@@ -92,9 +89,9 @@ class TestLibraryService(unittest.TestCase):
             info_hash = dummy.infohash
             torrent = lt.bencode(dummy.dict)
         if dummy_file is not None:
-            if type(dummy_file) is int:
+            if isinstance(dummy_file, int):
                 assert dummy is not None
-                dummy_file = dummy.files[dummy_file]
+                dummy_file = cast(tdummy.File, dummy.files[dummy_file])
             start = dummy_file.start
             stop = dummy_file.stop
             filename = protocol.decode(dummy_file.path_split[-1])

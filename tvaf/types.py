@@ -8,10 +8,6 @@ While we don't use any full ORM system, each of the following datatypes is also
 designed to closely align with its representation in tvaf's sqlite3 tables.
 Wherever possible, attribute names match table column names, and types match
 what you see when inserting into or selecting from the table.
-
-We currently also use the third-party dataclasses_json library to facilitate
-json encoding of datatypes, but that may change, and shouldn't be considered a
-stable part of the interface.
 """
 
 import dataclasses
@@ -19,8 +15,6 @@ import enum
 from typing import Optional
 import re
 import collections.abc
-
-import dataclasses_json
 
 USER_UNKNOWN = "*unknown*"
 
@@ -44,7 +38,6 @@ class TorrentSlice(collections.abc.Sized):
         return self.stop - self.start
 
 
-@dataclasses_json.dataclass_json
 @dataclasses.dataclass
 class TorrentMeta:
     """Tvaf's metadata about a torrent.
@@ -66,7 +59,6 @@ class TorrentMeta:
     atime: int = 0
 
 
-@dataclasses_json.dataclass_json
 @dataclasses.dataclass
 class Acct:
     """A record attributing some downloaded torrent data to a user.

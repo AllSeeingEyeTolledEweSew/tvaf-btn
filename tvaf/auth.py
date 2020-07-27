@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 from typing import ContextManager
+from typing import cast
 from typing import Optional
 import threading
 
@@ -46,7 +47,7 @@ class AuthService:
         return ctx
 
     def get_user(self) -> Optional[str]:
-        return getattr(self._local, "user", None)
+        return cast(Optional[str], getattr(self._local, "user", None))
 
     def pop_user(self):
         assert self.get_user() is not None

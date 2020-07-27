@@ -11,6 +11,7 @@ from tvaf import driver as driver_lib
 import re
 import concurrent.futures
 from typing import Any
+from typing import cast
 from tvaf import ltpy
 
 _log = logging.getLogger(__name__)
@@ -179,7 +180,7 @@ class ResumeService(driver_lib.Ticker):
 
     @staticmethod
     def get_alert_mask() -> int:
-        return (lt.alert_category.status | lt.alert_category.storage)
+        return cast(int, lt.alert_category.status | lt.alert_category.storage)
 
     def handle_save_resume_data_alert(self, alert:lt.save_resume_data_alert):
         with ltpy.translate_exceptions():

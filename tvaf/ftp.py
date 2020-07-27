@@ -46,7 +46,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
         return True
 
     def ftp2fs(self, ftppath:str) -> str:
-        return self.ftpnorm(ftppath)
+        return cast(str, self.ftpnorm(ftppath))
 
     def fs2ftp(self, fspath:str) -> str:
         return fspath
@@ -97,7 +97,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
         self.cur_dir = self._traverse_to_dir(path)
         self.cwd = str(self.cur_dir.abspath())
 
-    def open(self, path:str, mode:str) -> io.RawIOBase:
+    def open(self, path:str, mode:str) -> io.BufferedIOBase:
         f = cast(fs.File, self._traverse(path))
         if f.is_dir():
             raise fs.mkoserror(errno.EISDIR)
@@ -195,7 +195,7 @@ class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
         return perm in self.read_perms
 
     def get_perms(self, username:str) -> str:
-        return self.read_perms
+        return cast(str, self.read_perms)
 
     def validate_authentication(self, username:str, password:str, handler):
         try:

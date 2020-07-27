@@ -31,9 +31,7 @@ class BaseFTPTest(unittest.TestCase):
             raw = io.BytesIO(data)
             # bug in pyftpdlib: tries to access fileobj.name for debug logging
             raw.name = "<bytes>"
-            # opener can normally return a RawIOBase, but we'll mimic
-            # IOService returning BufferedTorrentIO here.
-            return io.BufferedReader(raw)
+            return raw
 
         def get_access(info_hash):
             t = self.torrents[info_hash]

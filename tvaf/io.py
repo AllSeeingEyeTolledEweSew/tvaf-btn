@@ -8,6 +8,7 @@ import collections
 import collections.abc
 import dataclasses
 import enum
+import concurrent.futures
 import logging
 import mmap
 import pathlib
@@ -32,7 +33,6 @@ from typing import SupportsFloat
 from typing import Tuple
 from weakref import WeakValueDictionary
 
-import dataclasses_json
 import intervaltree
 import libtorrent as lt
 
@@ -75,15 +75,12 @@ class FetchError(Error):
 GetTorrent = Callable[[], bytes]
 
 
-@dataclasses_json.dataclass_json
 @dataclasses.dataclass(frozen=True)
 class RequestParams:
     tslice: types.TorrentSlice = types.TorrentSlice()
     get_torrent: GetTorrent = _raise_notimplemented
     acct_params: Any = None
-    mode: RequestMode = dataclasses.field(
-        default=RequestMode.READ,
-        metadata=dataclasses_json.config(encoder=RequestMode))
+    mode: RequestMode = RequestMode.READ
 
     def __post_init__(self):
         if len(self.tslice) == 0:
@@ -588,7 +585,7 @@ class _Torrent:
         # yet implemented a proper locking protocol between IOService and
         # _Torrent. I intend to move to gevent instead of firming up a locking
         # protocol.
-        self._lock = ios._lock
+        self._lock:threading.RLock = ios._lock
         self._info_hash = info_hash
 
         self._requests: List[Request] = []
@@ -1303,7 +1300,9 @@ class IOService:
 
     @staticmethod
     def get_alert_mask() -> int:
-        return (lt.alert_category.status | lt.alert_category.piece_progress)
+        status:int = lt.alert_category.status
+        piece_progress:int = lt.alert_category.piece_progress
+        return status | piece_progress
 
     def get_post_torrent_updates_deadline(self) -> float:
         with self._lock:

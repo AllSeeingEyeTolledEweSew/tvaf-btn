@@ -1,6 +1,8 @@
-from tvaf import auth
-import unittest
 import concurrent.futures
+import unittest
+
+from tvaf import auth
+
 
 class TestAuthService(unittest.TestCase):
 
@@ -43,4 +45,3 @@ class TestAuthService(unittest.TestCase):
             executor = concurrent.futures.ThreadPoolExecutor()
             executor.submit(run_test, "second_thread_user").result()
         self.assertEqual(self.auth_service.get_user(), None)
-

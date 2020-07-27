@@ -1,10 +1,11 @@
-import pathlib
-import os
 import contextlib
-import tempfile
-import json
-import unittest
 import ipaddress
+import json
+import os
+import pathlib
+import tempfile
+import unittest
+
 from tvaf import config as config_lib
 
 

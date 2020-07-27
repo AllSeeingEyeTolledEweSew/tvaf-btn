@@ -19,7 +19,7 @@ class FormatCommand(distutils.cmd.Command):
         pass
 
     def run_isort(self):
-        subprocess.check_call(["isort", "-rc", "-sl", "-y", "-o", "libtorrent"])
+        subprocess.check_call(["isort", "-rc", "-y"])
 
     def run_yapf(self):
         subprocess.check_call(["yapf", "-i", "-r", "--style=google", "."])
@@ -48,7 +48,7 @@ class LintCommand(distutils.cmd.Command):
         pass
 
     def run_mypy(self):
-        subprocess.check_call(["mypy", "--ignore-missing-imports", "tvaf"])
+        subprocess.check_call(["mypy", "tvaf"])
 
     def run(self):
         self.run_mypy()

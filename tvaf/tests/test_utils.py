@@ -1,6 +1,7 @@
-import libtorrent as lt
 import logging
 import time
+
+import libtorrent as lt
 
 
 def create_isolated_session():

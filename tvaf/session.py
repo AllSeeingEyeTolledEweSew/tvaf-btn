@@ -1,10 +1,12 @@
-import libtorrent as lt
 import contextlib
-from tvaf import config as config_lib
-from typing import Callable
 import threading
-from typing import Dict
 from typing import Any
+from typing import Callable
+from typing import Dict
+
+import libtorrent as lt
+
+from tvaf import config as config_lib
 from tvaf import ltpy
 
 _OVERRIDES = {

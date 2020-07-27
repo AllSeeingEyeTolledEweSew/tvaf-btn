@@ -1,13 +1,16 @@
-import unittest
-from . import tdummy
-import pathlib
-from . import test_utils
+import concurrent.futures
 import logging
 import os
-import libtorrent as lt
-import concurrent.futures
+import pathlib
 import tempfile
+import unittest
+
+import libtorrent as lt
+
 from tvaf import resume as resume_lib
+
+from . import tdummy
+from . import test_utils
 
 
 def atp_dict_fixup(atp_dict):

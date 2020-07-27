@@ -1,18 +1,18 @@
-import libtorrent as lt
+import builtins
 import contextlib
 import enum
 import errno
-import builtins
-import sys
-import os
-from typing import Optional
 import functools
-from typing import Dict
+import os
+import sys
 from typing import Container
-from typing import Tuple
-from typing import Iterable
+from typing import Dict
 from typing import Generator
+from typing import Iterable
+from typing import Optional
+from typing import Tuple
 
+import libtorrent as lt
 
 GENERIC_CATEGORY = lt.generic_category()
 SYSTEM_CATEGORY = lt.system_category()

@@ -1,10 +1,10 @@
 """Tests for the tvaf.fs module."""
 
+import errno
+import io
+import pathlib
 import stat as stat_lib
 import unittest
-import io
-import errno
-import pathlib
 
 from tvaf import fs
 

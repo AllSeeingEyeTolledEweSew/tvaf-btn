@@ -1,7 +1,10 @@
 import unittest
-from tvaf import config as config_lib
+
 import libtorrent as lt
+
+from tvaf import config as config_lib
 from tvaf import session as session_lib
+
 
 class TestSession(unittest.TestCase):
 

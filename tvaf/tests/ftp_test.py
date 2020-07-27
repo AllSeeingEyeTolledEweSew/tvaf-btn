@@ -1,14 +1,18 @@
-from tvaf import ftp
-import io
-from tvaf import config as config_lib
-import logging
 import ftplib
-import libtorrent as lt
-from tvaf import auth
-from . import tdummy
-from tvaf import types
-from tvaf import library
+import io
+import logging
 import unittest
+
+import libtorrent as lt
+
+from tvaf import auth
+from tvaf import config as config_lib
+from tvaf import ftp
+from tvaf import library
+from tvaf import types
+
+from . import tdummy
+
 
 class DummyException(Exception): pass
 

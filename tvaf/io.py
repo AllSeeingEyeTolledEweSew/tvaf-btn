@@ -3,18 +3,18 @@
 """Data access functions for tvaf."""
 from __future__ import annotations
 
-import io
 import collections
 import collections.abc
+import concurrent.futures
 import dataclasses
 import enum
-import concurrent.futures
+import errno
+import io
 import logging
+import math
 import mmap
 import pathlib
-import math
 import random
-import errno
 import re
 import threading
 import time
@@ -22,25 +22,25 @@ from typing import Any
 from typing import Callable
 from typing import Dict
 from typing import Iterable
-from typing import Mapping
 from typing import List
-from typing import Sequence
-from typing import Union
-from typing import Optional
+from typing import Mapping
 from typing import MutableMapping
+from typing import Optional
+from typing import Sequence
 from typing import Set
 from typing import SupportsFloat
 from typing import Tuple
+from typing import Union
 from weakref import WeakValueDictionary
 
 import intervaltree
 import libtorrent as lt
 
-from tvaf import util
-from tvaf import types
 from tvaf import config as config_lib
-from tvaf import ltpy
 from tvaf import driver as driver_lib
+from tvaf import ltpy
+from tvaf import types
+from tvaf import util
 
 _log = logging.getLogger(__name__)
 

@@ -1,6 +1,8 @@
-import unittest
 import dataclasses
+import unittest
+
 from tvaf import protocol
+
 
 class IterFilesTest(unittest.TestCase):
 

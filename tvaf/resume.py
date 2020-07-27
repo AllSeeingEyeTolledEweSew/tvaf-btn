@@ -1,17 +1,19 @@
-import pathlib
-import time
-import logging
-import libtorrent as lt
-import threading
 import collections
+import concurrent.futures
+import logging
+import math
+import pathlib
+import re
+import threading
+import time
+from typing import Any
 from typing import Dict
 from typing import Optional
-import math
-from tvaf import driver as driver_lib
-import re
-import concurrent.futures
-from typing import Any
 from typing import cast
+
+import libtorrent as lt
+
+from tvaf import driver as driver_lib
 from tvaf import ltpy
 
 _log = logging.getLogger(__name__)

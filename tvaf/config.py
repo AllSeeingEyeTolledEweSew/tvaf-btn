@@ -2,22 +2,20 @@
 # accompanying UNLICENSE file.
 from __future__ import annotations
 
-import json
-import pathlib
-from typing import Callable
 import dataclasses
 import ipaddress
+import json
 import pathlib
-from typing import List
 from typing import Any
+from typing import Callable
 from typing import Dict
-from typing import MutableMapping
-from typing import TypeVar
-from typing import Union
+from typing import List
 from typing import Mapping
+from typing import MutableMapping
 from typing import Optional
 from typing import Type
-
+from typing import TypeVar
+from typing import Union
 
 # Design notes:
 

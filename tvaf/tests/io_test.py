@@ -1,30 +1,29 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
 
+import concurrent.futures
+import io
 import logging
-import pathlib
 import os
 import os.path
+import pathlib
 import sys
-import io
 import tempfile
-import logging
 import time
 import unittest
 import unittest.mock
-import concurrent.futures
 
 import libtorrent as lt
 
+import tvaf.io
+from tvaf import config as config_lib
+from tvaf import driver as driver_lib
+from tvaf import types
 from tvaf.io import IOService
 from tvaf.io import RequestMode
-from tvaf import types
-from tvaf import config as config_lib
-import tvaf.io
-from tvaf import driver as driver_lib
 
-from . import test_utils
 from . import tdummy
+from . import test_utils
 
 
 class IOServiceTestCase(unittest.TestCase):

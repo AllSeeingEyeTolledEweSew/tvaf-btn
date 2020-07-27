@@ -1,15 +1,17 @@
+import errno
+import logging
+import math
 import threading
 import time
-import errno
-import math
+from typing import Any
 from typing import Callable
+from typing import Iterable
 from typing import Optional
 from typing import Set
+
 import libtorrent as lt
-import logging
+
 from tvaf import ltpy
-from typing import Iterable
-from typing import Any
 
 AlertHandler = Callable[[lt.alert], None]
 

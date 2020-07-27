@@ -10,11 +10,11 @@ Wherever possible, attribute names match table column names, and types match
 what you see when inserting into or selecting from the table.
 """
 
+import collections.abc
 import dataclasses
 import enum
-from typing import Optional
 import re
-import collections.abc
+from typing import Optional
 
 USER_UNKNOWN = "*unknown*"
 

@@ -1,19 +1,21 @@
-import unittest
-import stat as stat_lib
-from typing import Iterable
-from typing import Tuple
-from typing import Optional
-from typing import cast
 import io
-from . import tdummy
-from tvaf import library
-from typing import Union
-import libtorrent as lt
-from tvaf import fs
-from tvaf import types
-from tvaf import protocol
+import stat as stat_lib
+import unittest
 from typing import Dict
+from typing import Iterable
+from typing import Optional
+from typing import Tuple
+from typing import Union
+from typing import cast
 
+import libtorrent as lt
+
+from tvaf import fs
+from tvaf import library
+from tvaf import protocol
+from tvaf import types
+
+from . import tdummy
 
 SINGLE = tdummy.Torrent.single_file(name=b"test.txt", length=16384 * 9 + 1000)
 MULTI = tdummy.Torrent(files=[

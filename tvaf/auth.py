@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import contextlib
-from typing import ContextManager
-from typing import cast
-from typing import Optional
 import threading
+from typing import ContextManager
+from typing import Optional
+from typing import cast
+
 
 class Error(Exception):
 

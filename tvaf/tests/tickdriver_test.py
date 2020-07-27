@@ -1,8 +1,10 @@
-from tvaf import driver as driver_lib
 import contextlib
-import unittest
-import time
 import math
+import time
+import unittest
+
+from tvaf import driver as driver_lib
+
 from . import mock_time
 
 

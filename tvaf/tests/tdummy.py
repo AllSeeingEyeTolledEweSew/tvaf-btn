@@ -1,10 +1,10 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
 
-import libtorrent as lt
-
 import hashlib
 import random
+
+import libtorrent as lt
 
 PIECE_LENGTH = 16384
 NAME = b"test.txt"

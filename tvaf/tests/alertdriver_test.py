@@ -1,9 +1,12 @@
-import unittest
 import threading
+import unittest
 import unittest.mock
-from . import test_utils
-from . import tdummy
+
 from tvaf import driver as driver_lib
+
+from . import tdummy
+from . import test_utils
+
 
 class IterAlertsTest(unittest.TestCase):
 

@@ -1,8 +1,10 @@
-from tvaf import ltpy
-import os
 import errno
+import os
 import unittest
+
 import libtorrent as lt
+
+from tvaf import ltpy
 
 
 class TestExceptionSubtypeInstantiation(unittest.TestCase):

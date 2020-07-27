@@ -1,7 +1,10 @@
 import os
-import libtorrent as lt
 import unittest
+
+import libtorrent as lt
+
 from tvaf.http import serialization
+
 from . import lib
 from . import tdummy
 from . import test_utils

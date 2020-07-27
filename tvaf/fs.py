@@ -13,19 +13,18 @@ import dataclasses
 import errno
 import io
 import os
-import time
 import os.path
-import stat as stat_lib
 import pathlib
+import stat as stat_lib
+import time
 from typing import Any
 from typing import Dict
-from typing import Tuple
-from typing import List
 from typing import Iterator
+from typing import List
 from typing import Optional
-from typing import cast
+from typing import Tuple
 from typing import Union
-
+from typing import cast
 
 Path = pathlib.PurePosixPath
 PathLike = Union[str, Path]

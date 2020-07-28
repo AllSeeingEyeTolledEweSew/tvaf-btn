@@ -30,6 +30,8 @@ def _partialclass(cls, *args, **kwds):
 
 class _FS(pyftpdlib.filesystems.AbstractedFS):
 
+    # pylint: disable=too-many-public-methods
+
     def __init__(self, *args, root: fs.Dir = None, **kwargs):
         assert root is not None
         super().__init__(*args, **kwargs)
@@ -70,7 +72,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
     def get_group_by_gid(self, gid: int) -> str:
         return "root"
 
-    def _traverse(self, path: str, *, follow_symlinks=True) -> fs.Node:
+    def _traverse(self, path: str) -> fs.Node:
         return self.cur_dir.traverse(path)
 
     def _ltraverse(self, path: str) -> fs.Node:
@@ -93,10 +95,10 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
         self.cwd = str(self.cur_dir.abspath())
 
     def open(self, path: str, mode: str) -> io.BufferedIOBase:
-        f = cast(fs.File, self._traverse(path))
-        if f.is_dir():
+        file_ = cast(fs.File, self._traverse(path))
+        if file_.is_dir():
             raise fs.mkoserror(errno.EISDIR)
-        fp = f.open(mode)
+        fp = file_.open(mode)
         return fp
 
     def listdir(self, path: str) -> List[str]:
@@ -149,8 +151,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
         mtime = self._traverse(path).stat().mtime
         if mtime is not None:
             return mtime
-        else:
-            return int(time.time())
+        return int(time.time())
 
     def realpath(self, path: str) -> str:
         return str(self.cur_dir.realpath(path))
@@ -159,6 +160,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
 class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
 
     def __init__(self, *, auth_service: auth.AuthService = None):
+        # pylint: disable=super-init-not-called
         assert auth_service is not None
         self.auth_service = auth_service
 
@@ -195,8 +197,8 @@ class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
     def validate_authentication(self, username: str, password: str, handler):
         try:
             self.auth_service.auth_password_plain(username, password)
-        except auth.AuthenticationFailed as e:
-            raise pyftpdlib.authorizers.AuthenticationFailed(e)
+        except auth.AuthenticationFailed as exc:
+            raise pyftpdlib.authorizers.AuthenticationFailed(exc)
 
     def impersonate_user(self, username: str, password: str):
         self.auth_service.push_user(username)

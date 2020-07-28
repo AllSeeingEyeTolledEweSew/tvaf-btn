@@ -30,12 +30,12 @@ class LibtorrentErrorValue(enum.IntEnum):
 class Error(RuntimeError):
 
     def __new__(cls, ec: lt.error_code):
-        cls = _CATEGORY_NAME_TO_SUBCLASS.get(ec.category().name(), cls)
-        if cls is OSError:
-            return cls.__new__(cls, ec)
-        if cls is LibtorrentError:
-            return cls.__new__(cls, ec)
-        return super().__new__(cls, ec)  # type: ignore
+        use_cls = _CATEGORY_NAME_TO_SUBCLASS.get(ec.category().name(), cls)
+        if use_cls is OSError:
+            return use_cls.__new__(use_cls, ec)
+        if use_cls is LibtorrentError:
+            return use_cls.__new__(use_cls, ec)
+        return super().__new__(use_cls, ec)  # type: ignore
 
     def __init__(self, ec):
         super().__init__(ec.value(), ec.message())
@@ -49,6 +49,8 @@ class Error(RuntimeError):
 
 
 class OSError(Error, builtins.OSError):
+
+    # pylint: disable=redefined-builtin
 
     def __new__(cls, ec: lt.error_code):
         # generic_category uses "portable" errno values, with the same
@@ -74,7 +76,7 @@ class OSError(Error, builtins.OSError):
         else:
             # Always instantiate this class directly
             errno_ = 0
-        cls = _ERRNO_TO_OSERROR.get(errno_, cls)
+        use_cls = _ERRNO_TO_OSERROR.get(errno_, cls)
         # super().__new__, object.__new__, Error.__new__ (with recursion
         # protection) all don't work here. builtins.OSError.__new__ is the only
         # thing that works and I don't understand why.
@@ -86,11 +88,12 @@ class OSError(Error, builtins.OSError):
             args = (0, ec.message(), None, ec.value())
         else:
             args = (ec.value(), ec.message())
-        return builtins.OSError.__new__(cls, *args)
+        return builtins.OSError.__new__(use_cls, *args)
 
     def __init__(self, ec: lt.error_code):
         # This does nothing. Why?
         # super(builtins.OSError, self).__init__(*args)
+        # pylint: disable=super-init-not-called
         self.ec = ec
         self.value = ec.value()
         self.category = ec.category()
@@ -102,62 +105,92 @@ class OSError(Error, builtins.OSError):
 
 # From pep3151
 class BlockingIOError(OSError, builtins.BlockingIOError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class ChildProcessError(OSError, builtins.ChildProcessError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class ConnectionError(OSError, builtins.ConnectionError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class BrokenPipeError(ConnectionError, builtins.BrokenPipeError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class ConnectionAbortedError(ConnectionError, builtins.ConnectionAbortedError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class ConnectionRefusedError(ConnectionError, builtins.ConnectionRefusedError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class ConnectionResetError(ConnectionError, builtins.ConnectionResetError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class FileExistsError(OSError, builtins.FileExistsError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class FileNotFoundError(OSError, builtins.FileNotFoundError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class InterruptedError(OSError, builtins.InterruptedError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class IsADirectoryError(OSError, builtins.IsADirectoryError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class NotADirectoryError(OSError, builtins.NotADirectoryError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class PermissionError(OSError, builtins.PermissionError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class ProcessLookupError(OSError, builtins.ProcessLookupError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
 class TimeoutError(OSError, builtins.TimeoutError):
+    # pylint: disable=redefined-builtin
+    # pylint: disable=too-many-ancestors
     pass
 
 
@@ -170,8 +203,8 @@ class LibtorrentError(Error):
 
     def __new__(cls, ec: lt.error_code):
         if ec.category() == LIBTORRENT_CATEGORY:
-            cls = _LIBTORRENT_CODE_TO_SUBCLASS.get(ec.value(), cls)
-        return RuntimeError.__new__(cls, ec)  # type: ignore
+            use_cls = _LIBTORRENT_CODE_TO_SUBCLASS.get(ec.value(), cls)
+        return RuntimeError.__new__(use_cls, ec)  # type: ignore
 
 
 class DuplicateTorrentError(LibtorrentError):

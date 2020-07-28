@@ -23,6 +23,10 @@ class FormatCommand(distutils.cmd.Command):
 
     def run_yapf(self):
         subprocess.check_call(["yapf", "-i", "-r", "."])
+        # yapf does not fix certain hanging indents currently, see
+        # https://github.com/google/yapf/issues/769
+        # We work around this by calling selective autopep8 after yapf.
+        subprocess.check_call(["autopep8", "-i", "-r", "--select", "E125", "."])
 
     def run_autoflake(self):
         subprocess.check_call([

@@ -1399,8 +1399,8 @@ class IOService:
                     # Some alerts are expected after we've totally removed the
                     # torrent.
                     if not isinstance(
-                            alert,
-                        (lt.torrent_deleted_alert, lt.torrent_log_alert)):
+                                alert,
+                            (lt.torrent_deleted_alert, lt.torrent_log_alert)):
                         _log.warning("alert for torrent we don't have?")
                     return
                 self._torrents_by_handle[handle] = torrent

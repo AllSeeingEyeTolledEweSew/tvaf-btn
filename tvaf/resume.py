@@ -14,7 +14,7 @@ import libtorrent as lt
 from tvaf import driver as driver_lib
 from tvaf import ltpy
 
-_log = logging.getLogger(__name__)
+_LOG = logging.getLogger(__name__)
 
 RESUME_DATA_DIR_NAME = "resume"
 
@@ -32,14 +32,14 @@ def iter_resume_data_from_disk(config_dir: pathlib.Path):
         try:
             data = path.read_bytes()
         except OSError:
-            _log.exception("while reading %s", path)
+            _LOG.exception("while reading %s", path)
             continue
 
         try:
             with ltpy.translate_exceptions():
                 yield lt.read_resume_data(data)
         except ltpy.Error:
-            _log.exception("while parsing %s", path)
+            _LOG.exception("while parsing %s", path)
             continue
 
 
@@ -128,9 +128,9 @@ class ResumeService(driver_lib.Ticker):
         try:
             self._write_resume_data_inner(infohash, atp)
         except OSError:
-            _log.exception("writing resume data for %s", infohash)
+            _LOG.exception("writing resume data for %s", infohash)
         else:
-            _log.debug("wrote resume data for %s", infohash)
+            _LOG.debug("wrote resume data for %s", infohash)
         finally:
             self._dec(infohash)
 
@@ -158,9 +158,9 @@ class ResumeService(driver_lib.Ticker):
             except FileNotFoundError:
                 pass
             else:
-                _log.debug("deleted resume data for %s", infohash)
+                _LOG.debug("deleted resume data for %s", infohash)
         except OSError:
-            _log.exception("while deleting resume data for %s", infohash)
+            _LOG.exception("while deleting resume data for %s", infohash)
         finally:
             self._pop(infohash)
 
@@ -195,13 +195,14 @@ class ResumeService(driver_lib.Ticker):
         # called immediately after remove_torrent().
         with self._condition:
             if infohash not in self._handles:
-                _log.debug("dropping resume data for missing torrent: %s",
+                _LOG.debug("dropping resume data for missing torrent: %s",
                            infohash)
                 return
         self.executor.submit(self._write_resume_data, infohash, alert.params)
 
+    # pylint: disable=invalid-name
     def handle_save_resume_data_failed_alert(
-        self, alert: lt.save_resume_data_failed_alert):
+            self, alert: lt.save_resume_data_failed_alert):
         with ltpy.translate_exceptions():
             infohash = str(alert.handle.info_hash())
         self._dec(infohash)
@@ -209,7 +210,7 @@ class ResumeService(driver_lib.Ticker):
     def handle_add_torrent_alert(self, alert: lt.add_torrent_alert):
         with self._condition:
             if self._aborted:
-                _log.warning("torrent added after ResumeService aborted")
+                _LOG.warning("torrent added after ResumeService aborted")
                 return
             with ltpy.translate_exceptions():
                 infohash = str(alert.handle.info_hash())

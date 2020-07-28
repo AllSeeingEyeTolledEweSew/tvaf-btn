@@ -15,8 +15,8 @@ class IterAlertsTest(unittest.TestCase):
         self.driver = driver_lib.AlertDriver(session=self.session)
 
     def test_iter_alerts(self):
-        h = self.session.add_torrent(tdummy.DEFAULT.atp())
-        self.session.remove_torrent(h)
+        handle = self.session.add_torrent(tdummy.DEFAULT.atp())
+        self.session.remove_torrent(handle)
 
         seen_alerts = []
         for alert in self.driver.iter_alerts():
@@ -32,8 +32,8 @@ class IterAlertsTest(unittest.TestCase):
     def test_iter_alerts_fed_by_thread(self):
 
         def run():
-            h = self.session.add_torrent(tdummy.DEFAULT.atp())
-            self.session.remove_torrent(h)
+            handle = self.session.add_torrent(tdummy.DEFAULT.atp())
+            self.session.remove_torrent(handle)
 
         thread = threading.Thread(target=run)
         started = False
@@ -55,8 +55,8 @@ class IterAlertsTest(unittest.TestCase):
                          ["add_torrent_alert", "torrent_removed_alert"])
 
     def test_iter_alerts_and_abort(self):
-        h = self.session.add_torrent(tdummy.DEFAULT.atp())
-        self.session.remove_torrent(h)
+        handle = self.session.add_torrent(tdummy.DEFAULT.atp())
+        self.session.remove_torrent(handle)
 
         seen_alerts = []
         with unittest.mock.patch.object(self.driver, "ABORT_CHECK_INTERVAL",
@@ -79,8 +79,8 @@ class RunTest(unittest.TestCase):
         self.driver = driver_lib.AlertDriver(session=self.session)
 
     def test_run(self):
-        h = self.session.add_torrent(tdummy.DEFAULT.atp())
-        self.session.remove_torrent(h)
+        handle = self.session.add_torrent(tdummy.DEFAULT.atp())
+        self.session.remove_torrent(handle)
 
         seen_alerts = []
 
@@ -103,8 +103,8 @@ class RunTest(unittest.TestCase):
     def test_run_fed_by_thread(self):
 
         def run_in_thread():
-            h = self.session.add_torrent(tdummy.DEFAULT.atp())
-            self.session.remove_torrent(h)
+            handle = self.session.add_torrent(tdummy.DEFAULT.atp())
+            self.session.remove_torrent(handle)
 
         thread = threading.Thread(target=run_in_thread)
 
@@ -130,8 +130,8 @@ class RunTest(unittest.TestCase):
                          ["add_torrent_alert", "torrent_removed_alert"])
 
     def test_run_with_failer(self):
-        h = self.session.add_torrent(tdummy.DEFAULT.atp())
-        self.session.remove_torrent(h)
+        handle = self.session.add_torrent(tdummy.DEFAULT.atp())
+        self.session.remove_torrent(handle)
 
         seen_alerts = []
 
@@ -164,8 +164,8 @@ class ThreadTest(unittest.TestCase):
         self.driver = driver_lib.AlertDriver(session=self.session)
 
     def test_thread(self):
-        h = self.session.add_torrent(tdummy.DEFAULT.atp())
-        self.session.remove_torrent(h)
+        handle = self.session.add_torrent(tdummy.DEFAULT.atp())
+        self.session.remove_torrent(handle)
 
         seen_alerts = []
 
@@ -189,8 +189,8 @@ class ThreadTest(unittest.TestCase):
     def test_thread_fed_by_thread(self):
 
         def run_in_thread():
-            h = self.session.add_torrent(tdummy.DEFAULT.atp())
-            self.session.remove_torrent(h)
+            handle = self.session.add_torrent(tdummy.DEFAULT.atp())
+            self.session.remove_torrent(handle)
 
         thread = threading.Thread(target=run_in_thread)
 

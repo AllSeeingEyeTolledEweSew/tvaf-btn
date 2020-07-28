@@ -67,44 +67,44 @@ class TestTraverse(unittest.TestCase):
                       self.symlink)
 
     def test_symlink_follow_self_loop(self):
-        self.loop = fs.Symlink()
-        self.loop.target = self.loop
-        self.directory.mkchild("loop", self.loop)
+        loop = fs.Symlink()
+        loop.target = loop
+        self.directory.mkchild("loop", loop)
         with self.assertRaises(OSError):
             self.directory.traverse("loop", follow_symlinks=True)
 
-    def test_symlink_no_follow_self_loop(self):
-        self.loop = fs.Symlink()
-        self.loop.target = self.loop
-        self.directory.mkchild("loop", self.loop)
+    def test_symlink_no_self_loop(self):
+        loop = fs.Symlink()
+        loop.target = loop
+        self.directory.mkchild("loop", loop)
         self.assertIs(self.directory.traverse("loop", follow_symlinks=False),
-                      self.loop)
+                      loop)
         with self.assertRaises(OSError):
             self.directory.traverse("loop/a", follow_symlinks=False)
 
     def test_symlink_follow_two_loop(self):
-        self.loop1 = fs.Symlink()
-        self.loop2 = fs.Symlink()
-        self.loop1.target = self.loop2
-        self.loop2.target = self.loop1
-        self.directory.mkchild("loop1", self.loop1)
-        self.directory.mkchild("loop2", self.loop2)
+        loop1 = fs.Symlink()
+        loop2 = fs.Symlink()
+        loop1.target = loop2
+        loop2.target = loop1
+        self.directory.mkchild("loop1", loop1)
+        self.directory.mkchild("loop2", loop2)
         with self.assertRaises(OSError):
             self.directory.traverse("loop1", follow_symlinks=True)
         with self.assertRaises(OSError):
             self.directory.traverse("loop2", follow_symlinks=True)
 
     def test_symlink_no_follow_two_loop(self):
-        self.loop1 = fs.Symlink()
-        self.loop2 = fs.Symlink()
-        self.loop1.target = self.loop2
-        self.loop2.target = self.loop1
-        self.directory.mkchild("loop1", self.loop1)
-        self.directory.mkchild("loop2", self.loop2)
+        loop1 = fs.Symlink()
+        loop2 = fs.Symlink()
+        loop1.target = loop2
+        loop2.target = loop1
+        self.directory.mkchild("loop1", loop1)
+        self.directory.mkchild("loop2", loop2)
         self.assertIs(self.directory.traverse("loop1", follow_symlinks=False),
-                      self.loop1)
+                      loop1)
         self.assertIs(self.directory.traverse("loop2", follow_symlinks=False),
-                      self.loop2)
+                      loop2)
         with self.assertRaises(OSError):
             self.directory.traverse("loop1/a", follow_symlinks=False)
         with self.assertRaises(OSError):
@@ -125,8 +125,8 @@ class TestTraverse(unittest.TestCase):
         self.assertIs(self.directory.traverse(".."), self.root)
 
     def test_symlink_repeat_no_loop(self):
-        self.dir_symlink = fs.Symlink(target=self.directory)
-        self.root.mkchild("dir_symlink", self.dir_symlink)
+        dir_symlink = fs.Symlink(target=self.directory)
+        self.root.mkchild("dir_symlink", dir_symlink)
         self.assertIs(self.root.traverse("dir_symlink/../dir_symlink/file"),
                       self.file)
 
@@ -154,18 +154,18 @@ class TestRealpath(unittest.TestCase):
                          fs.Path("/directory/file/a"))
 
     def test_symlink_follow_self_loop(self):
-        self.loop = fs.Symlink()
-        self.loop.target = self.loop
-        self.root.mkchild("loop", self.loop)
+        loop = fs.Symlink()
+        loop.target = loop
+        self.root.mkchild("loop", loop)
         self.assertEqual(self.root.realpath("loop/a"), fs.Path("/loop/a"))
 
     def test_symlink_follow_two_loop(self):
-        self.loop1 = fs.Symlink()
-        self.loop2 = fs.Symlink()
-        self.loop1.target = self.loop2
-        self.loop2.target = self.loop1
-        self.root.mkchild("loop1", self.loop1)
-        self.root.mkchild("loop2", self.loop2)
+        loop1 = fs.Symlink()
+        loop2 = fs.Symlink()
+        loop1.target = loop2
+        loop2.target = loop1
+        self.root.mkchild("loop1", loop1)
+        self.root.mkchild("loop2", loop2)
         self.assertEqual(self.root.realpath("loop1/a"), fs.Path("/loop1/a"))
         self.assertEqual(self.root.realpath("loop2/a"), fs.Path("/loop2/a"))
 
@@ -239,7 +239,7 @@ class DummyDir(fs.Dir):
         return None
 
     def readdir(self):
-        return [fs.Dirent(name="foo", stat=self.file.stat())]
+        return [fs.Dirent(name="foo", stat=self.dummy_file.stat())]
 
 
 class DummyFile(fs.File):

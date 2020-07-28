@@ -53,15 +53,11 @@ class FileSpec:
 
     @property
     def base_name(self):
-        if not hasattr(self, "_base"):
-            setattr(self, "_base", decode(self.base_name_bytes))
-        return self._base
+        return decode(self.base_name_bytes)
 
     @property
     def path(self):
-        if not hasattr(self, "_path"):
-            setattr(self, "_path", [decode(elem) for elem in self.path_bytes])
-        return self._path
+        return [decode(elem) for elem in self.path_bytes]
 
     @property
     def full_path_bytes(self):
@@ -73,16 +69,11 @@ class FileSpec:
 
     @property
     def attr(self):
-        if not hasattr(self, "_attr"):
-            setattr(self, "_attr", decode(self.attr_bytes))
-        return self._attr
+        return decode(self.attr_bytes)
 
     @property
     def target(self):
-        if not hasattr(self, "_target"):
-            setattr(self, "_target",
-                    [decode(elem) for elem in self.target_bytes])
-        return self._target
+        return [decode(elem) for elem in self.target_bytes]
 
     @property
     def full_target_bytes(self):

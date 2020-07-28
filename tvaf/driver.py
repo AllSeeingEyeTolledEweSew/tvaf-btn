@@ -15,7 +15,7 @@ from tvaf import ltpy
 
 AlertHandler = Callable[[lt.alert], None]
 
-_log = logging.getLogger(__name__)
+_LOG = logging.getLogger(__name__)
 
 
 def dispatch(obj, alert: lt.alert, prefix="handle_"):
@@ -43,9 +43,9 @@ def log_alert(alert: lt.alert,
         prefix += " [%s (%s %d)]"
         prefix_args += [error.message(), error.category().name(), error.value()]
         if method is None:
-            method = _log.error
+            method = _LOG.error
     if method is None:
-        method = _log.debug
+        method = _LOG.debug
 
     if message:
         message = prefix + ": " + message
@@ -114,21 +114,22 @@ class AlertDriver:
             for handler in list(self._handlers):
                 try:
                     handler(alert)
-                except Exception:
-                    _log.exception("while handling %s with %s", alert, handler)
+                except Exception:  # pylint: disable=broad-except
+                    _LOG.exception("while handling %s with %s", alert, handler)
 
     def run(self):
         try:
             self.run_inner()
-        except Exception:
-            _log.exception("fatal error")
+        except Exception:  # pylint: disable=broad-except
+            _LOG.exception("fatal error")
         finally:
-            _log.debug("shutting down")
+            _LOG.debug("shutting down")
 
 
 class Ticker:
 
     def get_tick_deadline(self) -> float:
+        # pylint: disable=no-self-use
         return math.inf
 
     def tick(self, now: float):
@@ -179,8 +180,8 @@ class TickDriver:
                 try:
                     if ticker.get_tick_deadline() <= now:
                         ticker.tick(now)
-                except Exception:
-                    _log.exception("during tick")
+                except Exception:  # pylint: disable=broad-except
+                    _LOG.exception("during tick")
 
     def get_tick_deadline(self):
         with self._condition:
@@ -190,8 +191,8 @@ class TickDriver:
                 for ticker in self._tickers:
                     try:
                         yield ticker.get_tick_deadline()
-                    except Exception:
-                        _log.exception("while getting deadline")
+                    except Exception:  # pylint: disable=broad-except
+                        _LOG.exception("while getting deadline")
                         yield -math.inf
 
             return float(min(iter_deadlines()))
@@ -221,7 +222,7 @@ class TickDriver:
             for now in self.iter_ticks():
                 self.tick(now)
         except Exception:
-            _log.exception("fatal error")
+            _LOG.exception("fatal error")
             raise
         finally:
-            _log.debug("shutting down")
+            _LOG.debug("shutting down")

@@ -28,7 +28,7 @@ from tvaf import fs
 from tvaf import protocol
 from tvaf import types
 
-_log = logging.getLogger(__name__)
+_LOG = logging.getLogger(__name__)
 
 Path = pathlib.PurePosixPath
 
@@ -106,7 +106,7 @@ class _V1TorrentAccess(fs.StaticDir):
             except KeyError:
                 pass
             except Exception:
-                _log.exception("%s: get_hints(%s, %s)", name, info_hash,
+                _LOG.exception("%s: get_hints(%s, %s)", name, info_hash,
                                spec.index)
         hints["filename"] = spec.full_path[-1]
         torrent_file = TorrentFile(opener=libs.opener,
@@ -159,18 +159,18 @@ class _V1Torrent(fs.Dir):
         except KeyError:
             pass
         except Exception:
-            _log.exception("%s: get_access(%s)", accessor_name, info_hash)
+            _LOG.exception("%s: get_access(%s)", accessor_name, info_hash)
         return None
 
     def get_node(self, name: str) -> Optional[fs.Node]:
         access = self._get_one_access(self.info_hash, name)
         if not access:
             return None
+
         if access.redirect_to:
             return fs.Symlink(target=access.redirect_to)
-        else:
-            return _V1TorrentAccess(self.libs, self.info_hash, self.info,
-                                    access)
+
+        return _V1TorrentAccess(self.libs, self.info_hash, self.info, access)
 
     def readdir(self) -> Iterator[fs.Dirent]:
         for name in self.libs.get_access_funcs:
@@ -200,13 +200,13 @@ class _V1(fs.Dir):
             except KeyError:
                 pass
             except Exception:
-                _log.exception("%s: get_layout_info_dict(%s)", name, info_hash)
+                _LOG.exception("%s: get_layout_info_dict(%s)", name, info_hash)
         if not info_dict:
             return None
         return _V1Torrent(self.libs, info_hash, protocol.Info(info_dict))
 
     def readdir(self) -> Iterator[fs.Dirent]:
-        return super().readdir()
+        raise fs.mkoserror(errno.ENOSYS)
 
 
 class _Browse(fs.DictDir):

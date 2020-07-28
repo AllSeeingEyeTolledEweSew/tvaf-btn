@@ -17,14 +17,14 @@ def serialize_error_code(ec: lt.error_code) -> Mapping[str, Any]:
 
 def serialize_bit_list(bit_list: Sequence[bool]) -> str:
     bitfield_bytes = bytearray()
-    b = 0
-    l = len(bit_list)
-    for i, v in enumerate(bit_list):
-        if v:
-            b |= 1 << (i & 7)
-        if i & 7 == 7 or i == l - 1:
-            bitfield_bytes.append(b)
-            b = 0
+    byte = 0
+    length = len(bit_list)
+    for i, value in enumerate(bit_list):
+        if value:
+            byte |= 1 << (i & 7)
+        if i & 7 == 7 or i == length - 1:
+            bitfield_bytes.append(byte)
+            byte = 0
     return base64.b64encode(bitfield_bytes).decode()
 
 
@@ -101,44 +101,42 @@ class TorrentStatusSerializer:
                 result[field] = status.storage_mode.name
             elif field in flag_fields:
                 result[field] = bool(status.flags & flag_fields[field])
-            # TODO: last_upload, last_download, active_duration, finished_duration,
-            # seeding_duration
+            # TODO: last_upload, last_download, active_duration,
+            # finished_duration, seeding_duration
 
         return result
 
 
-class _FileListSerializer:
+def _serialize_file_list(
+        storage: lt.file_storage) -> Sequence[Mapping[str, Any]]:
+    result: List[Dict[str, Any]] = []
 
-    def serialize(self,
-                  storage: lt.file_storage) -> Sequence[Mapping[str, Any]]:
-        result: List[Dict[str, Any]] = []
+    for i in range(storage.num_files()):
+        file_entry = dict(index=i,
+                          offset=storage.file_offset(i),
+                          path=storage.file_path(i),
+                          size=storage.file_size(i))
+        # TODO: symlink() seems to crash
+        # TODO: mtime() not mapped on python bindings
+        info_hash = storage.hash(i)
+        if not info_hash.is_all_zeros():
+            file_entry["info_hashes"] = dict(v1=str(info_hash))
+        flags = storage.file_flags(i)
+        attr = ""
+        storage_cls = lt.file_storage
+        if flags & storage_cls.flag_pad_file:
+            attr += "p"
+        if flags & storage_cls.flag_hidden:
+            attr += "h"
+        if flags & storage_cls.flag_executable:
+            attr += "x"
+        if flags & storage_cls.flag_symlink:
+            attr += "l"
+        file_entry["attr"] = attr
 
-        for i in range(storage.num_files()):
-            file_entry = dict(index=i,
-                              offset=storage.file_offset(i),
-                              path=storage.file_path(i),
-                              size=storage.file_size(i))
-            # TODO: symlink() seems to crash
-            # TODO: mtime() not mapped on python bindings
-            ih = storage.hash(i)
-            if not ih.is_all_zeros():
-                file_entry["info_hashes"] = dict(v1=str(ih))
-            flags = storage.file_flags(i)
-            attr = ""
-            storage_cls = lt.file_storage
-            if flags & storage_cls.flag_pad_file:
-                attr += "p"
-            if flags & storage_cls.flag_hidden:
-                attr += "h"
-            if flags & storage_cls.flag_executable:
-                attr += "x"
-            if flags & storage_cls.flag_symlink:
-                attr += "l"
-            file_entry["attr"] = attr
+        result.append(file_entry)
 
-            result.append(file_entry)
-
-        return result
+    return result
 
 
 class TorrentInfoSerializer:
@@ -157,8 +155,6 @@ class TorrentInfoSerializer:
             fields = self.FIELDS
         self.fields = fields
 
-        self._file_list_serializer = _FileListSerializer()
-
     def serialize(self, info: lt.torrent_info) -> Mapping[str, Any]:
         simple_callable_fields = self._SIMPLE_CALLABLE_FIELDS
 
@@ -170,8 +166,7 @@ class TorrentInfoSerializer:
             elif field == "info_hashes":
                 result[field] = dict(v1=str(info.info_hash()))
             elif field in ("files", "orig_files"):
-                result[field] = self._file_list_serializer.serialize(
-                    getattr(info, field)())
+                result[field] = _serialize_file_list(getattr(info, field)())
             elif field in ("merkle_tree", "similar_torrents"):
                 result[field] = [str(ih) for ih in getattr(info, field)()]
             elif field == "metadata":

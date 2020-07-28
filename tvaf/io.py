@@ -41,7 +41,7 @@ from tvaf import ltpy
 from tvaf import types
 from tvaf import util
 
-_log = logging.getLogger(__name__)
+_LOG = logging.getLogger(__name__)
 
 DEFAULT_DOWNLOAD_DIR_NAME = "downloads"
 
@@ -110,11 +110,12 @@ class MemoryView(collections.abc.ByteString):
             if (start, stop) == (self.start, self.stop):
                 return self
             return self.__class__(obj=self.obj, start=start, stop=stop)
-        elif isinstance(index, int):
+        if isinstance(index, int):
             # Not sure if I should use __index__ instead of isinstance(...,int)
             if index >= len(self):
                 raise IndexError()
             return self.obj[index % len(self)]
+        raise TypeError("%r should be either slice or int" % index)
 
     def __len__(self):
         return self.stop - self.start
@@ -268,7 +269,7 @@ class Request:
         with self._condition:
             if start in self._chunks:
                 if len(chunk) != len(self._chunks[start]):
-                    _log.warning("adding different size chunk at %d: %d != %d",
+                    _LOG.warning("adding different size chunk at %d: %d != %d",
                                  start, len(chunk), len(self._chunks[start]))
                 return
             self._chunks[start] = chunk
@@ -292,7 +293,7 @@ class Request:
                     return True
                 return False
 
-            value = self._condition.wait_for(condition, timeout=timeout)
+            self._condition.wait_for(condition, timeout=timeout)
             if self._exception is not None:
                 raise self._exception
             if self._read_offset in self._chunks:
@@ -325,6 +326,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
         assert tslice is not None
         assert get_torrent is not None
         assert user is not None
+        super().__init__()
         self._io_service = io_service
         self._tslice = tslice
         self._get_torrent = get_torrent
@@ -349,15 +351,13 @@ class BufferedTorrentIO(io.BufferedIOBase):
                 raise ValueError("Invalid value for whence: %s" % whence)
 
             if offset != self._offset:
-                # TODO: maybe update readahead logic
+                # TODO(AllSeeingEyeTolledEweSew): maybe update readahead logic
                 self._buffer = _EMPTY
                 self._offset = offset
 
             return self._offset
 
-    def close(self):
-        # TODO: maybe cancel readaheads
-        return super().close()
+    # TODO(AllSeeingEyeTolledEweSew): maybe cancel readaheads in close()
 
     def readable(self):
         return True
@@ -433,7 +433,9 @@ class BufferedTorrentIO(io.BufferedIOBase):
             try:
                 # TODO: timeouts
                 chunk = request.next()
-            except OSError:
+            except OSError:  # pylint: disable=try-except-raise
+                # Do this here because ltpy.Error has some subtypes that also
+                # inherit OSError.
                 raise
             except ltpy.Error as exc:
                 raise OSError(errno.EIO, str(exc)) from exc
@@ -556,18 +558,19 @@ def _req_key(req: Request):
             req.params.mode != RequestMode.FILL, random.random())
 
 
+# pylint: disable=invalid-name
 _cache_have_bug_4604 = None
 _4604_STATE_TIMEOUT = 30
 _4604_TICK_INTERVAL = 5
 
 
 def _have_bug_4604():
-    global _cache_have_bug_4604
+    global _cache_have_bug_4604  # pylint: disable=global-statement
     if _cache_have_bug_4604 is None:
         version = tuple(int(i) for i in lt.version.split("."))
         _cache_have_bug_4604 = (version < (1, 2, 7))
         if _cache_have_bug_4604:
-            _log.warning("libtorrent with bug #4604 detected. "
+            _LOG.warning("libtorrent with bug #4604 detected. "
                          "Please upgrade to libtorrent 1.2.7 or later.")
     return _cache_have_bug_4604
 
@@ -612,7 +615,8 @@ class _Torrent:
             int, Request]] = collections.defaultdict(WeakValueDictionary)
         self._piece_reading: Set[int] = set()
         self._piece_have: Set[int] = set()
-        self._state: lt.torrent_status.states = lt.torrent_status.states.checking_resume_data
+        self._state: lt.torrent_status.states = (
+            lt.torrent_status.states.checking_resume_data)
         self._flags = 0
 
         self._removal_requested = False
@@ -692,16 +696,16 @@ class _Torrent:
         method(msg, *([title] + list(args)), **kwargs)
 
     def _debug(self, msg: str, *args, **kwargs):
-        self._log(_log.debug, msg, *args, **kwargs)
+        self._log(_LOG.debug, msg, *args, **kwargs)
 
     def _exception(self, msg: str, *args, **kwargs):
-        self._log(_log.exception, msg, *args, **kwargs)
+        self._log(_LOG.exception, msg, *args, **kwargs)
 
     def _error(self, msg: str, *args, **kwargs):
-        self._log(_log.error, msg, *args, **kwargs)
+        self._log(_LOG.error, msg, *args, **kwargs)
 
     def _warning(self, msg: str, *args, **kwargs):
-        self._log(_log.warning, msg, *args, **kwargs)
+        self._log(_LOG.warning, msg, *args, **kwargs)
 
     def _any_pending(self) -> bool:
         return bool(self._pending)
@@ -816,7 +820,8 @@ class _Torrent:
                 else:
                     piece_reading_outstanding.add(i)
 
-            if want_reading != piece_reading_outstanding or want_seq != self._piece_seq:
+            if (want_reading != piece_reading_outstanding or
+                    want_seq != self._piece_seq):
                 update_pieces = set(want_seq) | set(self._piece_seq)
             else:
                 update_pieces = set()
@@ -1006,11 +1011,11 @@ class _Torrent:
             set_bits: List[Tuple[int, bool]] = []
 
             if self._keep():
-                if not (self._flags & lt.torrent_flags.auto_managed):
+                if not self._flags & lt.torrent_flags.auto_managed:
                     self._debug("setting auto_managed")
                     set_bits.append((lt.torrent_flags.auto_managed, True))
             else:
-                if not (self._flags & lt.torrent_flags.paused):
+                if not self._flags & lt.torrent_flags.paused:
                     self._debug("pausing")
                     self._mark_pending(_Action.PAUSE)
                     set_bits.append((lt.torrent_flags.auto_managed, False))
@@ -1035,13 +1040,13 @@ class _Torrent:
                 # Non-blocking
                 self._handle.set_flags(flags, mask)
 
-    def handle_torrent_paused_alert(self, alert: lt.torrent_paused_alert):
+    def handle_torrent_paused_alert(self, _: lt.torrent_paused_alert):
         with self._lock:
             self._remove_pending(_Action.PAUSE)
             self._flags |= lt.torrent_flags.paused
             self._sync()
 
-    def handle_torrent_resumed_alert(self, alert: lt.torrent_resumed_alert):
+    def handle_torrent_resumed_alert(self, _: lt.torrent_resumed_alert):
         with self._lock:
             self._flags &= lt.torrent_flags.paused
             self._sync()
@@ -1385,7 +1390,7 @@ class IOService:
             for status in alert.status:
                 torrent = self._get_torrent_for_handle(status.handle)
                 if not torrent:
-                    _log.warning("state update for torrent we don't have? %s",
+                    _LOG.warning("state update for torrent we don't have? %s",
                                  str(status.handle.info_hash()))
                     continue
                 torrent.handle_status_update(status)
@@ -1398,10 +1403,10 @@ class IOService:
                 if not torrent:
                     # Some alerts are expected after we've totally removed the
                     # torrent.
-                    if not isinstance(
-                                alert,
-                            (lt.torrent_deleted_alert, lt.torrent_log_alert)):
-                        _log.warning("alert for torrent we don't have?")
+                    expected_types = (lt.torrent_deleted_alert,
+                                      lt.torrent_log_alert)
+                    if not isinstance(alert, expected_types):
+                        _LOG.warning("alert for torrent we don't have?")
                     return
                 self._torrents_by_handle[handle] = torrent
             driver_lib.dispatch(torrent, alert)

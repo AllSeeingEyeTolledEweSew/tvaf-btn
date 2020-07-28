@@ -232,7 +232,7 @@ logging-modules=logging
 [MISCELLANEOUS]
 
 # List of note tags to take in consideration, separated by a comma.
-notes=FIXME,XXX,TODO
+notes=FIXME,XXX
 
 
 [SIMILARITIES]
@@ -355,7 +355,7 @@ max-branches=12
 max-statements=100
 
 # Maximum number of parents for a class (see R0901).
-max-parents=7
+max-parents=10
 
 # Maximum number of attributes for a class (see R0902).
 max-attributes=10
@@ -404,4 +404,4 @@ analyse-fallback-blocks=no
 
 # Exceptions that will emit a warning when being caught. Defaults to
 # "Exception"
-overgeneral-exceptions=Exception
+overgeneral-exceptions=BaseException

@@ -56,11 +56,11 @@ class IOServiceTestCase(unittest.TestCase):
             timeout = max(deadline - time.monotonic(), 0.0)
             timeout_ms = int(min(timeout * 1000, sys.maxsize))
 
-            a = self.session.wait_for_alert(int(timeout_ms))
+            self.session.wait_for_alert(int(timeout_ms))
 
-            for a in self.session.pop_alerts():
-                driver_lib.log_alert(a)
-                self.ios.handle_alert(a)
+            for alert in self.session.pop_alerts():
+                driver_lib.log_alert(alert)
+                self.ios.handle_alert(alert)
             now = time.monotonic()
             self.assertLess(now, condition_deadline, msg=f"{msg} timed out")
             if now >= self.ios.get_tick_deadline():
@@ -95,15 +95,15 @@ class IOServiceTestCase(unittest.TestCase):
     def pump_and_find_first_alert(self, condition, timeout=5):
         deadline = time.monotonic() + timeout
         while True:
-            a = self.session.wait_for_alert(
+            alert = self.session.wait_for_alert(
                 int((deadline - time.monotonic()) * 1000))
-            if not a:
+            if not alert:
                 assert False, f"condition timed out"
             saved = None
-            for a in self.session.pop_alerts():
-                self.ios.handle_alert(a)
-                if condition(a) and saved is None:
-                    saved = a
+            for alert in self.session.pop_alerts():
+                self.ios.handle_alert(alert)
+                if condition(alert) and saved is None:
+                    saved = alert
             if saved is not None:
                 return saved
 
@@ -141,7 +141,7 @@ class TestAddRemove(IOServiceTestCase):
 
     def test_add_remove(self):
         req = self.add_req()
-        self.pump_alerts(lambda: self.session.get_torrents(), msg="add")
+        self.pump_alerts(self.session.get_torrents, msg="add")
         handles = self.session.get_torrents()
         self.assertEqual([str(h.info_hash()) for h in handles],
                          [tdummy.INFOHASH])
@@ -162,7 +162,7 @@ class TestAddRemove(IOServiceTestCase):
 
 class TestRead(IOServiceTestCase):
 
-    def test_feed_pieces(self):
+    def test_all(self):
         req = self.add_req()
 
         self.feed_pieces()
@@ -173,7 +173,7 @@ class TestRead(IOServiceTestCase):
         self.pump_alerts(lambda: not req.active, msg="request deactivated")
         self.assertIsNone(req.exception)
 
-    def test_feed_not_aligned_across_pieces(self):
+    def test_unaligned_multi_pieces(self):
         start = tdummy.PIECE_LENGTH // 2
         stop = min(start + tdummy.PIECE_LENGTH, len(tdummy.DATA))
         req = self.add_req(start=start, stop=stop)
@@ -187,7 +187,7 @@ class TestRead(IOServiceTestCase):
         self.pump_alerts(lambda: not req.active, msg="deactivate")
         self.assertIsNone(req.exception)
 
-    def test_feed_not_aligned_single_piece(self):
+    def test_unaligned_single_piece(self):
         start = tdummy.PIECE_LENGTH // 4
         stop = 3 * tdummy.PIECE_LENGTH // 4
         req = self.add_req(start=start, stop=stop)
@@ -201,7 +201,7 @@ class TestRead(IOServiceTestCase):
         self.pump_alerts(lambda: not req.active, msg="deactivate")
         self.assertIsNone(req.exception)
 
-    def test_request_on_existing_torrent(self):
+    def test_existing_torrent(self):
         req = self.add_req()
 
         self.feed_pieces()
@@ -292,7 +292,7 @@ class TestRead(IOServiceTestCase):
     def test_file_error(self):
         # Create a file in tempdir, try to use it as the save_path
         path = os.path.join(self.tempdir.name, "file.txt")
-        with open(path, mode="w") as f:
+        with open(path, mode="w"):
             pass
         self.config["torrent_default_save_path"] = path
         self.ios.set_config(self.config)
@@ -408,7 +408,9 @@ class TestPriorities(IOServiceTestCase):
             }.items()),
             set(dict(enumerate(handle.get_piece_priorities())).items()))
         # libtorrent doesn't expose piece deadlines, so whitebox test here
+        # pylint: disable=protected-access
         torrent = self.ios._torrents[tdummy.INFOHASH]
+        # pylint: disable=protected-access
         self.assertEqual(torrent._piece_seq, {
             1: 2,
             2: 3,
@@ -419,6 +421,7 @@ class TestPriorities(IOServiceTestCase):
             7: 0,
             8: 1
         })
+        # pylint: disable=protected-access
         self.assertEqual(torrent._piece_reading, {3, 4, 7, 8})
 
     def test_with_have_pieces(self):
@@ -454,11 +457,16 @@ class TestPriorities(IOServiceTestCase):
                 logging.debug("prio is %s", handle.get_piece_priorities())
                 return False
             # libtorrent doesn't expose piece deadlines, so whitebox test here
+            # pylint: disable=protected-access
             torrent = self.ios._torrents[tdummy.INFOHASH]
+            # pylint: disable=protected-access
             if torrent._piece_seq != {2: 1, 4: 0, 6: 1, 8: 0}:
+                # pylint: disable=protected-access
                 logging.debug("seq is %s", torrent._piece_seq)
                 return False
+            # pylint: disable=protected-access
             if torrent._piece_reading != {4, 8}:
+                # pylint: disable=protected-access
                 logging.debug("reading is %s", torrent._piece_reading)
                 return False
             return True
@@ -468,12 +476,12 @@ class TestPriorities(IOServiceTestCase):
 
 class TestRemoveTorrent(IOServiceTestCase):
 
-    def test_remove_with_active_requests(self):
+    def test_with_active_requests(self):
         req = self.add_req()
         self.ios.remove_torrent(tdummy.INFOHASH)
         self.assertIsInstance(req.exception, tvaf.io.Cancelled)
 
-    def test_remove_keep_data(self):
+    def test_keep_data(self):
         req = self.add_req()
         self.feed_pieces()
 
@@ -520,7 +528,7 @@ class TestLoad(IOServiceTestCase):
         self.session.pause()
         handle.save_resume_data(lt.save_resume_flags_t.save_info_dict)
         alert = self.pump_and_find_first_alert(
-            lambda a: isinstance(a, lt.save_resume_data_alert))
+            lambda alert: isinstance(alert, lt.save_resume_data_alert))
         resume_data = alert.resume_data
 
         # Start a new session and load the resume data
@@ -536,7 +544,7 @@ class TestLoad(IOServiceTestCase):
         self.pump_alerts(lambda: not req.active, msg="request deactivated")
         self.assertIsNone(req.exception)
 
-    def test_load_resume_corrupted_and_read(self):
+    def test_load_corrupted_and_read(self):
         # Download a torrent
         req = self.add_req()
         self.feed_pieces()
@@ -552,8 +560,8 @@ class TestLoad(IOServiceTestCase):
 
         # Corrupt the data
         with open(os.path.join(self.tempdir.name, tdummy.NAME.decode()),
-                  mode="w") as f:
-            f.write("corrupted!")
+                  mode="w") as fp:
+            fp.write("corrupted!")
 
         # Open a new session, and load the torrent with resume data
         self.init_session()
@@ -593,54 +601,54 @@ class TestBufferedTorrentIO(IOServiceTestCase):
                              user="tvaf")
 
     def test_read_some(self):
-        f = self.executor.submit(self.open().read, 1024)
+        future = self.executor.submit(self.open().read, 1024)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="read")
-        self.assertEqual(f.result(), tdummy.DATA[:1024])
+        self.pump_alerts(future.done, msg="read")
+        self.assertEqual(future.result(), tdummy.DATA[:1024])
 
     def test_read_with_explicit_close(self):
         fp = self.open()
-        f = self.executor.submit(fp.read, 1024)
+        future = self.executor.submit(fp.read, 1024)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="read")
-        self.assertEqual(f.result(), tdummy.DATA[:1024])
+        self.pump_alerts(future.done, msg="read")
+        self.assertEqual(future.result(), tdummy.DATA[:1024])
         fp.close()
         self.assertTrue(fp.closed)
 
     def test_context_manager_with_read(self):
         with self.open() as fp:
-            f = self.executor.submit(fp.read, 1024)
+            future = self.executor.submit(fp.read, 1024)
             self.feed_pieces()
-            self.pump_alerts(f.done, msg="read")
-            self.assertEqual(f.result(), tdummy.DATA[:1024])
+            self.pump_alerts(future.done, msg="read")
+            self.assertEqual(future.result(), tdummy.DATA[:1024])
 
     def test_read_all(self):
-        f = self.executor.submit(self.open().read)
+        future = self.executor.submit(self.open().read)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="read")
-        self.assertEqual(f.result(), tdummy.DATA)
+        self.pump_alerts(future.done, msg="read")
+        self.assertEqual(future.result(), tdummy.DATA)
 
     def test_readinto(self):
-        b = bytearray(1024)
-        f = self.executor.submit(self.open().readinto, b)
+        array = bytearray(1024)
+        future = self.executor.submit(self.open().readinto, array)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="readinto")
-        self.assertEqual(f.result(), 1024)
-        self.assertEqual(b, tdummy.DATA[:1024])
+        self.pump_alerts(future.done, msg="readinto")
+        self.assertEqual(future.result(), 1024)
+        self.assertEqual(array, tdummy.DATA[:1024])
 
     def test_read1(self):
-        f = self.executor.submit(self.open().read1)
+        future = self.executor.submit(self.open().read1)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="read1")
-        self.assertEqual(f.result(), tdummy.PIECES[0])
+        self.pump_alerts(future.done, msg="read1")
+        self.assertEqual(future.result(), tdummy.PIECES[0])
 
     def test_readinto1(self):
-        b = bytearray(tdummy.LEN)
-        f = self.executor.submit(self.open().readinto1, b)
+        array = bytearray(tdummy.LEN)
+        future = self.executor.submit(self.open().readinto1, array)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="readinto1")
-        self.assertEqual(f.result(), len(tdummy.PIECES[0]))
-        self.assertEqual(b[:len(tdummy.PIECES[0])], tdummy.PIECES[0])
+        self.pump_alerts(future.done, msg="readinto1")
+        self.assertEqual(future.result(), len(tdummy.PIECES[0]))
+        self.assertEqual(array[:len(tdummy.PIECES[0])], tdummy.PIECES[0])
 
     def test_misc_methods(self):
         fp = self.open()
@@ -662,49 +670,49 @@ class TestBufferedTorrentIO(IOServiceTestCase):
 
         fp.seek(1024)
         self.assertEqual(fp.tell(), 1024)
-        f = self.executor.submit(fp.read, 1024)
+        future = self.executor.submit(fp.read, 1024)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="read")
-        self.assertEqual(f.result(), tdummy.DATA[1024:2048])
+        self.pump_alerts(future.done, msg="read")
+        self.assertEqual(future.result(), tdummy.DATA[1024:2048])
 
     def test_second_read_buffered(self):
         fp = self.open()
-        f = self.executor.submit(fp.read, 1024)
+        future = self.executor.submit(fp.read, 1024)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="read")
-        self.assertEqual(f.result(), tdummy.DATA[:1024])
+        self.pump_alerts(future.done, msg="read")
+        self.assertEqual(future.result(), tdummy.DATA[:1024])
 
         # The data should be buffered, so we shouldn't need to pump_alerts
         second = fp.read(1024)
         self.assertEqual(second, tdummy.DATA[1024:2048])
 
-    def test_second_read_partially_buffered(self):
+    def test_second_read_partial_buffer(self):
         fp = self.open()
-        f = self.executor.submit(fp.read, 1024)
+        future = self.executor.submit(fp.read, 1024)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="first read")
-        self.assertEqual(f.result(), tdummy.DATA[:1024])
+        self.pump_alerts(future.done, msg="first read")
+        self.assertEqual(future.result(), tdummy.DATA[:1024])
 
         # The data should be partially buffered. We'll need to pump_alerts
         # again.
-        f = self.executor.submit(fp.read, tdummy.PIECE_LENGTH)
-        self.pump_alerts(f.done, msg="second read")
-        self.assertEqual(f.result(),
+        future = self.executor.submit(fp.read, tdummy.PIECE_LENGTH)
+        self.pump_alerts(future.done, msg="second read")
+        self.assertEqual(future.result(),
                          tdummy.DATA[1024:tdummy.PIECE_LENGTH + 1024])
 
     def test_seek_resets_buffer(self):
         fp = self.open()
-        f = self.executor.submit(fp.read, 1024)
+        future = self.executor.submit(fp.read, 1024)
         self.feed_pieces()
-        self.pump_alerts(f.done, msg="first read")
-        self.assertEqual(f.result(), tdummy.DATA[:1024])
+        self.pump_alerts(future.done, msg="first read")
+        self.assertEqual(future.result(), tdummy.DATA[:1024])
 
         # Seek back to the start. The buffer should reset, but reads should
         # work as normal.
         fp.seek(0)
-        f = self.executor.submit(fp.read, 1024)
-        self.pump_alerts(f.done, msg="second read")
-        self.assertEqual(f.result(), tdummy.DATA[:1024])
+        future = self.executor.submit(fp.read, 1024)
+        self.pump_alerts(future.done, msg="second read")
+        self.assertEqual(future.result(), tdummy.DATA[:1024])
 
 
 class TestConfig(unittest.TestCase):

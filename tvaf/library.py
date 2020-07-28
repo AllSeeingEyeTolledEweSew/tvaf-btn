@@ -205,6 +205,9 @@ class _V1(fs.Dir):
             return None
         return _V1Torrent(self.libs, info_hash, protocol.Info(info_dict))
 
+    def readdir(self) -> Iterator[fs.Dirent]:
+        return super().readdir()
+
 
 class _Browse(fs.DictDir):
 

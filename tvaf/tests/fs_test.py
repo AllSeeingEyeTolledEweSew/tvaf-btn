@@ -1,9 +1,11 @@
 """Tests for the tvaf.fs module."""
+from __future__ import annotations
 
 import io
 import pathlib
 import stat as stat_lib
 import unittest
+from typing import Dict
 
 from tvaf import fs
 
@@ -13,7 +15,7 @@ class TestTraverse(unittest.TestCase):
     def setUp(self):
         self.root = fs.StaticDir()
         self.directory = fs.StaticDir()
-        self.file = fs.File(size=0)
+        self.file = DummyFile(size=0)
         self.root.mkchild("directory", self.directory)
         self.directory.mkchild("file", self.file)
         self.symlink = fs.Symlink(target=self.file)
@@ -134,7 +136,7 @@ class TestRealpath(unittest.TestCase):
     def setUp(self):
         self.root = fs.StaticDir()
         self.directory = fs.StaticDir()
-        self.file = fs.File(size=0)
+        self.file = DummyFile(size=0)
         self.root.mkchild("directory", self.directory)
         self.directory.mkchild("file", self.file)
         self.symlink = fs.Symlink(target=self.file)
@@ -176,30 +178,30 @@ class TestFile(unittest.TestCase):
     """Tests for tvaf.fs.File."""
 
     def test_file(self):
-        node = fs.File(size=0)
+        node = DummyFile(size=0)
         self.assertTrue(node.is_file())
         self.assertFalse(node.is_link())
         self.assertFalse(node.is_dir())
 
     def test_stat(self):
-        stat = fs.File(size=0).stat()
+        stat = DummyFile(size=0).stat()
         self.assertEqual(stat.filetype, stat_lib.S_IFREG)
         self.assertEqual(stat.size, 0)
         self.assertIs(stat.mtime, None)
 
     def test_os_stat(self):
-        os_stat = fs.File(size=123).stat().os()
+        os_stat = DummyFile(size=123).stat().os()
         self.assertEqual(stat_lib.S_IFMT(os_stat.st_mode), stat_lib.S_IFREG)
         self.assertEqual(os_stat.st_size, 123)
 
-        os_stat = fs.File(size=123, mtime=12345).stat().os()
+        os_stat = DummyFile(size=123, mtime=12345).stat().os()
         self.assertEqual(os_stat.st_mtime, 12345)
 
 
 class TestOpen(unittest.TestCase):
 
     def test_mode_rb(self):
-        node = fs.File(size=0)
+        node = DummyFile(size=0)
         contents = b"test contents"
 
         def open_raw(mode):
@@ -215,7 +217,7 @@ class TestGetRoot(unittest.TestCase):
 
     def setUp(self):
         self.dir = fs.StaticDir()
-        self.inner = fs.Dir()
+        self.inner = fs.StaticDir()
         self.dir.mkchild("inner", self.inner)
 
     def test_root_from_root(self):
@@ -225,23 +227,33 @@ class TestGetRoot(unittest.TestCase):
         self.assertIs(self.inner.get_root(), self.dir)
 
 
+class DummyDir(fs.Dir):
+
+    def __init__(self, dummy_file: DummyFile):
+        super().__init__()
+        self.dummy_file = dummy_file
+
+    def get_node(self, name):
+        if name == "foo":
+            return self.dummy_file
+        return None
+
+    def readdir(self):
+        return [fs.Dirent(name="foo", stat=self.file.stat())]
+
+
+class DummyFile(fs.File):
+
+    def open_raw(self, mode: str = "r") -> io.IOBase:
+        return io.BytesIO(b"foo")
+
+
 class TestDir(unittest.TestCase):
     """Tests for tvaf.fs.Dir."""
 
     def setUp(self):
-        self.dir = fs.Dir()
-        self.file = fs.File(size=100)
-
-        def get_node(name):
-            if name == "foo":
-                return self.file
-            return None
-
-        def readdir(self):
-            return [fs.Dirent(name="foo", stat=self.file.stat())]
-
-        self.dir.get_node = get_node
-        self.dir.readdir = readdir
+        self.file = DummyFile(size=100)
+        self.dir = DummyDir(self.file)
 
     def test_is_dir(self):
         self.assertTrue(self.dir.is_dir())
@@ -271,14 +283,24 @@ class TestDir(unittest.TestCase):
             self.dir.lookup("does-not-exist")
 
 
+class DummyDictDir(fs.DictDir):
+
+    def __init__(self, file1: fs.File, file2: fs.File):
+        super().__init__()
+        self.file1 = file1
+        self.file2 = file2
+
+    def get_dict(self) -> Dict[str, fs.Node]:
+        return dict(foo=self.file1, bar=self.file2)
+
+
 class TestDictDir(unittest.TestCase):
     """Tests for tvaf.fs.Dir."""
 
     def setUp(self):
-        self.dir = fs.DictDir()
-        self.file1 = fs.File(size=100, mtime=0)
-        self.file2 = fs.File(size=200, mtime=12345)
-        self.dir.get_dict = lambda: dict(foo=self.file1, bar=self.file2)
+        self.file1 = DummyFile(size=100, mtime=0)
+        self.file2 = DummyFile(size=200, mtime=12345)
+        self.dir = DummyDictDir(self.file1, self.file2)
 
     def test_stat(self):
         self.assertEqual(self.dir.filetype, stat_lib.S_IFDIR)
@@ -306,8 +328,8 @@ class TestStaticDir(unittest.TestCase):
 
     def setUp(self):
         self.dir = fs.StaticDir()
-        self.file1 = fs.File(size=10, mtime=0)
-        self.file2 = fs.File(size=100, mtime=12345)
+        self.file1 = DummyFile(size=10, mtime=0)
+        self.file2 = DummyFile(size=100, mtime=12345)
         self.dir.mkchild("foo", self.file1)
         self.dir.mkchild("bar", self.file2)
 
@@ -336,7 +358,7 @@ class TestSymlink(unittest.TestCase):
         self.dir2 = fs.StaticDir()
         self.root.mkchild("dir1", self.dir1)
         self.root.mkchild("dir2", self.dir2)
-        self.file = fs.File()
+        self.file = DummyFile()
         self.dir2.mkchild("file", self.file)
         self.symlink = fs.Symlink()
         self.dir1.mkchild("symlink", self.symlink)

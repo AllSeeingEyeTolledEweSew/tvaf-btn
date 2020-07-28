@@ -9,6 +9,7 @@ passed through the "surrogateescape" filter. Bytes objects aren't used.
 
 from __future__ import annotations
 
+import abc
 import dataclasses
 import errno
 import io
@@ -59,7 +60,7 @@ class Stat:
             else:
                 self.perms = 0o444
 
-    def os(self) -> os.stat_result:
+    def os(self) -> os.stat_result:  # pylint: disable=invalid-name
         st_mode = stat_lib.S_IFMT(self.filetype) | stat_lib.S_IMODE(self.perms)
         st_ino = 0
         st_dev = 0
@@ -162,6 +163,7 @@ def _partial_traverse(
             path = path.relative_to("/")
 
         node: Node = cur_dir
+        i = 0
         for i, part in enumerate(path.parts):
             # If we fail before lookup, our remainder includes the current part
             # we failed to lookup.
@@ -177,8 +179,8 @@ def _partial_traverse(
             else:
                 try:
                     node = cur_dir.lookup(part)
-                except OSError as e:
-                    return cur_dir, rest(), e
+                except OSError as ex:
+                    return cur_dir, rest(), ex
 
             # We looked up the next node. From here on, our remainder is
             # whatever we would lookup after this.
@@ -198,19 +200,18 @@ def _partial_traverse(
                         # value to save recursive calls and node construction.
                         node = maybe_node
                         continue
-                    else:
-                        # We are trying to resolve this symlink somewhere in
-                        # our call stack. We reached it again, so we're in a
-                        # symlink loop.
-                        return symlink, rest(), mkoserror(errno.ELOOP)
+                    # We are trying to resolve this symlink somewhere in
+                    # our call stack. We reached it again, so we're in a
+                    # symlink loop.
+                    return symlink, rest(), mkoserror(errno.ELOOP)
                 seen_symlink[symlink] = None
 
                 # Optimization: if symlink.target is a Node, we can use it
                 # directly, but we must still recurse to check for loops.
                 try:
                     target = symlink.readlink()
-                except OSError as e:
-                    return symlink, rest(), e
+                except OSError as ex:
+                    return symlink, rest(), ex
 
                 # Recurse into the symlink.
                 node, inner_rest, exc = inner(cur_dir, target, depth + 1)
@@ -224,7 +225,7 @@ def _partial_traverse(
     return inner(cur_dir, path, 0)
 
 
-class Dir(Node):
+class Dir(Node, abc.ABC):
     """A virtual directory."""
 
     def __init__(self, *, perms: int = None, mtime: int = None, size: int = 0):
@@ -242,6 +243,7 @@ class Dir(Node):
                     size=self.size,
                     mtime=self.mtime)
 
+    @abc.abstractmethod
     def get_node(self, name: str) -> Optional[Node]:
         raise mkoserror(errno.ENOSYS)
 
@@ -272,23 +274,24 @@ class Dir(Node):
         """Recursively look up a node by path.
 
         Args:
-            path: A relative path to another node within this Dir. Must not be an
-                absolute path.
+            path: A relative path to another node within this Dir. Must not be
+                an absolute path.
 
         Returns:
             A Node somewhere in the subtree of this Dir.
 
         Raises:
-            FileNotFoundError: If the given path couldn't be found within the root.
+            FileNotFoundError: If the given path couldn't be found within the
+                root.
             NotADirectoryError: If a non-terminal part of the path refers to a
                 non-directory.
             OSError: If some other error occurs.
         """
-        node, rest, e = _partial_traverse(self,
-                                          Path(path),
-                                          follow_symlinks=follow_symlinks)
-        if e:
-            raise e
+        node, _, ex = _partial_traverse(self,
+                                        Path(path),
+                                        follow_symlinks=follow_symlinks)
+        if ex is not None:
+            raise ex  # pylint: disable=raising-bad-type
         return node
 
     def realpath(self, path: PathLike) -> Path:
@@ -311,18 +314,19 @@ class Dir(Node):
             base = base.parent
         raise mkoserror(errno.ENOSYS)
 
+    @abc.abstractmethod
     def readdir(self) -> Iterator[Dirent]:
         """List the contents of a directory.
 
         Yields:
             A Dirent for each directory entry.
         """
-        # pylint: disable=no-self-use
         raise mkoserror(errno.ENOSYS)
 
 
-class DictDir(Dir):
+class DictDir(Dir, abc.ABC):
 
+    @abc.abstractmethod
     def get_dict(self) -> Dict[str, Node]:
         raise mkoserror(errno.ENOSYS)
 
@@ -358,7 +362,7 @@ class StaticDir(DictDir):
         return self.children
 
 
-class File(Node):
+class File(Node, abc.ABC):
     """An abstract file.
 
     The caller should check get_torrent_ref() to see if this is a
@@ -377,6 +381,7 @@ class File(Node):
                          size=size,
                          mtime=mtime)
 
+    @abc.abstractmethod
     def open_raw(self, mode: str = "r") -> io.IOBase:
         raise mkoserror(errno.ENOSYS)
 

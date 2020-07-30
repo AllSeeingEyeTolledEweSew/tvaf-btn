@@ -31,7 +31,7 @@ class BaseFTPTest(unittest.TestCase):
     def setUp(self):
         self.torrents = {t.infohash: t for t in (SINGLE, MULTI)}
 
-        def opener(tslice: types.TorrentSlice, get_torrent: library.GetTorrent):
+        def opener(tslice: types.TorrentSlice, _: library.GetTorrent):
             data = self.torrents[
                 tslice.info_hash].data[tslice.start:tslice.stop]
             raw = io.BytesIO(data)
@@ -40,9 +40,9 @@ class BaseFTPTest(unittest.TestCase):
             return raw
 
         def get_access(info_hash):
-            t = self.torrents[info_hash]
+            torrent = self.torrents[info_hash]
             return library.Access(seeders=100,
-                                  get_torrent=lambda: lt.bencode(t.dict))
+                                  get_torrent=lambda: lt.bencode(torrent.dict))
 
         self.hints = {
             (SINGLE.infohash, 0):

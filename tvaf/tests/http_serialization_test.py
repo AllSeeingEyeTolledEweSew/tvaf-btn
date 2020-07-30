@@ -12,17 +12,17 @@ from . import test_utils
 class TorrentInfoSerializerTest(lib.TestCase):
 
     def test_serialize_default_fields(self):
-        ti = tdummy.DEFAULT_STABLE.torrent_info()
+        torrent_info = tdummy.DEFAULT_STABLE.torrent_info()
         serializer = serialization.TorrentInfoSerializer()
-        result = serializer.serialize(ti)
+        result = serializer.serialize(torrent_info)
         self.assert_golden_json(result)
 
     def test_serialize_stable_fields(self):
-        ti = tdummy.DEFAULT.torrent_info()
+        torrent_info = tdummy.DEFAULT.torrent_info()
         fields = serialization.TorrentInfoSerializer.FIELDS - set(
             ("info_hashes", "hash_for_piece", "metadata", "merkle_tree"))
         serializer = serialization.TorrentInfoSerializer(fields)
-        result = serializer.serialize(ti)
+        result = serializer.serialize(torrent_info)
         self.assert_golden_json(result)
 
 

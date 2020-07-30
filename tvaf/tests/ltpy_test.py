@@ -6,6 +6,17 @@ import libtorrent as lt
 
 from tvaf import ltpy
 
+# Various WinError values. I can't find symbolic mappings for most of these.
+ERROR_WAIT_NO_CHILDREN = 128
+ERROR_CHILD_NOT_COMPLETE = 129
+ERROR_BROKEN_PIPE = 109
+ERROR_FILE_EXISTS = 80
+ERROR_ALREADY_EXISTS = 183
+ERROR_FILE_NOT_FOUND = 2
+ERROR_PATH_NOT_FOUND = 3
+ERROR_DIRECTORY = 267
+ERROR_ACCESS_DENIED = 5
+
 
 class TestExceptionSubtypeInstantiation(unittest.TestCase):
 
@@ -162,19 +173,12 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
         # Try invalid WinError
         self.assertIsInstance(func(-1), ltpy.OSError)
 
+        # pylint doesn't have a nice way to deal with Windows-specific errno
+        # values. We have to disable this check entirely.
+
+        # pylint: disable=no-member
+
         # This is a combination of pep3151 and cpython's errmap.h.
-
-        # I can't find any symbolic mappings for most WinErrors.
-        ERROR_WAIT_NO_CHILDREN = 128
-        ERROR_CHILD_NOT_COMPLETE = 129
-        ERROR_BROKEN_PIPE = 109
-        ERROR_FILE_EXISTS = 80
-        ERROR_ALREADY_EXISTS = 183
-        ERROR_FILE_NOT_FOUND = 2
-        ERROR_PATH_NOT_FOUND = 3
-        ERROR_DIRECTORY = 267
-        ERROR_ACCESS_DENIED = 5
-
         self.assertIsInstance(func(errno.WSAEALREADY), ltpy.BlockingIOError)
         self.assertIsInstance(func(errno.WSAEWOULDBLOCK), ltpy.BlockingIOError)
         self.assertIsInstance(func(errno.WSAEINPROGRESS), ltpy.BlockingIOError)

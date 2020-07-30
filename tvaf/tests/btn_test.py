@@ -11,6 +11,8 @@ import btn
 import tvaf.btn as tvaf_btn
 import tvaf.fs as fs
 
+# pylint: skip-file
+
 
 def get_mock_db() -> apsw.Connection:
     """Returns a connection to an in-memory database with the btn schemas."""

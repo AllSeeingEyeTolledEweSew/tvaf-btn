@@ -7,6 +7,8 @@ from tvaf import config as config_lib
 
 class TestConfig(unittest.TestCase):
 
+    # pylint: disable=too-many-public-methods
+
     def test_from_config_dir(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = pathlib.Path(tmpdir)

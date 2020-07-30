@@ -16,9 +16,9 @@ def atp_dict_fixup(atp_dict):
 
 
 def hashable(obj):
-    if type(obj) in (list, tuple):
+    if isinstance(obj, (list, tuple)):
         return tuple(hashable(x) for x in obj)
-    if type(obj) is dict:
+    if isinstance(obj, dict):
         return tuple(sorted((k, hashable(v)) for k, v in obj.items()))
     return obj
 
@@ -57,14 +57,14 @@ class BaseTest(unittest.TestCase):
     def tearDown(self):
         self.tempdir.cleanup()
 
-    def assertAtpEqual(self, got, expected):
+    def assert_atp_equal(self, got, expected):
         self.assertEqual(atp_comparable(got), atp_comparable(expected))
 
-    def assertAtpListEqual(self, got, expected):
+    def assert_atp_list_equal(self, got, expected):
         self.assertEqual([atp_comparable(atp) for atp in got],
                          [atp_comparable(atp) for atp in expected])
 
-    def assertAtpSetEqual(self, got, expected):
+    def assert_atp_sets_equal(self, got, expected):
         self.assertEqual(set(atp_hashable(atp) for atp in got),
                          set(atp_hashable(atp) for atp in expected))
 
@@ -80,11 +80,11 @@ class IterResumeDataTest(BaseTest):
     def setUp(self):
         super().setUp()
 
-        def write(t):
+        def write(torrent):
             self.resume_data_dir.mkdir(parents=True, exist_ok=True)
             path = self.resume_data_dir.joinpath(
-                t.infohash).with_suffix(".resume")
-            data = lt.bencode(lt.write_resume_data(t.atp()))
+                torrent.infohash).with_suffix(".resume")
+            data = lt.bencode(lt.write_resume_data(torrent.atp()))
             path.write_bytes(data)
 
         write(self.TORRENT1)
@@ -92,8 +92,8 @@ class IterResumeDataTest(BaseTest):
 
     def test_normal(self):
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
-        self.assertAtpSetEqual(set(atps),
-                               set((self.TORRENT1.atp(), self.TORRENT2.atp())))
+        self.assert_atp_sets_equal(
+            set(atps), set((self.TORRENT1.atp(), self.TORRENT2.atp())))
 
     def test_ignore_bad_data(self):
         # valid resume data, wrong filename
@@ -119,8 +119,8 @@ class IterResumeDataTest(BaseTest):
         path.symlink_to("does_not_exist.resume")
 
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
-        self.assertAtpSetEqual(set(atps),
-                               set((self.TORRENT1.atp(), self.TORRENT2.atp())))
+        self.assert_atp_sets_equal(
+            set(atps), set((self.TORRENT1.atp(), self.TORRENT2.atp())))
 
 
 class AbortTest(BaseTest):
@@ -139,8 +139,8 @@ class AbortTest(BaseTest):
         handle = self.session.add_torrent(atp)
 
         def is_downloading():
-            s = handle.status()
-            return s.state == s.downloading
+            status = handle.status()
+            return status.state == status.downloading
 
         self.driver.pump(is_downloading, msg="downloading state")
         # NB: bug in libtorrent where add_piece accepts str but not bytes

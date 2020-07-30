@@ -154,6 +154,9 @@ def _partial_traverse(
         cur_dir: Dir,
         path: Path,
         follow_symlinks=True) -> Tuple[Node, Path, Optional[OSError]]:
+    # TODO: refactor this into some classes, if we keep fs past v1.0.
+    # pylint: disable=too-many-branches
+
     seen_symlink: Dict[Symlink, Optional[Node]] = {}
 
     def inner(cur_dir: Dir, path: Path,

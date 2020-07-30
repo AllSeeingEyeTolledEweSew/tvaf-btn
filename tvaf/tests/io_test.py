@@ -98,7 +98,7 @@ class IOServiceTestCase(unittest.TestCase):
             alert = self.session.wait_for_alert(
                 int((deadline - time.monotonic()) * 1000))
             if not alert:
-                assert False, f"condition timed out"
+                assert False, "condition timed out"
             saved = None
             for alert in self.session.pop_alerts():
                 self.ios.handle_alert(alert)

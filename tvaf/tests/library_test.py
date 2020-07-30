@@ -52,6 +52,8 @@ def get_placeholder_data(tslice: types.TorrentSlice) -> bytes:
 
 class TestLibraryService(unittest.TestCase):
 
+    # pylint: disable=too-many-public-methods
+
     def setUp(self):
         self.torrents = {
             t.infohash: t
@@ -69,7 +71,7 @@ class TestLibraryService(unittest.TestCase):
         }
 
         def opener(tslice: types.TorrentSlice,
-                   get_torrent: library.GetTorrent) -> io.BytesIO:
+                   _: library.GetTorrent) -> io.BytesIO:
             return io.BytesIO(get_placeholder_data(tslice))
 
         self.libs = library.LibraryService(opener=opener)
@@ -84,9 +86,9 @@ class TestLibraryService(unittest.TestCase):
         return self.hints[(info_hash, index)]
 
     def get_access(self, info_hash):
-        t = self.torrents[info_hash]
+        torrent = self.torrents[info_hash]
         return library.Access(seeders=100,
-                              get_torrent=lambda: lt.bencode(t.dict))
+                              get_torrent=lambda: lt.bencode(torrent.dict))
 
     def assert_torrent_file(self,
                             tfile: library.TorrentFile,
@@ -205,7 +207,7 @@ class TestLibraryService(unittest.TestCase):
 
     def test_hints_with_mtime(self):
 
-        def get_mtime(info_hash, index):
+        def get_mtime(*_):
             return library.Hints(mtime=12345)
 
         self.libs.get_hints_funcs["mtime"] = get_mtime
@@ -243,14 +245,14 @@ class TestLibraryService(unittest.TestCase):
             self.assert_is_dir(self.libs.root.traverse(f"v1/{info_hash}"))
 
     def test_v1_lookup_bad(self):
-        v1 = self.libs.root.traverse("v1")
+        v1_dir = self.libs.root.traverse("v1")
         with self.assertRaises(FileNotFoundError):
-            v1.lookup("0" * 40)
+            v1_dir.lookup("0" * 40)
 
     def test_v1_readdir(self):
-        v1 = self.libs.root.traverse("v1")
+        v1_dir = self.libs.root.traverse("v1")
         with self.assertRaises(OSError):
-            list(v1.readdir())
+            list(v1_dir.readdir())
 
     def test_torrent_dir_readdir(self):
         for info_hash in self.torrents:
@@ -282,7 +284,7 @@ class TestLibraryService(unittest.TestCase):
 
     def test_torrent_dir_with_redirect_access(self):
 
-        def get_redirect(info_hash):
+        def get_redirect(_):
             return library.Access(redirect_to="test")
 
         self.libs.get_access_funcs["redirect"] = get_redirect

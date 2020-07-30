@@ -89,10 +89,10 @@ class Torrent:
         self.length = sum(f.length for f in self.files)
 
         offset = 0
-        for f in self.files:
-            f.start = offset
-            f.stop = offset + f.length
-            offset = f.stop
+        for file_ in self.files:
+            file_.start = offset
+            file_.stop = offset + file_.length
+            offset = file_.stop
 
         self._data = None
         self._pieces = None
@@ -134,13 +134,13 @@ class Torrent:
                 assert all(len(f.path_split) > 1 for f in self.files)
                 self._info[b"name"] = self.files[0].path_split[0]
                 self._info[b"files"] = []
-                for f in self.files:
+                for file_ in self.files:
                     fdict = {
-                        b"length": f.length,
-                        b"path": f.path_split[1:],
+                        b"length": file_.length,
+                        b"path": file_.path_split[1:],
                     }
-                    if f.attr:
-                        fdict[b"attr"] = f.attr
+                    if file_.attr:
+                        fdict[b"attr"] = file_.attr
                     self._info[b"files"].append(fdict)
         return self._info
 
@@ -166,12 +166,12 @@ class Torrent:
     def sha1_hash(self):
         return lt.sha1_hash(self.infohash_bytes)
 
-    def ti(self):
+    def torrent_info(self):
         return lt.torrent_info(self.dict)
 
     def atp(self):
         atp = lt.add_torrent_params()
-        atp.ti = self.ti()
+        atp.ti = self.torrent_info()
         # this is necessary so that
         # atp == read_resume_data(write_resume_data(atp))
         atp.info_hash = self.sha1_hash

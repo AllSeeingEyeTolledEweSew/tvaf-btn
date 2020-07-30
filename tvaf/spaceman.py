@@ -1,5 +1,4 @@
 # pylint: skip-file
-
 """Spaceman (Space Management) code."""
 
 

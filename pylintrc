@@ -68,14 +68,12 @@ enable=
 # no Warning level messages displayed, use"--disable=all --enable=classes
 # --disable=W"
 disable=
-  locally-disabled,
   missing-module-docstring,
   missing-class-docstring,
   missing-function-docstring,
   no-absolute-import,
   old-division,
   round-builtin,
-  suppressed-message,
 
 
 [REPORTS]

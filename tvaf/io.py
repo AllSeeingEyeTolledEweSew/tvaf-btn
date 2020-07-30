@@ -185,7 +185,7 @@ class Request:
 
     def pieces(self) -> Iterable[int]:
         with self._condition:
-            return range(self._start_piece, self._stop_piece)
+            return list(range(self._start_piece, self._stop_piece))
 
     @property
     def params(self) -> RequestParams:

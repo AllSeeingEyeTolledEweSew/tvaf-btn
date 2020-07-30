@@ -72,7 +72,7 @@ class IOServiceTestCase(unittest.TestCase):
 
     def feed_pieces(self, piece_indexes=None):
         if not piece_indexes:
-            piece_indexes = range(len(tdummy.PIECES))
+            piece_indexes = list(range(len(tdummy.PIECES)))
         handle = self.wait_for_torrent()
         for i in piece_indexes:
             # NB: bug in libtorrent where add_piece accepts str but not bytes

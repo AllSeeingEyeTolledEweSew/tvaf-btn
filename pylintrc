@@ -56,6 +56,7 @@ confidence=
 # it should appear only once). See also the "--disable" option for examples.
 enable=
   string,
+  python3,
 
 # Disable the message, report, category or checker with the given id(s). You
 # can either give multiple identifiers separated by comma (,) or put this
@@ -71,6 +72,9 @@ disable=
   missing-module-docstring,
   missing-class-docstring,
   missing-function-docstring,
+  no-absolute-import,
+  old-division,
+  round-builtin,
   suppressed-message,
 
 

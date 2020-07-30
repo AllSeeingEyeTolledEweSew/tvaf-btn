@@ -245,7 +245,8 @@ class DummyDir(fs.Dir):
 class DummyFile(fs.File):
 
     def open_raw(self, mode: str = "r") -> io.IOBase:
-        return io.BytesIO(b"foo")
+        # typeshed hierarchy is broken currently, ignore spurious error
+        return io.BytesIO(b"foo")  # type: ignore
 
 
 class TestDir(unittest.TestCase):

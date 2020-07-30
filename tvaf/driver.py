@@ -114,13 +114,13 @@ class AlertDriver:
             for handler in list(self._handlers):
                 try:
                     handler(alert)
-                except Exception:  # pylint: disable=broad-except
+                except Exception:
                     _LOG.exception("while handling %s with %s", alert, handler)
 
     def run(self):
         try:
             self.run_inner()
-        except Exception:  # pylint: disable=broad-except
+        except Exception:
             _LOG.exception("fatal error")
         finally:
             _LOG.debug("shutting down")
@@ -180,7 +180,7 @@ class TickDriver:
                 try:
                     if ticker.get_tick_deadline() <= now:
                         ticker.tick(now)
-                except Exception:  # pylint: disable=broad-except
+                except Exception:
                     _LOG.exception("during tick")
 
     def get_tick_deadline(self):
@@ -191,7 +191,7 @@ class TickDriver:
                 for ticker in self._tickers:
                     try:
                         yield ticker.get_tick_deadline()
-                    except Exception:  # pylint: disable=broad-except
+                    except Exception:
                         _LOG.exception("while getting deadline")
                         yield -math.inf
 

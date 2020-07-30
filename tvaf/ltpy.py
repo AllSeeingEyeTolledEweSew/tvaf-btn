@@ -106,91 +106,76 @@ class OSError(Error, builtins.OSError):
 # From pep3151
 class BlockingIOError(OSError, builtins.BlockingIOError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class ChildProcessError(OSError, builtins.ChildProcessError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class ConnectionError(OSError, builtins.ConnectionError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class BrokenPipeError(ConnectionError, builtins.BrokenPipeError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class ConnectionAbortedError(ConnectionError, builtins.ConnectionAbortedError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class ConnectionRefusedError(ConnectionError, builtins.ConnectionRefusedError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class ConnectionResetError(ConnectionError, builtins.ConnectionResetError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class FileExistsError(OSError, builtins.FileExistsError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class FileNotFoundError(OSError, builtins.FileNotFoundError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class InterruptedError(OSError, builtins.InterruptedError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class IsADirectoryError(OSError, builtins.IsADirectoryError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class NotADirectoryError(OSError, builtins.NotADirectoryError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class PermissionError(OSError, builtins.PermissionError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class ProcessLookupError(OSError, builtins.ProcessLookupError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 
 class TimeoutError(OSError, builtins.TimeoutError):
     # pylint: disable=redefined-builtin
-    # pylint: disable=too-many-ancestors
     pass
 
 

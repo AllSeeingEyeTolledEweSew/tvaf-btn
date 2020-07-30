@@ -191,16 +191,18 @@ class _V1(fs.Dir):
         super().__init__(perms=0o444)
         self.libs = libs
 
-    def get_node(self, info_hash: str) -> Optional[fs.Node]:
+    def get_node(self, name: str) -> Optional[fs.Node]:
+        info_hash = name
         info_dict = None
-        for name, func in self.libs.get_layout_info_dict_funcs.items():
+        for func_name, func in self.libs.get_layout_info_dict_funcs.items():
             try:
                 info_dict = func(info_hash)
                 break
             except KeyError:
                 pass
             except Exception:
-                _LOG.exception("%s: get_layout_info_dict(%s)", name, info_hash)
+                _LOG.exception("%s: get_layout_info_dict(%s)", func_name,
+                               info_hash)
         if not info_dict:
             return None
         return _V1Torrent(self.libs, info_hash, protocol.Info(info_dict))

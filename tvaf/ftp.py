@@ -48,7 +48,12 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
     def fs2ftp(self, fspath: str) -> str:
         return fspath
 
-    def mkstemp(self, *args, **kwargs):
+    def mkstemp(
+            self,
+            suffix="",
+            prefix="",
+            dir=None,  # pylint: disable=redefined-builtin
+            mode="wb"):
         raise fs.mkoserror(errno.EROFS)
 
     def mkdir(self, path: str):
@@ -94,8 +99,8 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
         self.cur_dir = self._traverse_to_dir(path)
         self.cwd = str(self.cur_dir.abspath())
 
-    def open(self, path: str, mode: str) -> io.BufferedIOBase:
-        file_ = cast(fs.File, self._traverse(path))
+    def open(self, filename: str, mode: str) -> io.BufferedIOBase:
+        file_ = cast(fs.File, self._traverse(filename))
         if file_.is_dir():
             raise fs.mkoserror(errno.EISDIR)
         fp = file_.open(mode)
@@ -164,19 +169,29 @@ class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
         assert auth_service is not None
         self.auth_service = auth_service
 
-    def add_user(self, *args, **kwargs):
+    def add_user(self,
+                 username: str,
+                 password: str,
+                 homedir: str,
+                 perm: str = "elr",
+                 msg_login: str = "Login successful.",
+                 msg_quit: str = "Goodbye."):
         raise NotImplementedError
 
-    def add_anonymous(self, *args, **kwargs):
+    def add_anonymous(self, homedir: str, **kwargs):
         raise NotImplementedError
 
-    def remove_user(self, *args, **kwargs):
+    def remove_user(self, username: str):
         raise NotImplementedError
 
-    def override_perm(self, *args, **kwargs):
+    def override_perm(self,
+                      username: str,
+                      directory: str,
+                      perm: str,
+                      recursive=False):
         raise NotImplementedError
 
-    def has_user(self, *args, **kwargs):
+    def has_user(self, username: str):
         raise NotImplementedError
 
     def get_msg_login(self, username: str) -> str:

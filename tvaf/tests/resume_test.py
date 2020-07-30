@@ -33,8 +33,10 @@ def atp_comparable(atp):
 
 class InlineExecutor(concurrent.futures.Executor):
 
-    def submit(self, func, *args, **kwargs):
-        func(*args, **kwargs)
+    def submit(self, *args, **kwargs):
+        func = args[0]
+        rest = args[1:]
+        func(*rest, **kwargs)
 
 
 class BaseTest(unittest.TestCase):

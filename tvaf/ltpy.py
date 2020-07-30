@@ -202,6 +202,7 @@ class CanceledError(OSError):
 class LibtorrentError(Error):
 
     def __new__(cls, ec: lt.error_code):
+        use_cls = cls
         if ec.category() == LIBTORRENT_CATEGORY:
             use_cls = _LIBTORRENT_CODE_TO_SUBCLASS.get(ec.value(), cls)
         return RuntimeError.__new__(use_cls, ec)  # type: ignore

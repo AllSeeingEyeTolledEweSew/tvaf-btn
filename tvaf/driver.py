@@ -69,9 +69,7 @@ class AlertDriver:
 
     ABORT_CHECK_INTERVAL = 1.0
 
-    def __init__(self, *, session: Optional[lt.session] = None):
-        assert session is not None
-
+    def __init__(self, *, session: lt.session):
         self.session = session
 
         self._handlers: Set[AlertHandler] = set()

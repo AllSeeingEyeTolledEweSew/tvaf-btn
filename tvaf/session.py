@@ -34,13 +34,8 @@ def _translate_exceptions():
 
 class SessionService:
 
-    def __init__(self,
-                 *,
-                 get_required_alert_mask: Callable[[], int] = None,
-                 config: config_lib.Config = None):
-        assert get_required_alert_mask is not None
-        assert config is not None
-
+    def __init__(self, *, get_required_alert_mask: Callable[[], int],
+                 config: config_lib.Config):
         self._lock = threading.RLock()
         self.get_required_alert_mask = get_required_alert_mask
 

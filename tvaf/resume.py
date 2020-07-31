@@ -6,7 +6,6 @@ import pathlib
 import re
 import threading
 from typing import Dict
-from typing import Optional
 from typing import cast
 
 import libtorrent as lt
@@ -58,15 +57,8 @@ class ResumeService(driver_lib.Ticker):
 
     SAVE_ALL_INTERVAL = math.tan(1.5657)  # ~196
 
-    def __init__(self,
-                 *,
-                 config_dir: pathlib.Path = None,
-                 session: Optional[lt.session] = None,
-                 executor: Optional[concurrent.futures.Executor] = None):
-        assert config_dir is not None
-        assert session is not None
-        assert executor is not None
-
+    def __init__(self, *, config_dir: pathlib.Path, session: lt.session,
+                 executor: concurrent.futures.Executor):
         self.resume_data_dir = config_dir.joinpath(RESUME_DATA_DIR_NAME)
         self.session = session
         self.executor = executor

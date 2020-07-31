@@ -116,13 +116,7 @@ class Request:
             time (in seconds since epoch) that the request was deleted.
     """
 
-    def __init__(self,
-                 *,
-                 params: Optional[RequestParams] = None,
-                 torrent: Optional[_Torrent] = None):
-        assert params is not None
-        assert torrent is not None
-
+    def __init__(self, *, params: RequestParams, torrent: _Torrent):
         self._params = params
         self._time = time.time()  # uses time.time()
         self._deactivated_at: Optional[SupportsFloat] = None  # uses time.time()
@@ -274,16 +268,8 @@ class BufferedTorrentIO(io.BufferedIOBase):
     # have piece size of 1mb or 2mb; and only 1 uses bep47 padding, which
     # indicates most files in multi-file torrents are piece-misaligned.
 
-    def __init__(self,
-                 *,
-                 io_service: IOService = None,
-                 tslice: types.TorrentSlice = None,
-                 get_torrent: GetTorrent = None,
-                 user: str = None):
-        assert io_service is not None
-        assert tslice is not None
-        assert get_torrent is not None
-        assert user is not None
+    def __init__(self, *, io_service: IOService, tslice: types.TorrentSlice,
+                 get_torrent: GetTorrent, user: str):
         super().__init__()
         self._io_service = io_service
         self._tslice = tslice
@@ -541,13 +527,13 @@ class _Torrent:
 
     def __init__(self,
                  *,
-                 ios: Optional[IOService] = None,
-                 info_hash: Optional[str] = None,
-                 add_torrent_params: Optional[lt.add_torrent_params] = None):
-        assert ios is not None
-
+                 ios: IOService,
+                 info_hash: str = None,
+                 add_torrent_params: lt.add_torrent_params = None):
         if info_hash is None:
-            assert add_torrent_params is not None
+            if add_torrent_params is None:
+                raise TypeError(
+                    "one of info_hash or add_torrent_params required")
             with ltpy.translate_exceptions():
                 info_hash = str(add_torrent_params.info_hash)
 
@@ -1190,17 +1176,9 @@ class _Torrent:
 
 class IOService:
 
-    def __init__(self,
-                 *,
-                 session: lt.session = None,
-                 config: config_lib.Config = None,
-                 config_dir: pathlib.Path = None,
-                 executor: concurrent.futures.Executor = None):
-        assert session is not None
-        assert config is not None
-        assert config_dir is not None
-        assert executor is not None
-
+    def __init__(self, *, session: lt.session, config: config_lib.Config,
+                 config_dir: pathlib.Path,
+                 executor: concurrent.futures.Executor):
         self._session = session
         self.config_dir = config_dir
         self.executor = executor
@@ -1267,14 +1245,8 @@ class IOService:
 
         self._atp_settings = atp_settings
 
-    def open(self,
-             *,
-             tslice: types.TorrentSlice = None,
-             get_torrent: GetTorrent = None,
-             user: str = None) -> io.BufferedIOBase:
-        assert tslice is not None
-        assert get_torrent is not None
-        assert user is not None
+    def open(self, *, tslice: types.TorrentSlice, get_torrent: GetTorrent,
+             user: str) -> io.BufferedIOBase:
         return BufferedTorrentIO(io_service=self,
                                  tslice=tslice,
                                  get_torrent=get_torrent,

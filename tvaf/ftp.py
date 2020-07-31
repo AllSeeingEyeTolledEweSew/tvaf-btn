@@ -32,8 +32,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
 
     # pylint: disable=too-many-public-methods
 
-    def __init__(self, *args, root: fs.Dir = None, **kwargs):
-        assert root is not None
+    def __init__(self, *args, root: fs.Dir, **kwargs):
         super().__init__(*args, **kwargs)
         self.cur_dir = root
 
@@ -164,9 +163,8 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
 
 class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
 
-    def __init__(self, *, auth_service: auth.AuthService = None):
+    def __init__(self, *, auth_service: auth.AuthService):
         # pylint: disable=super-init-not-called
-        assert auth_service is not None
         self.auth_service = auth_service
 
     def add_user(self,
@@ -228,13 +226,8 @@ class _FTPHandler(pyftpdlib.handlers.FTPHandler):
     # BufferedTorrentIO expose fileno that raises io.UnsupportedOperation.
     use_sendfile = False
 
-    def __init__(self,
-                 *args,
-                 root: fs.Dir = None,
-                 auth_service: auth.AuthService = None,
+    def __init__(self, *args, root: fs.Dir, auth_service: auth.AuthService,
                  **kwargs):
-        assert root is not None
-        assert auth_service is not None
         super().__init__(*args, **kwargs)
         self.authorizer = _Authorizer(auth_service=auth_service)
         self.abstracted_fs = _partialclass(_FS, root=root)
@@ -242,15 +235,8 @@ class _FTPHandler(pyftpdlib.handlers.FTPHandler):
 
 class FTPD(config_lib.HasConfig):
 
-    def __init__(self,
-                 *,
-                 config: config_lib.Config = None,
-                 root: fs.Dir = None,
-                 auth_service: auth.AuthService = None):
-        assert auth_service is not None
-        assert root is not None
-        assert config is not None
-
+    def __init__(self, *, config: config_lib.Config, root: fs.Dir,
+                 auth_service: auth.AuthService):
         self.auth_service = auth_service
         self.root = root
 

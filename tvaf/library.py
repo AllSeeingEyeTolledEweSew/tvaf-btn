@@ -45,16 +45,8 @@ TorrentFileOpener = Callable[[types.TorrentSlice, GetTorrent], io.IOBase]
 
 class TorrentFile(fs.File):
 
-    def __init__(self,
-                 *,
-                 opener: TorrentFileOpener = None,
-                 tslice: types.TorrentSlice = None,
-                 get_torrent: GetTorrent = None,
-                 hints: Hints = None):
-        assert opener is not None
-        assert tslice is not None
-        assert get_torrent is not None
-        assert hints is not None
+    def __init__(self, *, opener: TorrentFileOpener, tslice: types.TorrentSlice,
+                 get_torrent: GetTorrent, hints: Hints):
         super().__init__(size=len(tslice), mtime=hints.get("mtime"))
         self.opener = opener
         self.tslice = tslice
@@ -109,6 +101,7 @@ class _V1TorrentAccess(fs.StaticDir):
                 _LOG.exception("%s: get_hints(%s, %s)", name, info_hash,
                                spec.index)
         hints["filename"] = spec.full_path[-1]
+        assert access.get_torrent is not None
         torrent_file = TorrentFile(opener=libs.opener,
                                    tslice=types.TorrentSlice(
                                        info_hash=info_hash,
@@ -247,8 +240,7 @@ GetHints = Callable[[str, int], Hints]
 
 class LibraryService:
 
-    def __init__(self, *, opener: TorrentFileOpener = None):
-        assert opener is not None
+    def __init__(self, *, opener: TorrentFileOpener):
         self.opener = opener
         self.root = _Root(libs=self)
         self.get_access_funcs: Dict[str, GetAccess] = {}

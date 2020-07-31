@@ -83,7 +83,7 @@ class IOServiceTestCase(unittest.TestCase):
 
         def read_and_check():
             while req.has_next():
-                chunk = req.next(timeout=0)
+                chunk = req.get_next(timeout=0)
                 if not chunk:
                     break
                 chunks.append(bytes(chunk))
@@ -156,7 +156,7 @@ class TestAddRemove(IOServiceTestCase):
 
         req = self.add_req(get_torrent=raise_dummy)
         with self.assertRaises(tvaf.io.FetchError):
-            req.next(timeout=5)
+            req.get_next(timeout=5)
         self.assertIsInstance(req.exception, tvaf.io.FetchError)
 
 
@@ -230,12 +230,12 @@ class TestRead(IOServiceTestCase):
 
         def read_and_check():
             while req1.has_next():
-                chunk = req1.next(timeout=0)
+                chunk = req1.get_next(timeout=0)
                 if not chunk:
                     break
                 chunks1.append(bytes(chunk))
             while req2.has_next():
-                chunk = req2.next(timeout=0)
+                chunk = req2.get_next(timeout=0)
                 if not chunk:
                     break
                 chunks2.append(bytes(chunk))

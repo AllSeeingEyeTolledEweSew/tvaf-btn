@@ -19,6 +19,7 @@ import threading
 import time
 from typing import Any
 from typing import Callable
+from typing import DefaultDict
 from typing import Dict
 from typing import Iterable
 from typing import List
@@ -217,7 +218,7 @@ class Request:
 
     def cancel(self, message: str = "Request cancelled"):
         self._set_exception(Cancelled(message))
-        self._torrent._sync()
+        self._torrent.sync()
 
     def _clamp(self, start: int, stop: int) -> Tuple[int, int]:
         return max(start,
@@ -281,7 +282,7 @@ class Request:
         with self._condition:
             return self._read_offset < self.params.tslice.stop
 
-    def next(self, timeout: Optional[float] = None) -> MemoryView:
+    def get_next(self, timeout: Optional[float] = None) -> MemoryView:
         assert self.params.mode == RequestMode.READ
         with self._condition:
             assert self.has_next()
@@ -432,7 +433,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
         while request.has_next():
             try:
                 # TODO: timeouts
-                chunk = request.next()
+                chunk = request.get_next()
             except OSError:  # pylint: disable=try-except-raise
                 # Do this here because ltpy.Error has some subtypes that also
                 # inherit OSError.
@@ -611,8 +612,10 @@ class _Torrent:
 
         self._piece_priorities: Dict[int, int] = dict()
         self._piece_seq: Dict[int, int] = dict()
-        self._piece_readers: Dict[int, WeakValueDictionary[
-            int, Request]] = collections.defaultdict(WeakValueDictionary)
+        # NB: WeakValueDictionary is not subscriptable as of 3.8
+        self._piece_readers = collections.defaultdict(
+            WeakValueDictionary
+        )  # type: DefaultDict[int, WeakValueDictionary[int, Request]]
         self._piece_reading: Set[int] = set()
         self._piece_have: Set[int] = set()
         self._state: lt.torrent_status.states = (
@@ -685,7 +688,7 @@ class _Torrent:
             self._torrent_info = atp.ti
             for req in self._requests:
                 self._init_req(req)
-            self._sync()
+            self.sync()
 
     def _log(self, method, msg: str, *args, **kwargs):
         msg = "%s: " + msg
@@ -734,7 +737,7 @@ class _Torrent:
             self._remove_data_requested = False
             self._requests.append(req)
             self._init_req(req)
-            self._sync()
+            self.sync()
         return req
 
     def request_removal(self, remove_data: bool = False):
@@ -893,7 +896,7 @@ class _Torrent:
             else:
                 for req in readers:
                     req._set_exception(exc)
-                self._sync()
+                self.sync()
 
     def handle_piece_finished_alert(self, alert: lt.piece_finished_alert):
         i = alert.piece_index
@@ -914,7 +917,7 @@ class _Torrent:
             for req in reqs:
                 req._on_piece_finished(i)
 
-            self._sync()
+            self.sync()
 
             if self._is_checking():
                 return
@@ -934,7 +937,7 @@ class _Torrent:
 
         with self._lock:
             self._piece_have.discard(i)
-            self._sync()
+            self.sync()
 
     def _keep(self) -> bool:
         with self._lock:
@@ -971,7 +974,7 @@ class _Torrent:
         with self._lock:
             for req in self._requests:
                 req._set_exception(exc)
-            self._sync()
+            self.sync()
 
     def _cleanup(self):
         with self._lock:
@@ -1044,14 +1047,14 @@ class _Torrent:
         with self._lock:
             self._remove_pending(_Action.PAUSE)
             self._flags |= lt.torrent_flags.paused
-            self._sync()
+            self.sync()
 
     def handle_torrent_resumed_alert(self, _: lt.torrent_resumed_alert):
         with self._lock:
             self._flags &= lt.torrent_flags.paused
-            self._sync()
+            self.sync()
 
-    def _sync(self):
+    def sync(self):
         with self._lock:
             self._cleanup()
             self._read_pieces()
@@ -1171,7 +1174,7 @@ class _Torrent:
                 self._warning("got add_torrent_alert but already have handle")
 
             self._handle = alert.handle
-            self._sync()
+            self.sync()
 
     def _maybe_remove_torrent(self):
         with self._lock:
@@ -1223,7 +1226,7 @@ class _Torrent:
                 self._time_4604_changed = time.monotonic()
             self._debug("%s -> %s", alert.prev_state, alert.state)
             self._state = alert.state
-            self._sync()
+            self.sync()
 
 
 class IOService:

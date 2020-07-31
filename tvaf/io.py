@@ -41,6 +41,7 @@ from tvaf import driver as driver_lib
 from tvaf import ltpy
 from tvaf import types
 from tvaf import util
+from tvaf import xmemoryview as xmv
 
 _LOG = logging.getLogger(__name__)
 
@@ -86,50 +87,6 @@ class RequestParams:
     def __post_init__(self):
         if len(self.tslice) == 0:
             raise ValueError("can't have a zero-length request")
-
-
-_MemoryViewTarget = Union[bytes, bytearray, memoryview]
-
-
-@dataclasses.dataclass(frozen=True)
-class MemoryView(collections.abc.ByteString):
-    # This would be memoryview, if we could access the bounds within the
-    # backing object. BufferedTorrentIO would like to reuse the underlying
-    # object as its buffer.
-    obj: _MemoryViewTarget = b""
-    start: int = 0
-    stop: int = 0
-
-    def __getitem__(self, index):
-        if isinstance(index, slice):
-            start, stop, step = index.indices(len(self))
-            if step != 1:
-                raise NotImplementedError
-            start += self.start
-            stop += self.start
-            # The "full" slice is a common case when reading
-            if (start, stop) == (self.start, self.stop):
-                return self
-            return self.__class__(obj=self.obj, start=start, stop=stop)
-        if isinstance(index, int):
-            # Not sure if I should use __index__ instead of isinstance(...,int)
-            if index >= len(self):
-                raise IndexError()
-            return self.obj[index % len(self)]
-        raise TypeError("%r should be either slice or int" % index)
-
-    def __len__(self):
-        return self.stop - self.start
-
-    def __bytes__(self) -> bytes:
-        return self.to_memoryview().tobytes()
-
-    def to_memoryview(self) -> memoryview:
-        return memoryview(self.obj)[self.start:self.stop]
-
-
-# Singleton empty MemoryView, to save a malloc
-_EMPTY = MemoryView()
 
 
 class Request:
@@ -180,7 +137,7 @@ class Request:
         self._start_piece = 0
         self._stop_piece = 0
 
-        self._chunks: Dict[int, MemoryView] = dict()
+        self._chunks: Dict[int, xmv.MemoryView] = dict()
         self._read_offset = params.tslice.start
         self._read_outstanding = len(params.tslice)
 
@@ -264,7 +221,7 @@ class Request:
     def _add_piece(self, offset: int, piece: bytes):
         assert self.params.mode == RequestMode.READ
         start, stop = self._clamp(offset, offset + len(piece))
-        chunk = MemoryView(piece, start - offset, stop - offset)
+        chunk = xmv.MemoryView(piece, start - offset, stop - offset)
         if not chunk:
             return
         with self._condition:
@@ -282,7 +239,7 @@ class Request:
         with self._condition:
             return self._read_offset < self.params.tslice.stop
 
-    def get_next(self, timeout: Optional[float] = None) -> MemoryView:
+    def get_next(self, timeout: Optional[float] = None) -> xmv.MemoryView:
         assert self.params.mode == RequestMode.READ
         with self._condition:
             assert self.has_next()
@@ -301,7 +258,7 @@ class Request:
                 chunk = self._chunks.pop(self._read_offset)
                 self._read_offset += len(chunk)
                 return chunk
-            return _EMPTY
+            return xmv.EMPTY
 
 
 ReadintoTarget = Union[bytearray, mmap.mmap, memoryview]
@@ -335,7 +292,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
 
         self._read_lock = threading.RLock()
         self._offset = 0
-        self._buffer = _EMPTY
+        self._buffer = xmv.EMPTY
 
     def seekable(self):
         return True
@@ -353,7 +310,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
 
             if offset != self._offset:
                 # TODO(AllSeeingEyeTolledEweSew): maybe update readahead logic
-                self._buffer = _EMPTY
+                self._buffer = xmv.EMPTY
                 self._offset = offset
 
             return self._offset
@@ -429,7 +386,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
                                mode=RequestMode.READ)
         request = self._io_service.add_request(params)
 
-        chunk = _EMPTY
+        chunk = xmv.EMPTY
         while request.has_next():
             try:
                 # TODO: timeouts
@@ -448,15 +405,17 @@ class BufferedTorrentIO(io.BufferedIOBase):
                 # We requested a 1-byte read. Now expand the chunk, up to the
                 # requested size.
                 stop = chunk.start + min(size, len(chunk.obj) - chunk.start)
-                chunk = MemoryView(obj=chunk.obj, start=chunk.start, stop=stop)
+                chunk = xmv.MemoryView(obj=chunk.obj,
+                                       start=chunk.start,
+                                       stop=stop)
             result.append(chunk.to_memoryview())
             self._offset += len(chunk)
             size -= len(chunk)
 
         # Save the "leftovers" from the final chunk as our buffer
-        self._buffer = MemoryView(obj=chunk.obj,
-                                  start=chunk.stop,
-                                  stop=len(chunk.obj))
+        self._buffer = xmv.MemoryView(obj=chunk.obj,
+                                      start=chunk.stop,
+                                      stop=len(chunk.obj))
 
         return result
 

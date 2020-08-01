@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import collections
 import collections.abc
-import concurrent.futures
 import dataclasses
 import enum
 import logging
@@ -14,6 +13,7 @@ import pathlib
 import random
 import threading
 import time
+from concurrent import futures
 from typing import Any
 from typing import DefaultDict
 from typing import Dict
@@ -307,7 +307,6 @@ class Request:
 
 class _Action(enum.Enum):
 
-    FETCH = "fetch"
     ADD = "add"
     REMOVE = "remove"
     PAUSE = "pause"
@@ -365,6 +364,8 @@ class _Torrent:
 
         self._handle: Optional[lt.torrent_handle] = None
         self._pending: Dict[_Action, bool] = dict()
+        # As of 3.8, Future is not subscriptable
+        self._fetch_future = None  # type: Optional[futures.Future[lt.torrent_info]]
         self._add_torrent_params: Optional[lt.add_torrent_params] = None
 
         self._torrent_info: Optional[lt.torrent_info] = None
@@ -469,8 +470,13 @@ class _Torrent:
     def _warning(self, msg: str, *args, **kwargs):
         self._log(_LOG.warning, msg, *args, **kwargs)
 
-    def _any_pending(self) -> bool:
-        return bool(self._pending)
+    def _try_cancel_pending(self) -> bool:
+        with self._lock:
+            if self._pending:
+                return False
+            if self._fetch_future is not None:
+                return self._fetch_future.cancel()
+            return True
 
     def _mark_pending(self, action: _Action):
         self._pending[action] = True
@@ -850,24 +856,28 @@ class _Torrent:
         with self._lock:
             assert self._add_torrent_params is None
 
-            if self._any_pending():
+            if not self._try_cancel_pending():
                 return
 
             self._debug("fetching torrent info")
-            self._mark_pending(_Action.FETCH)
 
             reqs = sorted(self._requests, key=_req_key)
             assert reqs
             get_torrent = reqs[0].params.get_torrent
 
-            future = self._service.executor.submit(fetch, get_torrent)
-            future.add_done_callback(self._handle_fetched_torrent_info)
+            self._fetch_future = self._service.executor.submit(
+                fetch, get_torrent)
+            self._fetch_future.add_done_callback(
+                self._handle_fetched_torrent_info)
 
-    def _handle_fetched_torrent_info(self, future: concurrent.futures.Future):
+    def _handle_fetched_torrent_info(self, future: futures.Future):
         assert future.done()
 
         with self._lock:
-            self._remove_pending(_Action.FETCH)
+            self._fetch_future = None
+
+            if future.cancelled():
+                return
 
             try:
                 torrent_info = future.result()
@@ -895,7 +905,7 @@ class _Torrent:
             assert self._add_torrent_params is not None
             assert self._handle is None
 
-            if self._any_pending():
+            if not self._try_cancel_pending():
                 return
 
             self._debug("adding torrent")
@@ -938,7 +948,7 @@ class _Torrent:
 
     def _maybe_remove_torrent(self):
         with self._lock:
-            if self._any_pending():
+            if not self._try_cancel_pending():
                 return
 
             self._debug("removing torrent")
@@ -965,7 +975,7 @@ class _Torrent:
 
     def _maybe_remove_from_parent(self):
         with self._service._lock:
-            if self._any_pending():
+            if not self._try_cancel_pending():
                 return
 
             self._debug("removing from parent")
@@ -989,8 +999,7 @@ class _Torrent:
 class RequestService:
 
     def __init__(self, *, session: lt.session, config: config_lib.Config,
-                 config_dir: pathlib.Path,
-                 executor: concurrent.futures.Executor):
+                 config_dir: pathlib.Path, executor: futures.Executor):
         self._session = session
         self.config_dir = config_dir
         self.executor = executor

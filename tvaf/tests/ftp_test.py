@@ -31,7 +31,7 @@ class BaseFTPTest(unittest.TestCase):
     def setUp(self):
         self.torrents = {t.infohash: t for t in (SINGLE, MULTI)}
 
-        def opener(tslice: types.TorrentSlice, _: library.GetTorrent):
+        def opener(tslice: types.TorrentSlice, _: types.GetTorrent):
             data = self.torrents[
                 tslice.info_hash].data[tslice.start:tslice.stop]
             raw = io.BytesIO(data)

@@ -71,7 +71,7 @@ class TestLibraryService(unittest.TestCase):
         }
 
         def opener(tslice: types.TorrentSlice,
-                   _: library.GetTorrent) -> io.BytesIO:
+                   _: types.GetTorrent) -> io.BytesIO:
             return io.BytesIO(get_placeholder_data(tslice))
 
         self.libs = library.LibraryService(opener=opener)

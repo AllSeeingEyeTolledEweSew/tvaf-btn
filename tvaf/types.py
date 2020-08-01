@@ -12,9 +12,12 @@ what you see when inserting into or selecting from the table.
 
 import collections.abc
 import dataclasses
+from typing import Callable
 from typing import Optional
 
 USER_UNKNOWN = "*unknown*"
+
+GetTorrent = Callable[[], bytes]
 
 
 @dataclasses.dataclass(frozen=True)

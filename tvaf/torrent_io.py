@@ -2,7 +2,6 @@ import errno
 import io
 import mmap
 import threading
-from typing import Callable
 from typing import List
 from typing import Sequence
 from typing import Union
@@ -11,8 +10,6 @@ from tvaf import ltpy
 from tvaf import request as request_lib
 from tvaf import types
 from tvaf import xmemoryview as xmv
-
-GetTorrent = Callable[[], bytes]
 
 ReadintoTarget = Union[bytearray, mmap.mmap, memoryview]
 
@@ -28,7 +25,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
     # indicates most files in multi-file torrents are piece-misaligned.
 
     def __init__(self, *, request_service: request_lib.RequestService,
-                 tslice: types.TorrentSlice, get_torrent: GetTorrent,
+                 tslice: types.TorrentSlice, get_torrent: types.GetTorrent,
                  user: str):
         super().__init__()
         self._request_service = request_service

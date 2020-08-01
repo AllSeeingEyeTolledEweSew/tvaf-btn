@@ -32,21 +32,19 @@ _LOG = logging.getLogger(__name__)
 
 Path = pathlib.PurePosixPath
 
-GetTorrent = Callable[[], bytes]
-
 
 class Hints(collections.UserDict):
 
     pass
 
 
-TorrentFileOpener = Callable[[types.TorrentSlice, GetTorrent], io.IOBase]
+TorrentFileOpener = Callable[[types.TorrentSlice, types.GetTorrent], io.IOBase]
 
 
 class TorrentFile(fs.File):
 
     def __init__(self, *, opener: TorrentFileOpener, tslice: types.TorrentSlice,
-                 get_torrent: GetTorrent, hints: Hints):
+                 get_torrent: types.GetTorrent, hints: Hints):
         super().__init__(size=len(tslice), mtime=hints.get("mtime"))
         self.opener = opener
         self.tslice = tslice
@@ -227,7 +225,7 @@ class Access:
 
     redirect_to: Optional[str] = None
     seeders: Optional[int] = None
-    get_torrent: Optional[GetTorrent] = None
+    get_torrent: Optional[types.GetTorrent] = None
 
     def __post_init__(self):
         assert (self.redirect_to is not None) ^ (self.get_torrent is not None)

@@ -15,7 +15,6 @@ import random
 import threading
 import time
 from typing import Any
-from typing import Callable
 from typing import DefaultDict
 from typing import Dict
 from typing import Iterable
@@ -69,13 +68,10 @@ class FetchError(Error):
     pass
 
 
-GetTorrent = Callable[[], bytes]
-
-
 @dataclasses.dataclass(frozen=True)
 class Params:
     tslice: types.TorrentSlice = types.TorrentSlice()
-    get_torrent: GetTorrent = _raise_notimplemented
+    get_torrent: types.GetTorrent = _raise_notimplemented
     acct_params: Any = None
     mode: Mode = Mode.READ
 
@@ -845,7 +841,7 @@ class _Torrent:
 
     def _maybe_async_fetch_torrent_info(self):
 
-        def fetch(get_torrent: GetTorrent):
+        def fetch(get_torrent: types.GetTorrent):
             try:
                 data = get_torrent()
             except Exception as exc:

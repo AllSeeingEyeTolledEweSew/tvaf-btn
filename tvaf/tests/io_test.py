@@ -2,14 +2,11 @@
 # accompanying UNLICENSE file.
 
 import concurrent.futures
-import io
 import logging
 import os
 import os.path
 import pathlib
-import sys
 import tempfile
-import time
 import unittest
 import unittest.mock
 
@@ -17,119 +14,12 @@ import libtorrent as lt
 
 import tvaf.io
 from tvaf import config as config_lib
-from tvaf import driver as driver_lib
-from tvaf import types
 from tvaf.io import IOService
 from tvaf.io import RequestMode
 
+from . import io_test_utils
 from . import tdummy
 from . import test_utils
-
-
-class IOServiceTestCase(unittest.TestCase):
-    """Tests for tvaf.dal.create_schema()."""
-
-    def setUp(self):
-        self.tempdir = tempfile.TemporaryDirectory()
-        self.config_dir = pathlib.Path(self.tempdir.name)
-        self.config = config_lib.Config(
-            torrent_default_save_path=str(self.config_dir))
-        self.executor = concurrent.futures.ThreadPoolExecutor()
-        self.init_session()
-
-    def init_session(self):
-        self.session = test_utils.create_isolated_session()
-        self.ios = IOService(session=self.session,
-                             config=self.config,
-                             config_dir=self.config_dir,
-                             executor=self.executor)
-
-    def tearDown(self):
-        self.tempdir.cleanup()
-        self.executor.shutdown()
-
-    def pump_alerts(self, condition, msg="condition", timeout=5):
-        condition_deadline = time.monotonic() + timeout
-        while not condition():
-            deadline = min(condition_deadline, self.ios.get_tick_deadline(),
-                           self.ios.get_post_torrent_updates_deadline())
-            timeout = max(deadline - time.monotonic(), 0.0)
-            timeout_ms = int(min(timeout * 1000, sys.maxsize))
-
-            self.session.wait_for_alert(int(timeout_ms))
-
-            for alert in self.session.pop_alerts():
-                driver_lib.log_alert(alert)
-                self.ios.handle_alert(alert)
-            now = time.monotonic()
-            self.assertLess(now, condition_deadline, msg=f"{msg} timed out")
-            if now >= self.ios.get_tick_deadline():
-                self.ios.tick()
-            if now >= self.ios.get_post_torrent_updates_deadline():
-                self.session.post_torrent_updates(
-                    self.ios.get_post_torrent_updates_flags())
-                self.ios.on_fired_post_torrent_updates()
-
-    def feed_pieces(self, piece_indexes=None):
-        if not piece_indexes:
-            piece_indexes = list(range(len(tdummy.PIECES)))
-        handle = self.wait_for_torrent()
-        for i in piece_indexes:
-            # NB: bug in libtorrent where add_piece accepts str but not bytes
-            handle.add_piece(i, tdummy.PIECES[i].decode(), 0)
-
-    def read_all(self, req, msg="read all data", timeout=5):
-        chunks = []
-
-        def read_and_check():
-            while req.has_next():
-                chunk = req.get_next(timeout=0)
-                if not chunk:
-                    break
-                chunks.append(bytes(chunk))
-            return not req.has_next()
-
-        self.pump_alerts(read_and_check, msg=msg, timeout=timeout)
-        return b"".join(chunks)
-
-    def pump_and_find_first_alert(self, condition, timeout=5):
-        deadline = time.monotonic() + timeout
-        while True:
-            alert = self.session.wait_for_alert(
-                int((deadline - time.monotonic()) * 1000))
-            if not alert:
-                assert False, "condition timed out"
-            saved = None
-            for alert in self.session.pop_alerts():
-                self.ios.handle_alert(alert)
-                if condition(alert) and saved is None:
-                    saved = alert
-            if saved is not None:
-                return saved
-
-    def add_req(self,
-                mode=RequestMode.READ,
-                infohash=tdummy.INFOHASH,
-                start=0,
-                stop=len(tdummy.DATA),
-                acct_params="tvaf",
-                get_torrent=lambda: lt.bencode(tdummy.DICT)):
-        tslice = types.TorrentSlice(info_hash=infohash, start=start, stop=stop)
-        params = tvaf.io.RequestParams(tslice=tslice,
-                                       mode=mode,
-                                       acct_params=acct_params,
-                                       get_torrent=get_torrent)
-        return self.ios.add_request(params)
-
-    def wait_for_torrent(self):
-
-        def find():
-            return self.session.find_torrent(tdummy.SHA1_HASH)
-
-        self.pump_alerts(lambda: find().is_valid(), msg="add")
-        handle = find()
-        self.assertTrue(handle.is_valid())
-        return handle
 
 
 class DummyException(Exception):
@@ -137,7 +27,7 @@ class DummyException(Exception):
     pass
 
 
-class TestAddRemove(IOServiceTestCase):
+class TestAddRemove(io_test_utils.IOServiceTestCase):
 
     def test_add_remove(self):
         req = self.add_req()
@@ -160,7 +50,7 @@ class TestAddRemove(IOServiceTestCase):
         self.assertIsInstance(req.exception, tvaf.io.FetchError)
 
 
-class TestRead(IOServiceTestCase):
+class TestRead(io_test_utils.IOServiceTestCase):
 
     def test_all(self):
         req = self.add_req()
@@ -368,7 +258,7 @@ class TestRead(IOServiceTestCase):
         self.assertIsNone(req.exception)
 
 
-class TestPriorities(IOServiceTestCase):
+class TestPriorities(io_test_utils.IOServiceTestCase):
 
     def test_priorities(self):
 
@@ -474,7 +364,7 @@ class TestPriorities(IOServiceTestCase):
         self.pump_alerts(check_prioritized, msg="prioritize")
 
 
-class TestRemoveTorrent(IOServiceTestCase):
+class TestRemoveTorrent(io_test_utils.IOServiceTestCase):
 
     def test_with_active_requests(self):
         req = self.add_req()
@@ -515,7 +405,7 @@ class TestRemoveTorrent(IOServiceTestCase):
         self.assertIsNone(req.exception)
 
 
-class TestLoad(IOServiceTestCase):
+class TestLoad(io_test_utils.IOServiceTestCase):
 
     def test_load_resume_data_and_read(self):
         # Download a torrent
@@ -588,131 +478,6 @@ class TestLoad(IOServiceTestCase):
 
         self.pump_alerts(lambda: not req.active, msg="request deactivated")
         self.assertIsNone(req.exception)
-
-
-class TestBufferedTorrentIO(IOServiceTestCase):
-
-    def open(self):
-        tslice = types.TorrentSlice(info_hash=tdummy.INFOHASH,
-                                    start=0,
-                                    stop=tdummy.LEN)
-        return self.ios.open(tslice=tslice,
-                             get_torrent=lambda: lt.bencode(tdummy.DICT),
-                             user="tvaf")
-
-    def test_read_some(self):
-        future = self.executor.submit(self.open().read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
-
-    def test_read_with_explicit_close(self):
-        fp = self.open()
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
-        fp.close()
-        self.assertTrue(fp.closed)
-
-    def test_context_manager_with_read(self):
-        with self.open() as fp:
-            future = self.executor.submit(fp.read, 1024)
-            self.feed_pieces()
-            self.pump_alerts(future.done, msg="read")
-            self.assertEqual(future.result(), tdummy.DATA[:1024])
-
-    def test_read_all(self):
-        future = self.executor.submit(self.open().read)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA)
-
-    def test_readinto(self):
-        array = bytearray(1024)
-        future = self.executor.submit(self.open().readinto, array)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="readinto")
-        self.assertEqual(future.result(), 1024)
-        self.assertEqual(array, tdummy.DATA[:1024])
-
-    def test_read1(self):
-        future = self.executor.submit(self.open().read1)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read1")
-        self.assertEqual(future.result(), tdummy.PIECES[0])
-
-    def test_readinto1(self):
-        array = bytearray(tdummy.LEN)
-        future = self.executor.submit(self.open().readinto1, array)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="readinto1")
-        self.assertEqual(future.result(), len(tdummy.PIECES[0]))
-        self.assertEqual(array[:len(tdummy.PIECES[0])], tdummy.PIECES[0])
-
-    def test_misc_methods(self):
-        fp = self.open()
-
-        self.assertTrue(fp.seekable())
-        self.assertTrue(fp.readable())
-        self.assertFalse(fp.writable())
-
-        with self.assertRaises(OSError):
-            fp.fileno()
-        with self.assertRaises(OSError):
-            fp.write(b"data")
-
-    def test_seek_and_read(self):
-        fp = self.open()
-
-        fp.seek(0, io.SEEK_END)
-        self.assertEqual(fp.tell(), tdummy.LEN)
-
-        fp.seek(1024)
-        self.assertEqual(fp.tell(), 1024)
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA[1024:2048])
-
-    def test_second_read_buffered(self):
-        fp = self.open()
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
-
-        # The data should be buffered, so we shouldn't need to pump_alerts
-        second = fp.read(1024)
-        self.assertEqual(second, tdummy.DATA[1024:2048])
-
-    def test_second_read_partial_buffer(self):
-        fp = self.open()
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="first read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
-
-        # The data should be partially buffered. We'll need to pump_alerts
-        # again.
-        future = self.executor.submit(fp.read, tdummy.PIECE_LENGTH)
-        self.pump_alerts(future.done, msg="second read")
-        self.assertEqual(future.result(),
-                         tdummy.DATA[1024:tdummy.PIECE_LENGTH + 1024])
-
-    def test_seek_resets_buffer(self):
-        fp = self.open()
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="first read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
-
-        # Seek back to the start. The buffer should reset, but reads should
-        # work as normal.
-        fp.seek(0)
-        future = self.executor.submit(fp.read, 1024)
-        self.pump_alerts(future.done, msg="second read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
 
 
 class TestConfig(unittest.TestCase):

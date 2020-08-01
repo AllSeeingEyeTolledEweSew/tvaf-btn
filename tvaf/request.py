@@ -361,7 +361,6 @@ class _Torrent:
         self._info_hash = info_hash
 
         self._requests: List[Request] = []
-        self._readers: List[Request] = []
         self._requests_tree = intervaltree.IntervalTree()
 
         self._handle: Optional[lt.torrent_handle] = None

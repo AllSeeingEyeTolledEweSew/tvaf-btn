@@ -956,12 +956,9 @@ class _Torrent:
                 # DOES block (checks handle is valid)
                 self._service._session.remove_torrent(handle, flags)
 
-    def handle_torrent_removed_alert(self, alert: lt.torrent_removed_alert):
+    def handle_torrent_removed_alert(self, _alert: lt.torrent_removed_alert):
         with self._lock:
             self._remove_pending(_Action.REMOVE)
-
-            with self._service._lock:
-                self._service._torrents_by_handle.pop(alert.handle, None)
             # This errors out any existing requests, and syncs to the next
             # step.
             self._fatal(CancelledError("Unexpectedly removed"))
@@ -1138,6 +1135,10 @@ class RequestService:
                     continue
                 torrent.handle_status_update(status)
 
+    def _handle_torrent_removed_alert(self, alert: lt.torrent_removed_alert):
+        with self._lock:
+            self._torrents_by_handle.pop(alert.handle, None)
+
     def handle_alert(self, alert: lt.alert):
         if isinstance(alert, lt.torrent_alert):
             handle = alert.handle
@@ -1153,5 +1154,5 @@ class RequestService:
                     return
                 self._torrents_by_handle[handle] = torrent
             driver_lib.dispatch(torrent, alert)
-        else:
-            driver_lib.dispatch(self, alert, prefix="_handle")
+        # Will remove torrents with torrent_removed_alert
+        driver_lib.dispatch(self, alert, prefix="_handle")

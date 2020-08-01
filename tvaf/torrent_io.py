@@ -140,7 +140,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
                 raise
             except ltpy.Error as exc:
                 raise OSError(errno.EIO, str(exc)) from exc
-            except request_lib.Cancelled as exc:
+            except request_lib.CancelledError as exc:
                 raise OSError(errno.ECANCELED, str(exc)) from exc
             except request_lib.Error as exc:
                 raise OSError(errno.EIO, str(exc)) from exc

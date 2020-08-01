@@ -58,7 +58,7 @@ class Error(Exception):
     pass
 
 
-class Cancelled(Error):
+class CancelledError(Error):
 
     pass
 
@@ -159,7 +159,7 @@ class Request:
         return self._stop_piece
 
     def cancel(self, message: str = "Request cancelled"):
-        self._set_exception(Cancelled(message))
+        self._set_exception(CancelledError(message))
         self._torrent.sync()
 
     def _clamp(self, start: int, stop: int) -> Tuple[int, int]:
@@ -504,7 +504,7 @@ class _Torrent:
         with self._lock:
             self._removal_requested = True
             self._remove_data_requested = remove_data
-            self._fatal(Cancelled("Delete requested"))
+            self._fatal(CancelledError("Delete requested"))
 
     def _update_priorities(self):
         # Libtorrent strictly downloads time-critical pieces first, in order of
@@ -965,7 +965,7 @@ class _Torrent:
                 self._service._torrents_by_handle.pop(alert.handle, None)
             # This errors out any existing requests, and syncs to the next
             # step.
-            self._fatal(Cancelled("Unexpectedly removed"))
+            self._fatal(CancelledError("Unexpectedly removed"))
 
     def _maybe_remove_from_parent(self):
         with self._service._lock:

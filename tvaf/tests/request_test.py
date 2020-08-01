@@ -35,7 +35,7 @@ class TestAddRemove(request_test_utils.RequestServiceTestCase):
                          [tdummy.INFOHASH])
         req.cancel()
         self.pump_alerts(lambda: not self.session.get_torrents(), msg="remove")
-        self.assertIsInstance(req.exception, request_lib.Cancelled)
+        self.assertIsInstance(req.exception, request_lib.CancelledError)
 
     def test_fetch_error(self):
 
@@ -367,7 +367,7 @@ class TestRemoveTorrent(request_test_utils.RequestServiceTestCase):
     def test_with_active_requests(self):
         req = self.add_req()
         self.service.remove_torrent(tdummy.INFOHASH)
-        self.assertIsInstance(req.exception, request_lib.Cancelled)
+        self.assertIsInstance(req.exception, request_lib.CancelledError)
 
     def test_keep_data(self):
         req = self.add_req()

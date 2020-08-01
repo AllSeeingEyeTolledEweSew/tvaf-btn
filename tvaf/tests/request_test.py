@@ -12,12 +12,10 @@ import unittest.mock
 
 import libtorrent as lt
 
-import tvaf.io
 from tvaf import config as config_lib
-from tvaf.io import IOService
-from tvaf.io import RequestMode
+from tvaf import request as request_lib
 
-from . import io_test_utils
+from . import request_test_utils
 from . import tdummy
 from . import test_utils
 
@@ -27,7 +25,7 @@ class DummyException(Exception):
     pass
 
 
-class TestAddRemove(io_test_utils.IOServiceTestCase):
+class TestAddRemove(request_test_utils.RequestServiceTestCase):
 
     def test_add_remove(self):
         req = self.add_req()
@@ -37,7 +35,7 @@ class TestAddRemove(io_test_utils.IOServiceTestCase):
                          [tdummy.INFOHASH])
         req.cancel()
         self.pump_alerts(lambda: not self.session.get_torrents(), msg="remove")
-        self.assertIsInstance(req.exception, tvaf.io.Cancelled)
+        self.assertIsInstance(req.exception, request_lib.Cancelled)
 
     def test_fetch_error(self):
 
@@ -45,12 +43,12 @@ class TestAddRemove(io_test_utils.IOServiceTestCase):
             raise DummyException("dummy")
 
         req = self.add_req(get_torrent=raise_dummy)
-        with self.assertRaises(tvaf.io.FetchError):
+        with self.assertRaises(request_lib.FetchError):
             req.get_next(timeout=5)
-        self.assertIsInstance(req.exception, tvaf.io.FetchError)
+        self.assertIsInstance(req.exception, request_lib.FetchError)
 
 
-class TestRead(io_test_utils.IOServiceTestCase):
+class TestRead(request_test_utils.RequestServiceTestCase):
 
     def test_all(self):
         req = self.add_req()
@@ -185,7 +183,7 @@ class TestRead(io_test_utils.IOServiceTestCase):
         with open(path, mode="w"):
             pass
         self.config["torrent_default_save_path"] = path
-        self.ios.set_config(self.config)
+        self.service.set_config(self.config)
 
         req = self.add_req()
         self.feed_pieces()
@@ -258,12 +256,12 @@ class TestRead(io_test_utils.IOServiceTestCase):
         self.assertIsNone(req.exception)
 
 
-class TestPriorities(io_test_utils.IOServiceTestCase):
+class TestPriorities(request_test_utils.RequestServiceTestCase):
 
     def test_priorities(self):
 
         def add_req(mode_name, start_piece, stop_piece):
-            self.add_req(mode=getattr(RequestMode, mode_name),
+            self.add_req(mode=getattr(request_lib.Mode, mode_name),
                          start=start_piece * tdummy.PIECE_LENGTH,
                          stop=stop_piece * tdummy.PIECE_LENGTH)
 
@@ -299,7 +297,7 @@ class TestPriorities(io_test_utils.IOServiceTestCase):
             set(dict(enumerate(handle.get_piece_priorities())).items()))
         # libtorrent doesn't expose piece deadlines, so whitebox test here
         # pylint: disable=protected-access
-        torrent = self.ios._torrents[tdummy.INFOHASH]
+        torrent = self.service._torrents[tdummy.INFOHASH]
         # pylint: disable=protected-access
         self.assertEqual(torrent._piece_seq, {
             1: 2,
@@ -317,7 +315,7 @@ class TestPriorities(io_test_utils.IOServiceTestCase):
     def test_with_have_pieces(self):
 
         def add_req(mode_name, start_piece, stop_piece):
-            self.add_req(mode=getattr(RequestMode, mode_name),
+            self.add_req(mode=getattr(request_lib.Mode, mode_name),
                          start=start_piece * tdummy.PIECE_LENGTH,
                          stop=stop_piece * tdummy.PIECE_LENGTH)
 
@@ -348,7 +346,7 @@ class TestPriorities(io_test_utils.IOServiceTestCase):
                 return False
             # libtorrent doesn't expose piece deadlines, so whitebox test here
             # pylint: disable=protected-access
-            torrent = self.ios._torrents[tdummy.INFOHASH]
+            torrent = self.service._torrents[tdummy.INFOHASH]
             # pylint: disable=protected-access
             if torrent._piece_seq != {2: 1, 4: 0, 6: 1, 8: 0}:
                 # pylint: disable=protected-access
@@ -364,12 +362,12 @@ class TestPriorities(io_test_utils.IOServiceTestCase):
         self.pump_alerts(check_prioritized, msg="prioritize")
 
 
-class TestRemoveTorrent(io_test_utils.IOServiceTestCase):
+class TestRemoveTorrent(request_test_utils.RequestServiceTestCase):
 
     def test_with_active_requests(self):
         req = self.add_req()
-        self.ios.remove_torrent(tdummy.INFOHASH)
-        self.assertIsInstance(req.exception, tvaf.io.Cancelled)
+        self.service.remove_torrent(tdummy.INFOHASH)
+        self.assertIsInstance(req.exception, request_lib.Cancelled)
 
     def test_keep_data(self):
         req = self.add_req()
@@ -380,7 +378,7 @@ class TestRemoveTorrent(io_test_utils.IOServiceTestCase):
         self.pump_alerts(lambda: not req.active, msg="deactivate")
         self.assertIsNone(req.exception)
 
-        self.ios.remove_torrent(tdummy.INFOHASH, remove_data=False)
+        self.service.remove_torrent(tdummy.INFOHASH, remove_data=False)
 
         self.pump_alerts(lambda: not self.session.get_torrents(), msg="remove")
 
@@ -396,7 +394,7 @@ class TestRemoveTorrent(io_test_utils.IOServiceTestCase):
         self.pump_alerts(lambda: not req.active, msg="deactivate")
         self.assertIsNone(req.exception)
 
-        self.ios.remove_torrent(tdummy.INFOHASH, remove_data=True)
+        self.service.remove_torrent(tdummy.INFOHASH, remove_data=True)
 
         def removed():
             return os.listdir(self.tempdir.name) == []
@@ -405,7 +403,7 @@ class TestRemoveTorrent(io_test_utils.IOServiceTestCase):
         self.assertIsNone(req.exception)
 
 
-class TestLoad(io_test_utils.IOServiceTestCase):
+class TestLoad(request_test_utils.RequestServiceTestCase):
 
     def test_load_resume_data_and_read(self):
         # Download a torrent
@@ -424,7 +422,7 @@ class TestLoad(io_test_utils.IOServiceTestCase):
         # Start a new session and load the resume data
         self.init_session()
         atp = lt.read_resume_data(lt.bencode(resume_data))
-        self.ios.add_torrent(atp)
+        self.service.add_torrent(atp)
 
         # A request should complete as normal
         req = self.add_req()
@@ -456,7 +454,7 @@ class TestLoad(io_test_utils.IOServiceTestCase):
         # Open a new session, and load the torrent with resume data
         self.init_session()
         atp = lt.read_resume_data(lt.bencode(resume_data))
-        self.ios.add_torrent(atp)
+        self.service.add_torrent(atp)
         req = self.add_req()
 
         # The torrent should find the files corrupted and try to download
@@ -488,10 +486,10 @@ class TestConfig(unittest.TestCase):
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.config = config_lib.Config()
         self.session = test_utils.create_isolated_session()
-        self.ios = IOService(session=self.session,
-                             config=self.config,
-                             config_dir=self.config_dir,
-                             executor=self.executor)
+        self.service = request_lib.RequestService(session=self.session,
+                                                  config=self.config,
+                                                  config_dir=self.config_dir,
+                                                  executor=self.executor)
 
     def tearDown(self):
         self.tempdir.cleanup()
@@ -502,17 +500,18 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(self.config,
                          config_lib.Config(torrent_default_save_path=save_path))
 
-        self.assertEqual(self.ios.get_atp_settings(), dict(save_path=save_path))
+        self.assertEqual(self.service.get_atp_settings(),
+                         dict(save_path=save_path))
 
     def test_set_config(self):
         # Set all non-default configs
         self.config["torrent_default_save_path"] = self.tempdir.name
         self.config["torrent_default_flags_apply_ip_filter"] = False
         self.config["torrent_default_storage_mode"] = "allocate"
-        self.ios.set_config(self.config)
+        self.service.set_config(self.config)
 
         self.assertEqual(
-            self.ios.get_atp_settings(),
+            self.service.get_atp_settings(),
             dict(save_path=self.tempdir.name,
                  flags=lt.torrent_flags.default_flags &
                  ~lt.torrent_flags.apply_ip_filter,
@@ -521,10 +520,10 @@ class TestConfig(unittest.TestCase):
         # Set some default configs
         self.config["torrent_default_flags_apply_ip_filter"] = True
         self.config["torrent_default_storage_mode"] = "sparse"
-        self.ios.set_config(self.config)
+        self.service.set_config(self.config)
 
         self.assertEqual(
-            self.ios.get_atp_settings(),
+            self.service.get_atp_settings(),
             dict(save_path=self.tempdir.name,
                  flags=lt.torrent_flags.default_flags |
                  lt.torrent_flags.apply_ip_filter,
@@ -536,14 +535,14 @@ class TestConfig(unittest.TestCase):
 
         self.config["torrent_default_save_path"] = str(bad_link)
         with self.assertRaises(config_lib.InvalidConfigError):
-            self.ios.set_config(self.config)
+            self.service.set_config(self.config)
 
     def test_flags_apply_ip_filter_null(self):
         self.config["torrent_default_flags_apply_ip_filter"] = None
         with self.assertRaises(config_lib.InvalidConfigError):
-            self.ios.set_config(self.config)
+            self.service.set_config(self.config)
 
     def test_storage_mode_invalid(self):
         self.config["torrent_default_storage_mode"] = "invalid"
         with self.assertRaises(config_lib.InvalidConfigError):
-            self.ios.set_config(self.config)
+            self.service.set_config(self.config)

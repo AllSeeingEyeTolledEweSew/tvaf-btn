@@ -43,7 +43,7 @@ _LOG = logging.getLogger(__name__)
 DEFAULT_DOWNLOAD_DIR_NAME = "downloads"
 
 
-class RequestMode(enum.Enum):
+class Mode(enum.Enum):
 
     READ = "read"
     READAHEAD = "readahead"
@@ -73,11 +73,11 @@ GetTorrent = Callable[[], bytes]
 
 
 @dataclasses.dataclass(frozen=True)
-class RequestParams:
+class Params:
     tslice: types.TorrentSlice = types.TorrentSlice()
     get_torrent: GetTorrent = _raise_notimplemented
     acct_params: Any = None
-    mode: RequestMode = RequestMode.READ
+    mode: Mode = Mode.READ
 
     def __post_init__(self):
         if len(self.tslice) == 0:
@@ -111,7 +111,7 @@ class Request:
             time (in seconds since epoch) that the request was deleted.
     """
 
-    def __init__(self, *, params: RequestParams, torrent: _Torrent):
+    def __init__(self, *, params: Params, torrent: _Torrent):
         self._params = params
         self._time = time.time()  # uses time.time()
         self._deactivated_at: Optional[SupportsFloat] = None  # uses time.time()
@@ -135,7 +135,7 @@ class Request:
             return list(range(self._start_piece, self._stop_piece))
 
     @property
-    def params(self) -> RequestParams:
+    def params(self) -> Params:
         return self._params
 
     @property
@@ -208,7 +208,7 @@ class Request:
             self._condition.notify_all()
 
     def _add_piece(self, offset: int, piece: bytes):
-        assert self.params.mode == RequestMode.READ
+        assert self.params.mode == Mode.READ
         start, stop = self._clamp(offset, offset + len(piece))
         chunk = xmv.MemoryView(piece, start - offset, stop - offset)
         if not chunk:
@@ -224,12 +224,12 @@ class Request:
             self._read_outstanding -= stop - start
 
     def has_next(self) -> bool:
-        assert self.params.mode == RequestMode.READ
+        assert self.params.mode == Mode.READ
         with self._condition:
             return self._read_offset < self.params.tslice.stop
 
     def get_next(self, timeout: Optional[float] = None) -> xmv.MemoryView:
-        assert self.params.mode == RequestMode.READ
+        assert self.params.mode == Mode.READ
         with self._condition:
             assert self.has_next()
 
@@ -318,9 +318,9 @@ class _Action(enum.Enum):
 
 
 def _req_key(req: Request):
-    return (req.deactivated_at is not None, req.params.mode != RequestMode.READ,
-            req.params.mode != RequestMode.READAHEAD,
-            req.params.mode != RequestMode.FILL, random.random())
+    return (req.deactivated_at is not None, req.params.mode != Mode.READ,
+            req.params.mode != Mode.READAHEAD, req.params.mode != Mode.FILL,
+            random.random())
 
 
 # pylint: disable=invalid-name
@@ -346,7 +346,7 @@ class _Torrent:
 
     def __init__(self,
                  *,
-                 ios: IOService,
+                 service: RequestService,
                  info_hash: str = None,
                  add_torrent_params: lt.add_torrent_params = None):
         if info_hash is None:
@@ -356,12 +356,12 @@ class _Torrent:
             with ltpy.translate_exceptions():
                 info_hash = str(add_torrent_params.info_hash)
 
-        self._ios = ios
+        self._service = service
         # One lock for both top-level and per-torrent operations. I have not
         # yet implemented a proper locking protocol between IOService and
         # _Torrent. I intend to move to gevent instead of firming up a locking
         # protocol.
-        self._lock: threading.RLock = ios._lock
+        self._lock: threading.RLock = service._lock
         self._info_hash = info_hash
 
         self._requests: List[Request] = []
@@ -491,10 +491,10 @@ class _Torrent:
             for i in req.pieces():
                 if i in self._piece_have:
                     req._on_piece_finished(i)
-                if req.params.mode == RequestMode.READ:
+                if req.params.mode == Mode.READ:
                     self._piece_readers[i][id(req)] = req
 
-    def add_request(self, params: RequestParams) -> Request:
+    def add_request(self, params: Params) -> Request:
         req = Request(params=params, torrent=self)
         with self._lock:
             self._removal_requested = False
@@ -541,7 +541,7 @@ class _Torrent:
             }
 
             for req in self._requests:
-                if req.params.mode != RequestMode.FILL:
+                if req.params.mode != Mode.FILL:
                     continue
                 for i in req.pieces():
                     if i in self._piece_have:
@@ -550,7 +550,7 @@ class _Torrent:
 
             base_readahead_seq = 0
             for req in self._requests:
-                if req.params.mode != RequestMode.READ:
+                if req.params.mode != Mode.READ:
                     continue
                 seq = 0
                 for i in req.pieces():
@@ -563,7 +563,7 @@ class _Torrent:
                     seq += 1
 
             for req in self._requests:
-                if req.params.mode != RequestMode.READAHEAD:
+                if req.params.mode != Mode.READAHEAD:
                     continue
                 seq = 0
                 for i in req.pieces():
@@ -836,7 +836,7 @@ class _Torrent:
                 else:
                     self._maybe_remove_from_parent()
 
-    def _get_preferred_params(self) -> Optional[RequestParams]:
+    def _get_preferred_params(self) -> Optional[Params]:
         with self._lock:
             reqs = sorted(self._requests, key=_req_key)
             if reqs:
@@ -865,7 +865,7 @@ class _Torrent:
             assert reqs
             get_torrent = reqs[0].params.get_torrent
 
-            future = self._ios.executor.submit(fetch, get_torrent)
+            future = self._service.executor.submit(fetch, get_torrent)
             future.add_done_callback(self._handle_fetched_torrent_info)
 
     def _handle_fetched_torrent_info(self, future: concurrent.futures.Future):
@@ -888,7 +888,7 @@ class _Torrent:
             atp = lt.add_torrent_params()
 
             # NB: async_add_torrent may do disk io to normalize save_path
-            for key, value in self._ios.get_atp_settings().items():
+            for key, value in self._service.get_atp_settings().items():
                 setattr(atp, key, value)
 
             atp.ti = torrent_info
@@ -908,7 +908,8 @@ class _Torrent:
 
             with ltpy.translate_exceptions():
                 # DOES block (may do disk io to normalize path)
-                self._ios._session.async_add_torrent(self._add_torrent_params)
+                self._service._session.async_add_torrent(
+                    self._add_torrent_params)
 
     def handle_add_torrent_alert(self, alert: lt.add_torrent_alert):
         exc = ltpy.exception_from_alert(alert)
@@ -958,25 +959,25 @@ class _Torrent:
             self._add_torrent_params = None
             with ltpy.translate_exceptions():
                 # DOES block (checks handle is valid)
-                self._ios._session.remove_torrent(handle, flags)
+                self._service._session.remove_torrent(handle, flags)
 
     def handle_torrent_removed_alert(self, alert: lt.torrent_removed_alert):
         with self._lock:
             self._remove_pending(_Action.REMOVE)
 
-            with self._ios._lock:
-                self._ios._torrents_by_handle.pop(alert.handle, None)
+            with self._service._lock:
+                self._service._torrents_by_handle.pop(alert.handle, None)
             # This errors out any existing requests, and syncs to the next
             # step.
             self._fatal(Cancelled("Unexpectedly removed"))
 
     def _maybe_remove_from_parent(self):
-        with self._ios._lock:
+        with self._service._lock:
             if self._any_pending():
                 return
 
             self._debug("removing from parent")
-            del self._ios._torrents[self._info_hash]
+            del self._service._torrents[self._info_hash]
 
     def handle_torrent_error_alert(self, alert: lt.torrent_error_alert):
         with self._lock:
@@ -993,7 +994,7 @@ class _Torrent:
             self.sync()
 
 
-class IOService:
+class RequestService:
 
     def __init__(self, *, session: lt.session, config: config_lib.Config,
                  config_dir: pathlib.Path,
@@ -1099,11 +1100,12 @@ class IOService:
             for torrent in self._torrents.values():
                 torrent.tick()
 
-    def add_request(self, params: RequestParams) -> Request:
+    def add_request(self, params: Params) -> Request:
         with self._lock:
             torrent = self._torrents.get(params.tslice.info_hash)
             if not torrent:
-                torrent = _Torrent(ios=self, info_hash=params.tslice.info_hash)
+                torrent = _Torrent(service=self,
+                                   info_hash=params.tslice.info_hash)
                 self._torrents[params.tslice.info_hash] = torrent
             return torrent.add_request(params)
 
@@ -1113,7 +1115,7 @@ class IOService:
                 info_hash = str(atp.info_hash)
             if info_hash in self._torrents:
                 raise KeyError(info_hash)
-            self._torrents[info_hash] = _Torrent(ios=self,
+            self._torrents[info_hash] = _Torrent(service=self,
                                                  add_torrent_params=atp)
 
     def remove_torrent(self, info_hash: str, remove_data: bool = False):

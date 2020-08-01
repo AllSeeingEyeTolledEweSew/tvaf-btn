@@ -7,8 +7,8 @@ from typing import List
 from typing import Sequence
 from typing import Union
 
-from tvaf import io as io_lib
 from tvaf import ltpy
+from tvaf import request as request_lib
 from tvaf import types
 from tvaf import xmemoryview as xmv
 
@@ -27,11 +27,11 @@ class BufferedTorrentIO(io.BufferedIOBase):
     # have piece size of 1mb or 2mb; and only 1 uses bep47 padding, which
     # indicates most files in multi-file torrents are piece-misaligned.
 
-    def __init__(self, *, io_service: io_lib.IOService,
+    def __init__(self, *, request_service: request_lib.RequestService,
                  tslice: types.TorrentSlice, get_torrent: GetTorrent,
                  user: str):
         super().__init__()
-        self._io_service = io_service
+        self._request_service = request_service
         self._tslice = tslice
         self._get_torrent = get_torrent
         self._user = user
@@ -126,11 +126,11 @@ class BufferedTorrentIO(io.BufferedIOBase):
         tslice = types.TorrentSlice(info_hash=self._tslice.info_hash,
                                     start=self._offset,
                                     stop=stop)
-        params = io_lib.RequestParams(tslice=tslice,
-                                      get_torrent=self._get_torrent,
-                                      acct_params=self._user,
-                                      mode=io_lib.RequestMode.READ)
-        request = self._io_service.add_request(params)
+        params = request_lib.Params(tslice=tslice,
+                                    get_torrent=self._get_torrent,
+                                    acct_params=self._user,
+                                    mode=request_lib.Mode.READ)
+        request = self._request_service.add_request(params)
 
         chunk = xmv.EMPTY
         while request.has_next():
@@ -143,9 +143,9 @@ class BufferedTorrentIO(io.BufferedIOBase):
                 raise
             except ltpy.Error as exc:
                 raise OSError(errno.EIO, str(exc)) from exc
-            except io_lib.Cancelled as exc:
+            except request_lib.Cancelled as exc:
                 raise OSError(errno.ECANCELED, str(exc)) from exc
-            except io_lib.Error as exc:
+            except request_lib.Error as exc:
                 raise OSError(errno.EIO, str(exc)) from exc
             if read1:
                 # We requested a 1-byte read. Now expand the chunk, up to the

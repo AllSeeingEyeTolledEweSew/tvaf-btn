@@ -5,18 +5,18 @@ import libtorrent as lt
 from tvaf import torrent_io
 from tvaf import types
 
-from . import io_test_utils
+from . import request_test_utils
 from . import tdummy
 
 
-class TestBufferedTorrentIO(io_test_utils.IOServiceTestCase):
+class TestBufferedTorrentIO(request_test_utils.RequestServiceTestCase):
 
     def open(self):
         tslice = types.TorrentSlice(info_hash=tdummy.INFOHASH,
                                     start=0,
                                     stop=tdummy.LEN)
         return torrent_io.BufferedTorrentIO(
-            io_service=self.ios,
+            request_service=self.service,
             tslice=tslice,
             get_torrent=lambda: lt.bencode(tdummy.DICT),
             user="tvaf")

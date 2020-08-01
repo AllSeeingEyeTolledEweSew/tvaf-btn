@@ -9,14 +9,14 @@ import libtorrent as lt
 
 from tvaf import config as config_lib
 from tvaf import driver as driver_lib
-from tvaf import io as io_lib
+from tvaf import request as request_lib
 from tvaf import types
 
 from . import tdummy
 from . import test_utils
 
 
-class IOServiceTestCase(unittest.TestCase):
+class RequestServiceTestCase(unittest.TestCase):
     """Tests for tvaf.dal.create_schema()."""
 
     def setUp(self):
@@ -29,10 +29,10 @@ class IOServiceTestCase(unittest.TestCase):
 
     def init_session(self):
         self.session = test_utils.create_isolated_session()
-        self.ios = io_lib.IOService(session=self.session,
-                                    config=self.config,
-                                    config_dir=self.config_dir,
-                                    executor=self.executor)
+        self.service = request_lib.RequestService(session=self.session,
+                                                  config=self.config,
+                                                  config_dir=self.config_dir,
+                                                  executor=self.executor)
 
     def tearDown(self):
         self.tempdir.cleanup()
@@ -41,8 +41,8 @@ class IOServiceTestCase(unittest.TestCase):
     def pump_alerts(self, condition, msg="condition", timeout=5):
         condition_deadline = time.monotonic() + timeout
         while not condition():
-            deadline = min(condition_deadline, self.ios.get_tick_deadline(),
-                           self.ios.get_post_torrent_updates_deadline())
+            deadline = min(condition_deadline, self.service.get_tick_deadline(),
+                           self.service.get_post_torrent_updates_deadline())
             timeout = max(deadline - time.monotonic(), 0.0)
             timeout_ms = int(min(timeout * 1000, sys.maxsize))
 
@@ -50,15 +50,15 @@ class IOServiceTestCase(unittest.TestCase):
 
             for alert in self.session.pop_alerts():
                 driver_lib.log_alert(alert)
-                self.ios.handle_alert(alert)
+                self.service.handle_alert(alert)
             now = time.monotonic()
             self.assertLess(now, condition_deadline, msg=f"{msg} timed out")
-            if now >= self.ios.get_tick_deadline():
-                self.ios.tick()
-            if now >= self.ios.get_post_torrent_updates_deadline():
+            if now >= self.service.get_tick_deadline():
+                self.service.tick()
+            if now >= self.service.get_post_torrent_updates_deadline():
                 self.session.post_torrent_updates(
-                    self.ios.get_post_torrent_updates_flags())
-                self.ios.on_fired_post_torrent_updates()
+                    self.service.get_post_torrent_updates_flags())
+                self.service.on_fired_post_torrent_updates()
 
     def feed_pieces(self, piece_indexes=None):
         if not piece_indexes:
@@ -91,25 +91,25 @@ class IOServiceTestCase(unittest.TestCase):
                 assert False, "condition timed out"
             saved = None
             for alert in self.session.pop_alerts():
-                self.ios.handle_alert(alert)
+                self.service.handle_alert(alert)
                 if condition(alert) and saved is None:
                     saved = alert
             if saved is not None:
                 return saved
 
     def add_req(self,
-                mode=io_lib.RequestMode.READ,
+                mode=request_lib.Mode.READ,
                 infohash=tdummy.INFOHASH,
                 start=0,
                 stop=len(tdummy.DATA),
                 acct_params="tvaf",
                 get_torrent=lambda: lt.bencode(tdummy.DICT)):
         tslice = types.TorrentSlice(info_hash=infohash, start=start, stop=stop)
-        params = io_lib.RequestParams(tslice=tslice,
-                                      mode=mode,
-                                      acct_params=acct_params,
-                                      get_torrent=get_torrent)
-        return self.ios.add_request(params)
+        params = request_lib.Params(tslice=tslice,
+                                    mode=mode,
+                                    acct_params=acct_params,
+                                    get_torrent=get_torrent)
+        return self.service.add_request(params)
 
     def wait_for_torrent(self):
 

@@ -72,7 +72,7 @@ class FetchError(Error):
 class Params:
     tslice: types.TorrentSlice = types.TorrentSlice()
     get_torrent: types.GetTorrent = _raise_notimplemented
-    acct_params: Any = None
+    user: str = ""
     mode: Mode = Mode.READ
 
     def __post_init__(self):
@@ -686,11 +686,11 @@ class _Torrent:
 
             reqs = sorted(reqs, key=_req_key)
             if reqs:
-                params = reqs[0].params.acct_params
+                user = reqs[0].params.user
             else:
-                params = None
+                user = None
 
-            self._debug("acct(%d, %s)", piece_size, params)
+            self._debug("acct(%d, %s)", piece_size, user)
 
     def handle_hash_failed_alert(self, alert: lt.hash_failed_alert):
         i = alert.piece_index

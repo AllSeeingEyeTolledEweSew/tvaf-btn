@@ -102,12 +102,12 @@ class RequestServiceTestCase(unittest.TestCase):
                 infohash=tdummy.INFOHASH,
                 start=0,
                 stop=len(tdummy.DATA),
-                acct_params="tvaf",
+                user="tvaf",
                 get_torrent=lambda: lt.bencode(tdummy.DICT)):
         tslice = types.TorrentSlice(info_hash=infohash, start=start, stop=stop)
         params = request_lib.Params(tslice=tslice,
                                     mode=mode,
-                                    acct_params=acct_params,
+                                    user=user,
                                     get_torrent=get_torrent)
         return self.service.add_request(params)
 

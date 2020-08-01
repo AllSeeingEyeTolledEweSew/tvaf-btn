@@ -125,7 +125,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
                                     stop=stop)
         params = request_lib.Params(tslice=tslice,
                                     get_torrent=self._get_torrent,
-                                    acct_params=self._user,
+                                    user=self._user,
                                     mode=request_lib.Mode.READ)
         request = self._request_service.add_request(params)
 

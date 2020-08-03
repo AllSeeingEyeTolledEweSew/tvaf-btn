@@ -1058,11 +1058,11 @@ class RequestService:
         maybe_name = config.get_str("torrent_default_storage_mode")
         if maybe_name is not None:
             full_name = f"storage_mode_{maybe_name}"
-            value = lt.storage_mode_t.names.get(full_name)
-            if value is None:
+            mode = lt.storage_mode_t.names.get(full_name)
+            if mode is None:
                 raise config_lib.InvalidConfigError(
                     f"invalid storage mode {maybe_name}")
-            atp_settings["storage_mode"] = value
+            atp_settings["storage_mode"] = mode
 
         self._atp_settings = atp_settings
 

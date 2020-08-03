@@ -66,15 +66,10 @@ class TorrentStatusSerializer:
          "last_seen_complete", "queue_position", "need_save_resume",
          "moving_storage", "announcing_to_trackers", "announcing_to_lsd",
          "announcing_to_dht", "flags"))
-    _FIELD_SERIALIZERS = {
-        "pieces": serialize_bit_list,
-        "verified_pieces": serialize_bit_list,
-        "errc": serialize_error_code,
-    }
 
-    FIELDS = (_SIMPLE_FIELDS | frozenset(_FIELD_SERIALIZERS.keys()) |
-              frozenset(_FLAG_FIELDS.keys()) | frozenset(
-                  ("info_hashes", "state", "storage_mode")))
+    FIELDS = (_SIMPLE_FIELDS | frozenset(_FLAG_FIELDS.keys()) | frozenset(
+        ("pieces", "verified_pieces", "errc", "info_hashes", "state",
+         "storage_mode")))
 
     def __init__(self, fields: Collection[str] = None):
         if fields is None:
@@ -83,7 +78,6 @@ class TorrentStatusSerializer:
 
     def serialize(self, status: lt.torrent_status) -> Mapping[str, Any]:
         simple_fields = self._SIMPLE_FIELDS
-        field_serializers = self._FIELD_SERIALIZERS
         flag_fields = _FLAG_FIELDS
 
         result: Dict[str, Any] = {}
@@ -91,8 +85,10 @@ class TorrentStatusSerializer:
         for field in self.fields:
             if field in simple_fields:
                 result[field] = getattr(status, field)
-            elif field in field_serializers:
-                result[field] = field_serializers[field](getattr(status, field))
+            elif field in ("pieces", "verified_pieces"):
+                result[field] = serialize_bit_list(getattr(status, field))
+            elif field == "errc":
+                result[field] = serialize_error_code(status.errc)
             elif field == "info_hashes":
                 result[field] = dict(v1=str(status.info_hash))
             elif field == "state":

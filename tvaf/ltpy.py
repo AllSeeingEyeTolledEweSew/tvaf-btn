@@ -240,9 +240,12 @@ _CATEGORY_NAME_TO_SUBCLASS = {
 }
 
 _LIBTORRENT_CODE_TO_SUBCLASS = {
-    LibtorrentErrorValue.DUPLICATE_TORRENT: DuplicateTorrentError,
-    LibtorrentErrorValue.INVALID_TORRENT_HANDLE: InvalidTorrentHandleError,
-    LibtorrentErrorValue.INVALID_SESSION_HANDLE: InvalidSessionHandleError,
+    LibtorrentErrorValue.DUPLICATE_TORRENT.value:
+        DuplicateTorrentError,
+    LibtorrentErrorValue.INVALID_TORRENT_HANDLE.value:
+        InvalidTorrentHandleError,
+    LibtorrentErrorValue.INVALID_SESSION_HANDLE.value:
+        InvalidSessionHandleError,
 }
 
 _ERRNO_TO_OSERROR = {

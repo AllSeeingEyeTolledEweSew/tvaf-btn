@@ -6,7 +6,6 @@ import pathlib
 import re
 import threading
 from typing import Dict
-from typing import cast
 
 import libtorrent as lt
 
@@ -178,7 +177,7 @@ class ResumeService(driver_lib.Ticker):
 
     @staticmethod
     def get_alert_mask() -> int:
-        return cast(int, lt.alert_category.status | lt.alert_category.storage)
+        return lt.alert_category.status | lt.alert_category.storage
 
     def handle_save_resume_data_alert(self, alert: lt.save_resume_data_alert):
         with ltpy.translate_exceptions():

@@ -8,6 +8,8 @@ from typing import Sequence
 
 import libtorrent as lt
 
+from tvaf import ltpy
+
 
 def serialize_error_code(ec: lt.error_code) -> Mapping[str, Any]:
     return dict(category=ec.category().name(),
@@ -76,7 +78,7 @@ class TorrentStatusSerializer:
             fields = self.FIELDS
         self.fields = fields
 
-    def serialize(self, status: lt.torrent_status) -> Mapping[str, Any]:
+    def _serialize_inner(self, status: lt.torrent_status) -> Mapping[str, Any]:
         simple_fields = self._SIMPLE_FIELDS
         flag_fields = _FLAG_FIELDS
 
@@ -101,6 +103,10 @@ class TorrentStatusSerializer:
             # finished_duration, seeding_duration
 
         return result
+
+    def serialize(self, status: lt.torrent_status) -> Mapping[str, Any]:
+        with ltpy.translate_exceptions():
+            return self._serialize_inner(status)
 
 
 def _serialize_file_list(
@@ -151,7 +157,7 @@ class TorrentInfoSerializer:
             fields = self.FIELDS
         self.fields = fields
 
-    def serialize(self, info: lt.torrent_info) -> Mapping[str, Any]:
+    def _serialize_inner(self, info: lt.torrent_info) -> Mapping[str, Any]:
         simple_callable_fields = self._SIMPLE_CALLABLE_FIELDS
 
         result: Dict[str, Any] = {}
@@ -176,6 +182,10 @@ class TorrentInfoSerializer:
 
         return result
 
+    def serialize(self, info: lt.torrent_info) -> Mapping[str, Any]:
+        with ltpy.translate_exceptions():
+            return self._serialize_inner(info)
+
 
 class TorrentHandleSerializer:
 
@@ -193,7 +203,7 @@ class TorrentHandleSerializer:
             fields = self.FIELDS
         self.fields = fields
 
-    def serialize(self, handle: lt.torrent_handle) -> Mapping[str, Any]:
+    def _serialize_inner(self, handle: lt.torrent_handle) -> Mapping[str, Any]:
         result: Dict[str, Any] = {}
         simple_callable_fields = self._SIMPLE_CALLABLE_FIELDS
         flag_fields = _FLAG_FIELDS
@@ -214,6 +224,10 @@ class TorrentHandleSerializer:
                 result[field] = bool(handle.flags() & flag_fields[field])
 
         return result
+
+    def serialize(self, handle: lt.torrent_handle) -> Mapping[str, Any]:
+        with ltpy.translate_exceptions():
+            return self._serialize_inner(handle)
 
 
 _TORRENT_FIELD_TO_QUERY_FLAG = {

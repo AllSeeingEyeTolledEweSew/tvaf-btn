@@ -70,7 +70,7 @@ class TorrentStatusSerializer:
          "announcing_to_dht", "flags"))
 
     FIELDS = (_SIMPLE_FIELDS | frozenset(_FLAG_FIELDS.keys()) | frozenset(
-        ("pieces", "verified_pieces", "errc", "info_hashes", "state",
+        ("pieces", "verified_pieces", "errc", "info_hash", "state",
          "storage_mode")))
 
     def __init__(self, fields: Collection[str] = None):
@@ -91,7 +91,7 @@ class TorrentStatusSerializer:
                 result[field] = serialize_bit_list(getattr(status, field))
             elif field == "errc":
                 result[field] = serialize_error_code(status.errc)
-            elif field == "info_hashes":
+            elif field == "info_hash":
                 result[field] = dict(v1=str(status.info_hash))
             elif field == "state":
                 result[field] = status.state.name
@@ -122,7 +122,7 @@ def _serialize_file_list(
         # TODO: mtime() not mapped on python bindings
         info_hash = storage.hash(i)
         if not info_hash.is_all_zeros():
-            file_entry["info_hashes"] = dict(v1=str(info_hash))
+            file_entry["info_hash"] = dict(v1=str(info_hash))
         flags = storage.file_flags(i)
         attr = ""
         storage_cls = lt.file_storage
@@ -150,7 +150,7 @@ class TorrentInfoSerializer:
 
     FIELDS = _SIMPLE_CALLABLE_FIELDS | frozenset(
         ("files", "orig_files", "merkle_tree", "similar_torrents", "metadata",
-         "hash_for_piece", "info_hashes"))
+         "hash_for_piece", "info_hash"))
 
     def __init__(self, fields: Collection[str] = None):
         if fields is None:
@@ -165,7 +165,7 @@ class TorrentInfoSerializer:
         for field in self.fields:
             if field in simple_callable_fields:
                 result[field] = getattr(info, field)()
-            elif field == "info_hashes":
+            elif field == "info_hash":
                 result[field] = dict(v1=str(info.info_hash()))
             elif field in ("files", "orig_files"):
                 result[field] = _serialize_file_list(getattr(info, field)())
@@ -196,7 +196,7 @@ class TorrentHandleSerializer:
          "upload_limit", "max_uploads", "max_connections"))
 
     FIELDS = _SIMPLE_CALLABLE_FIELDS | frozenset(
-        _FLAG_FIELDS.keys()) | frozenset(("info_hashes",))
+        _FLAG_FIELDS.keys()) | frozenset(("info_hash",))
 
     def __init__(self, fields: Collection[str] = None):
         if fields is None:
@@ -218,7 +218,7 @@ class TorrentHandleSerializer:
         for field in self.fields:
             if field in simple_callable_fields:
                 result[field] = getattr(handle, field)()
-            elif field == "info_hashes":
+            elif field == "info_hash":
                 result[field] = dict(v1=str(handle.info_hash()))
             elif field in flag_fields:
                 result[field] = bool(handle.flags() & flag_fields[field])

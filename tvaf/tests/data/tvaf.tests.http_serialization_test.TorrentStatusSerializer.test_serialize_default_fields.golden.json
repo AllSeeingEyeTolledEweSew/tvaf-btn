@@ -39,7 +39,7 @@
     "flags": 56,
     "has_incoming": false,
     "has_metadata": true,
-    "info_hashes": {
+    "info_hash": {
         "v1": "c23420052b6ea2265d51587530e69425703c87b3"
     },
     "last_seen_complete": 0,

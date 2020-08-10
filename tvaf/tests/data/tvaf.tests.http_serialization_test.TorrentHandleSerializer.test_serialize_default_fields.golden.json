@@ -24,7 +24,7 @@
     "flag_upload_mode": false,
     "flags": 56,
     "http_seeds": [],
-    "info_hashes": {
+    "info_hash": {
         "v1": "c23420052b6ea2265d51587530e69425703c87b3"
     },
     "max_connections": 16777215,

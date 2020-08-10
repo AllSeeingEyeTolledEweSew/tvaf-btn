@@ -20,7 +20,7 @@ class TorrentInfoSerializerTest(lib.TestCase):
     def test_serialize_stable_fields(self):
         torrent_info = tdummy.DEFAULT.torrent_info()
         fields = serialization.TorrentInfoSerializer.FIELDS - set(
-            ("info_hashes", "hash_for_piece", "metadata", "merkle_tree"))
+            ("info_hash", "hash_for_piece", "metadata", "merkle_tree"))
         serializer = serialization.TorrentInfoSerializer(fields)
         result = serializer.serialize(torrent_info)
         self.assert_golden_json(result)
@@ -45,7 +45,7 @@ class TorrentStatusSerializer(lib.TestCase):
         self.atp.ti = tdummy.DEFAULT.torrent_info()
         handle = self.session.add_torrent(self.atp)
         fields = serialization.TorrentStatusSerializer.FIELDS - set(
-            ("info_hashes", "added_time", "save_path"))
+            ("info_hash", "added_time", "save_path"))
         serializer = serialization.TorrentStatusSerializer(fields)
         result = serializer.serialize(handle.status())
         self.assert_golden_json(result)
@@ -72,7 +72,7 @@ class TorrentHandleSerializer(lib.TestCase):
                                 lt.tracker_source.source_client)
         handle = self.session.add_torrent(self.atp)
         fields = serialization.TorrentHandleSerializer.FIELDS - set(
-            ("info_hashes",))
+            ("info_hash",))
         serializer = serialization.TorrentHandleSerializer(fields)
         result = serializer.serialize(handle)
         self.assert_golden_json(result)

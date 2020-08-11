@@ -5,6 +5,7 @@ import math
 import pathlib
 import re
 import threading
+from typing import Any
 from typing import Dict
 
 import libtorrent as lt
@@ -56,11 +57,23 @@ class ResumeService(driver_lib.Ticker):
 
     SAVE_ALL_INTERVAL = math.tan(1.5657)  # ~196
 
-    def __init__(self, *, config_dir: pathlib.Path, session: lt.session,
-                 executor: concurrent.futures.Executor):
+    def __init__(self,
+                 *,
+                 config_dir: pathlib.Path,
+                 session: lt.session,
+                 inline=False):
         self.resume_data_dir = config_dir.joinpath(RESUME_DATA_DIR_NAME)
         self.session = session
-        self.executor = executor
+
+        if inline:
+
+            def call_inline(func, *args, **kwargs):
+                func(*args, **kwargs)
+
+            self._call: Any = call_inline
+        else:
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            self._call = executor.submit
 
         self._condition = threading.Condition(threading.RLock())
         self._outstanding: Dict[str, int] = collections.defaultdict(int)
@@ -189,7 +202,7 @@ class ResumeService(driver_lib.Ticker):
                 _LOG.debug("dropping resume data for missing torrent: %s",
                            infohash)
                 return
-        self.executor.submit(self._write_resume_data, infohash, alert.params)
+        self._call(self._write_resume_data, infohash, alert.params)
 
     # pylint: disable=invalid-name
     def handle_save_resume_data_failed_alert(
@@ -210,7 +223,7 @@ class ResumeService(driver_lib.Ticker):
     def handle_torrent_removed_alert(self, alert: lt.torrent_removed_alert):
         with ltpy.translate_exceptions():
             infohash = str(alert.info_hash)
-        self.executor.submit(self._delete_resume_data, infohash)
+        self._call(self._delete_resume_data, infohash)
 
     def _save_on_alert(self, alert: lt.torrent_alert):
         with ltpy.translate_exceptions():

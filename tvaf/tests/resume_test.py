@@ -1,4 +1,3 @@
-import concurrent.futures
 import pathlib
 import tempfile
 import unittest
@@ -31,14 +30,6 @@ def atp_comparable(atp):
     return atp_dict_fixup(lt.write_resume_data(atp))
 
 
-class InlineExecutor(concurrent.futures.Executor):
-
-    def submit(self, *args, **kwargs):
-        func = args[0]
-        rest = args[1:]
-        func(*rest, **kwargs)
-
-
 class BaseTest(unittest.TestCase):
 
     def setUp(self):
@@ -50,7 +41,7 @@ class BaseTest(unittest.TestCase):
             resume_lib.RESUME_DATA_DIR_NAME)
         self.resume = resume_lib.ResumeService(session=self.session,
                                                config_dir=self.config_dir,
-                                               executor=InlineExecutor())
+                                               inline=True)
         self.driver = test_utils.InlineDriver()
         self.driver.session = self.session
         self.driver.handlers.append(self.resume.handle_alert)

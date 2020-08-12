@@ -1010,10 +1010,8 @@ class RequestService(driver_lib.Ticker):
         self._torrents: Dict[str, _Torrent] = dict()
         self._torrents_by_handle: Dict[lt.torrent_handle, _Torrent] = dict()
         if _have_bug_4604():
-            self._post_torrent_updates_deadline = -math.inf
             self._tick_deadline = -math.inf
         else:
-            self._post_torrent_updates_deadline = math.inf
             self._tick_deadline = math.inf
 
         self._atp_settings: Mapping[str, Any] = {}
@@ -1071,22 +1069,6 @@ class RequestService(driver_lib.Ticker):
         piece_progress: int = lt.alert_category.piece_progress
         return status | piece_progress
 
-    def get_post_torrent_updates_deadline(self) -> float:
-        with self._lock:
-            return self._post_torrent_updates_deadline
-
-    def on_fired_post_torrent_updates(self):
-        if not _have_bug_4604():
-            return
-
-        with self._lock:
-            self._post_torrent_updates_deadline = time.monotonic(
-            ) + _4604_TICK_INTERVAL
-
-    @staticmethod
-    def get_post_torrent_updates_flags():
-        return 0
-
     def get_tick_deadline(self) -> float:
         with self._lock:
             return self._tick_deadline
@@ -1095,8 +1077,11 @@ class RequestService(driver_lib.Ticker):
         if not _have_bug_4604():
             return
 
+        # TODO: this should be centralized
+        self._session.post_torrent_updates(flags=0)
+
         with self._lock:
-            self._tick_deadline = time.monotonic() + _4604_TICK_INTERVAL
+            self._tick_deadline = now + _4604_TICK_INTERVAL
             for torrent in self._torrents.values():
                 torrent.tick(now)
 

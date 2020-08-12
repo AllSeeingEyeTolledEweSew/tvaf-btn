@@ -51,8 +51,7 @@ class RequestServiceTestCase(unittest.TestCase):
     def pump_alerts(self, condition, msg="condition", timeout=5):
         condition_deadline = time.monotonic() + timeout
         while not condition():
-            deadline = min(condition_deadline, self.service.get_tick_deadline(),
-                           self.service.get_post_torrent_updates_deadline())
+            deadline = min(condition_deadline, self.service.get_tick_deadline())
             timeout = max(deadline - time.monotonic(), 0.0)
             timeout_ms = int(min(timeout * 1000, sys.maxsize))
 
@@ -65,10 +64,6 @@ class RequestServiceTestCase(unittest.TestCase):
             self.assertLess(now, condition_deadline, msg=f"{msg} timed out")
             if now >= self.service.get_tick_deadline():
                 self.service.tick(now)
-            if now >= self.service.get_post_torrent_updates_deadline():
-                self.session.post_torrent_updates(
-                    self.service.get_post_torrent_updates_flags())
-                self.service.on_fired_post_torrent_updates()
 
     def feed_pieces(self, piece_indexes=None):
         if not piece_indexes:

@@ -64,7 +64,7 @@ class RequestServiceTestCase(unittest.TestCase):
             now = time.monotonic()
             self.assertLess(now, condition_deadline, msg=f"{msg} timed out")
             if now >= self.service.get_tick_deadline():
-                self.service.tick()
+                self.service.tick(now)
             if now >= self.service.get_post_torrent_updates_deadline():
                 self.session.post_torrent_updates(
                     self.service.get_post_torrent_updates_flags())

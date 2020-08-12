@@ -1,4 +1,3 @@
-import concurrent.futures
 import pathlib
 import sys
 import tempfile
@@ -34,19 +33,16 @@ class RequestServiceTestCase(unittest.TestCase):
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.config = config_lib.Config(
             torrent_default_save_path=str(self.config_dir))
-        self.executor = concurrent.futures.ThreadPoolExecutor()
         self.init_session()
 
     def init_session(self):
         self.session = test_utils.create_isolated_session()
         self.service = request_lib.RequestService(session=self.session,
                                                   config=self.config,
-                                                  config_dir=self.config_dir,
-                                                  executor=self.executor)
+                                                  config_dir=self.config_dir)
 
     def tearDown(self):
         self.tempdir.cleanup()
-        self.executor.shutdown()
 
     def pump_alerts(self, condition, msg="condition", timeout=5):
         condition_deadline = time.monotonic() + timeout

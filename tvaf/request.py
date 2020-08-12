@@ -998,10 +998,10 @@ class _Torrent:
 class RequestService(driver_lib.Ticker):
 
     def __init__(self, *, session: lt.session, config: config_lib.Config,
-                 config_dir: pathlib.Path, executor: futures.Executor):
+                 config_dir: pathlib.Path):
         self._session = session
         self.config_dir = config_dir
-        self.executor = executor
+        self.executor = futures.ThreadPoolExecutor()
 
         # One lock for both top-level and per-torrent operations. I have not
         # yet implemented a proper locking protocol between IOService and

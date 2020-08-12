@@ -1,3 +1,4 @@
+import concurrent.futures
 import io
 
 import libtorrent as lt
@@ -10,6 +11,10 @@ from . import tdummy
 
 
 class TestBufferedTorrentIO(request_test_utils.RequestServiceTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.executor = concurrent.futures.ThreadPoolExecutor()
 
     def open(self):
         tslice = types.TorrentSlice(info_hash=tdummy.INFOHASH,

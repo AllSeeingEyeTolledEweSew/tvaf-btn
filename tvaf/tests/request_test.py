@@ -1,7 +1,6 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
 
-import concurrent.futures
 import logging
 import os
 import os.path
@@ -485,18 +484,15 @@ class TestConfig(unittest.TestCase):
 
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
-        self.executor = concurrent.futures.ThreadPoolExecutor()
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.config = config_lib.Config()
         self.session = test_utils.create_isolated_session()
         self.service = request_lib.RequestService(session=self.session,
                                                   config=self.config,
-                                                  config_dir=self.config_dir,
-                                                  executor=self.executor)
+                                                  config_dir=self.config_dir)
 
     def tearDown(self):
         self.tempdir.cleanup()
-        self.executor.shutdown()
 
     def test_config_defaults(self):
         save_path = str(self.config_dir.joinpath("downloads"))

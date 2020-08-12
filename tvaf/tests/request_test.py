@@ -163,6 +163,9 @@ class TestRead(request_test_utils.RequestServiceTestCase):
         atp.save_path = seed_dir.name
         atp.flags &= ~lt.torrent_flags.paused
         handle = seed.add_torrent(atp)
+        # https://github.com/arvidn/libtorrent/issues/4980: add_piece() while
+        # checking silently fails in libtorrent 1.2.8.
+        request_test_utils.wait_done_checking_or_error(handle)
         for i, piece in enumerate(tdummy.PIECES):
             # NB: bug in libtorrent where add_piece accepts str but not bytes
             handle.add_piece(i, piece.decode(), 0)

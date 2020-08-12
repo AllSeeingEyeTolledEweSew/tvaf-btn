@@ -16,6 +16,16 @@ from . import tdummy
 from . import test_utils
 
 
+def wait_done_checking_or_error(handle: lt.torrent_handle):
+    while True:
+        status = handle.status()
+        if status.state not in (lt.torrent_status.states.checking_resume_data,
+                                lt.torrent_status.states.checking_files):
+            break
+        if status.errc.value() != 0:
+            break
+
+
 class RequestServiceTestCase(unittest.TestCase):
     """Tests for tvaf.dal.create_schema()."""
 
@@ -64,6 +74,9 @@ class RequestServiceTestCase(unittest.TestCase):
         if not piece_indexes:
             piece_indexes = list(range(len(tdummy.PIECES)))
         handle = self.wait_for_torrent()
+        # https://github.com/arvidn/libtorrent/issues/4980: add_piece() while
+        # checking silently fails in libtorrent 1.2.8.
+        wait_done_checking_or_error(handle)
         for i in piece_indexes:
             # NB: bug in libtorrent where add_piece accepts str but not bytes
             handle.add_piece(i, tdummy.PIECES[i].decode(), 0)

@@ -32,7 +32,7 @@ def _translate_exceptions():
         raise config_lib.InvalidConfigError(str(exc)) from exc
 
 
-class SessionService:
+class SessionService(config_lib.HasConfig):
 
     def __init__(self, *, get_required_alert_mask: Callable[[], int],
                  config: config_lib.Config):

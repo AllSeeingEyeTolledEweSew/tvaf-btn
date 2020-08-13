@@ -995,7 +995,7 @@ class _Torrent:
             self.sync()
 
 
-class RequestService(driver_lib.Ticker):
+class RequestService(driver_lib.Ticker, config_lib.HasConfig):
 
     def __init__(self, *, session: lt.session, config: config_lib.Config,
                  config_dir: pathlib.Path):

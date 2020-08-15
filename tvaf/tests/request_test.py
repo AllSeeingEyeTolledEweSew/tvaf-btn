@@ -46,6 +46,16 @@ class TestAddRemove(request_test_utils.RequestServiceTestCase):
             req.get_next(timeout=5)
         self.assertIsInstance(req.exception, request_lib.FetchError)
 
+    def test_shutdown(self):
+        req = self.add_req()
+        self.service.abort()
+        self.assertIsInstance(req.exception, request_lib.CancelledError)
+
+    def test_already_shutdown(self):
+        self.service.abort()
+        with self.assertRaises(request_lib.CancelledError):
+            self.add_req()
+
 
 class TestRead(request_test_utils.RequestServiceTestCase):
 

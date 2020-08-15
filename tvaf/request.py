@@ -1007,6 +1007,7 @@ class RequestService(driver_lib.Ticker, config_lib.HasConfig):
         # yet implemented a proper locking protocol between IOService and
         # _Torrent.
         self._lock = threading.RLock()
+        self._shutdown = False
         self._torrents: Dict[str, _Torrent] = dict()
         self._torrents_by_handle: Dict[lt.torrent_handle, _Torrent] = dict()
         if _have_bug_4604():
@@ -1087,6 +1088,8 @@ class RequestService(driver_lib.Ticker, config_lib.HasConfig):
 
     def add_request(self, params: Params) -> Request:
         with self._lock:
+            if self._shutdown:
+                raise CancelledError("Shutting down")
             torrent = self._torrents.get(params.tslice.info_hash)
             if not torrent:
                 torrent = _Torrent(service=self,
@@ -1150,3 +1153,9 @@ class RequestService(driver_lib.Ticker, config_lib.HasConfig):
             driver_lib.dispatch(torrent, alert)
         # Will remove torrents with torrent_removed_alert
         driver_lib.dispatch(self, alert, prefix="_handle")
+
+    def abort(self):
+        with self._lock:
+            self._shutdown = True
+            for torrent in self._torrents.values():
+                torrent._fatal(CancelledError("Shutting down"))

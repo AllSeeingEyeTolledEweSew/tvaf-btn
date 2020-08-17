@@ -1,5 +1,4 @@
 import pathlib
-import sys
 import tempfile
 import time
 import unittest
@@ -8,15 +7,17 @@ import libtorrent as lt
 
 from tvaf import config as config_lib
 from tvaf import driver as driver_lib
+from tvaf import lt4604
 from tvaf import request as request_lib
 from tvaf import types
 
+from . import lib
 from . import tdummy
 from . import test_utils
 
 
 def wait_done_checking_or_error(handle: lt.torrent_handle):
-    while True:
+    for _ in lib.loop_until_timeout(5, msg="checking (or error)"):
         status = handle.status()
         if status.state not in (lt.torrent_status.states.checking_resume_data,
                                 lt.torrent_status.states.checking_files):
@@ -40,6 +41,12 @@ class RequestServiceTestCase(unittest.TestCase):
         self.service = request_lib.RequestService(session=self.session,
                                                   config=self.config,
                                                   config_dir=self.config_dir)
+        self.alert_driver = driver_lib.AlertDriver(session=self.session)
+        self.tick_driver = driver_lib.TickDriver()
+        self.lt4604_fixup = lt4604.Fixup(tick_driver=self.tick_driver)
+
+        self.alert_driver.add(self.service.handle_alert)
+        self.alert_driver.add(self.lt4604_fixup.handle_alert)
 
     def tearDown(self):
         self.tempdir.cleanup()
@@ -47,19 +54,10 @@ class RequestServiceTestCase(unittest.TestCase):
     def pump_alerts(self, condition, msg="condition", timeout=5):
         condition_deadline = time.monotonic() + timeout
         while not condition():
-            deadline = min(condition_deadline, self.service.get_tick_deadline())
-            timeout = max(deadline - time.monotonic(), 0.0)
-            timeout_ms = int(min(timeout * 1000, sys.maxsize))
-
-            self.session.wait_for_alert(int(timeout_ms))
-
-            for alert in self.session.pop_alerts():
-                driver_lib.log_alert(alert)
-                self.service.handle_alert(alert)
             now = time.monotonic()
             self.assertLess(now, condition_deadline, msg=f"{msg} timed out")
-            if now >= self.service.get_tick_deadline():
-                self.service.tick(now)
+            self.tick_driver.tick(now)
+            self.alert_driver.pump_alerts()
 
     def feed_pieces(self, piece_indexes=None):
         if not piece_indexes:

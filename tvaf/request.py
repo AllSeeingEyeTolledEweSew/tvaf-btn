@@ -318,23 +318,6 @@ def _req_key(req: Request):
             random.random())
 
 
-# pylint: disable=invalid-name
-_cache_have_bug_4604 = None
-_4604_STATE_TIMEOUT = 30
-_4604_TICK_INTERVAL = 5
-
-
-def _have_bug_4604():
-    global _cache_have_bug_4604  # pylint: disable=global-statement
-    if _cache_have_bug_4604 is None:
-        version = tuple(int(i) for i in lt.version.split("."))
-        _cache_have_bug_4604 = (version < (1, 2, 7))
-        if _cache_have_bug_4604:
-            _LOG.warning("libtorrent with bug #4604 detected. "
-                         "Please upgrade to libtorrent 1.2.7 or later.")
-    return _cache_have_bug_4604
-
-
 class _Torrent:
 
     _DEADLINE_GAP = 10000
@@ -385,63 +368,14 @@ class _Torrent:
         self._removal_requested = False
         self._remove_data_requested = False
 
-        # State to work around libtorrent bug 4604
-        self._pieces_downloaded = 0
-        self._time_4604_changed = -math.inf  # Uses time.monotonic()
-
         if add_torrent_params is not None:
             self._set_add_torrent_params(add_torrent_params)
-
-    def _check_4604(self, now: float):
-        if not _have_bug_4604():
-            return
-
-        with self._lock:
-            if self._handle is None:
-                return
-            delta = self._time_4604_changed - now
-            if delta < _4604_STATE_TIMEOUT:
-                return
-            if self._state != lt.torrent_status.states.downloading:
-                return
-            outstanding = self._pieces_downloaded - len(self._piece_have)
-            if outstanding <= 0:
-                return
-
-            self._warning(
-                "Working around "
-                "http://github.com/arvidn/libtorrent/issues/4604: "
-                "there have been %d pieces downloaded but not hashed for %s "
-                "seconds. Force-checking the torrent to recover lost hash "
-                "jobs. You should upgrade to libtorrent>=1.2.7", outstanding,
-                delta)
-            with ltpy.translate_exceptions():
-                self._handle.force_recheck()
-            self._time_4604_changed = now
-
-    def handle_status_update(self, status: lt.torrent_status, now: float):
-        with self._lock:
-            assert self._torrent_info is not None
-
-            if _have_bug_4604():
-                pieces_downloaded = round(status.progress *
-                                          self._torrent_info.num_pieces())
-                if pieces_downloaded != self._pieces_downloaded:
-                    self._time_4604_changed = now
-                self._pieces_downloaded = pieces_downloaded
-                self._check_4604(now)
-
-    def tick(self, now: float):
-        with self._lock:
-            self._check_4604(now)
 
     def _set_add_torrent_params(self, atp: lt.add_torrent_params):
         assert atp.ti is not None
         atp.file_priorities = []
         atp.piece_priorities = [0] * atp.ti.num_pieces()
         atp.flags &= ~lt.torrent_flags.paused
-        if _have_bug_4604():
-            atp.flags |= lt.torrent_flags.update_subscribe
         with self._lock:
             self._add_torrent_params = atp
             self._torrent_info = atp.ti
@@ -667,9 +601,6 @@ class _Torrent:
 
         with self._lock:
             assert self._torrent_info is not None
-
-            if _have_bug_4604():
-                self._time_4604_changed = time.monotonic()
 
             self._piece_have.add(i)
             self._piece_priorities.pop(i, None)
@@ -988,14 +919,12 @@ class _Torrent:
 
     def handle_state_changed_alert(self, alert: lt.state_changed_alert):
         with self._lock:
-            if _have_bug_4604():
-                self._time_4604_changed = time.monotonic()
             self._debug("%s -> %s", alert.prev_state, alert.state)
             self._state = alert.state
             self.sync()
 
 
-class RequestService(driver_lib.Ticker, config_lib.HasConfig):
+class RequestService(config_lib.HasConfig):
 
     def __init__(self, *, session: lt.session, config: config_lib.Config,
                  config_dir: pathlib.Path):
@@ -1010,10 +939,6 @@ class RequestService(driver_lib.Ticker, config_lib.HasConfig):
         self._shutdown = False
         self._torrents: Dict[str, _Torrent] = dict()
         self._torrents_by_handle: Dict[lt.torrent_handle, _Torrent] = dict()
-        if _have_bug_4604():
-            self._tick_deadline = -math.inf
-        else:
-            self._tick_deadline = math.inf
 
         self._atp_settings: Mapping[str, Any] = {}
         self.set_config(config)
@@ -1069,22 +994,6 @@ class RequestService(driver_lib.Ticker, config_lib.HasConfig):
         status: int = lt.alert_category.status
         piece_progress: int = lt.alert_category.piece_progress
         return status | piece_progress
-
-    def get_tick_deadline(self) -> float:
-        with self._lock:
-            return self._tick_deadline
-
-    def tick(self, now: float):
-        if not _have_bug_4604():
-            return
-
-        # TODO: this should be centralized
-        self._session.post_torrent_updates(flags=0)
-
-        with self._lock:
-            self._tick_deadline = now + _4604_TICK_INTERVAL
-            for torrent in self._torrents.values():
-                torrent.tick(now)
 
     def add_request(self, params: Params) -> Request:
         with self._lock:

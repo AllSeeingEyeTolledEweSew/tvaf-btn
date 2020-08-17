@@ -4,72 +4,50 @@ import unittest.mock
 
 from tvaf import driver as driver_lib
 
+from . import lib
 from . import tdummy
 from . import test_utils
 
 
-class IterAlertsTest(unittest.TestCase):
+class DummyException(Exception):
+    pass
+
+
+class PumpAlertsTest(unittest.TestCase):
 
     def setUp(self):
         self.session = test_utils.create_isolated_session()
         self.driver = driver_lib.AlertDriver(session=self.session)
 
-    def test_iter_alerts(self):
+    def test_pump_alerts(self):
         handle = self.session.add_torrent(tdummy.DEFAULT.atp())
         self.session.remove_torrent(handle)
 
         seen_alerts = []
-        for alert in self.driver.iter_alerts():
+
+        def handler(alert):
             type_name = alert.__class__.__name__
             if type_name in ("add_torrent_alert", "torrent_removed_alert"):
                 seen_alerts.append(type_name)
-            if type_name == "torrent_removed_alert":
+
+        self.driver.add(handler)
+        for _ in lib.loop_until_timeout(5):
+            self.driver.pump_alerts()
+            if "torrent_removed_alert" in seen_alerts:
                 break
 
         self.assertEqual(seen_alerts,
                          ["add_torrent_alert", "torrent_removed_alert"])
 
-    def test_iter_alerts_fed_by_thread(self):
+    def test_pump_alerts_with_exception(self):
 
-        def run():
-            handle = self.session.add_torrent(tdummy.DEFAULT.atp())
-            self.session.remove_torrent(handle)
+        def handler(alert):
+            raise DummyException("whoops")
 
-        thread = threading.Thread(target=run)
-        started = False
-
-        seen_alerts = []
-        for alert in self.driver.iter_alerts():
-            if not started:
-                thread.start()
-                started = True
-            type_name = alert.__class__.__name__
-            if type_name in ("add_torrent_alert", "torrent_removed_alert"):
-                seen_alerts.append(type_name)
-            if type_name == "torrent_removed_alert":
-                break
-
-        thread.join()
-
-        self.assertEqual(seen_alerts,
-                         ["add_torrent_alert", "torrent_removed_alert"])
-
-    def test_iter_alerts_and_abort(self):
-        handle = self.session.add_torrent(tdummy.DEFAULT.atp())
-        self.session.remove_torrent(handle)
-
-        seen_alerts = []
-        with unittest.mock.patch.object(self.driver, "ABORT_CHECK_INTERVAL",
-                                        0.1):
-            for alert in self.driver.iter_alerts():
-                type_name = alert.__class__.__name__
-                if type_name in ("add_torrent_alert", "torrent_removed_alert"):
-                    seen_alerts.append(type_name)
-                if type_name == "torrent_removed_alert":
-                    self.driver.abort()
-
-        self.assertEqual(seen_alerts,
-                         ["add_torrent_alert", "torrent_removed_alert"])
+        self.driver.add(handler)
+        with self.assertRaises(DummyException):
+            for _ in lib.loop_until_timeout(5):
+                self.driver.pump_alerts()
 
 
 class RunTest(unittest.TestCase):

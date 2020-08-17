@@ -7,6 +7,7 @@ from typing import Any
 from typing import Callable
 from typing import Iterable
 from typing import Optional
+from typing import Sequence
 from typing import Set
 
 import libtorrent as lt
@@ -97,27 +98,32 @@ class AlertDriver:
         assert self._thread is not None
         self._thread.join()
 
-    def iter_alerts(self):
-        while True:
-            with ltpy.translate_exceptions():
-                self.session.wait_for_alert(
-                    int(self.ABORT_CHECK_INTERVAL * 1000))
-                alerts = self.session.pop_alerts()
-            if not alerts and self._aborted:
-                return
-            yield from alerts
-
-    def run_inner(self):
-        for alert in self.iter_alerts():
+    def pump_alerts(self, raise_exceptions=True) -> Sequence[lt.alert]:
+        with ltpy.translate_exceptions():
+            alerts = self.session.pop_alerts()
+        for alert in alerts:
+            log_alert(alert)
             for handler in list(self._handlers):
                 try:
                     handler(alert)
                 except Exception:
+                    if raise_exceptions:
+                        raise
                     _LOG.exception("while handling %s with %s", alert, handler)
+        return alerts
+
+    def _run_inner(self):
+        while True:
+            with ltpy.translate_exceptions():
+                self.session.wait_for_alert(
+                    int(self.ABORT_CHECK_INTERVAL * 1000))
+            self.pump_alerts(raise_exceptions=False)
+            if self._aborted:
+                break
 
     def run(self):
         try:
-            self.run_inner()
+            self._run_inner()
         except Exception:
             _LOG.exception("fatal error")
         finally:

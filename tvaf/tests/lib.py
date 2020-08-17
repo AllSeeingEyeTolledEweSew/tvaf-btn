@@ -10,13 +10,22 @@ import io
 import json
 import os
 import re
+import time
 import unittest
 import unittest.mock
 from typing import Any
+from typing import Generator
 
 import apsw
 
 import tvaf.types
+
+
+def loop_until_timeout(timeout: float, msg: str = "condition") -> Generator:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        yield
+    raise AssertionError(f"{msg} timed out")
 
 
 def add_fixture_row(conn: apsw.Connection, table: str, **kwargs: Any) -> None:

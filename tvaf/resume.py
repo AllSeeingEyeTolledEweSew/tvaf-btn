@@ -61,9 +61,11 @@ class ResumeService(driver_lib.Ticker):
                  *,
                  config_dir: pathlib.Path,
                  session: lt.session,
+                 tick_driver: driver_lib.TickDriver,
                  inline=False):
         self.resume_data_dir = config_dir.joinpath(RESUME_DATA_DIR_NAME)
         self.session = session
+        self.tick_driver = tick_driver
 
         if inline:
 
@@ -99,7 +101,11 @@ class ResumeService(driver_lib.Ticker):
             self._handles.pop(infohash, None)
             self._condition.notify_all()
 
+    def start(self):
+        self.tick_driver.add(self)
+
     def abort(self):
+        self.tick_driver.discard(self)
         with self._condition:
             assert not self._aborted
             self._aborted = True
@@ -176,6 +182,8 @@ class ResumeService(driver_lib.Ticker):
 
     def tick(self, now: float):
         with self._condition:
+            if self._aborted:
+                return
             self._save_all(flush=False)
             self._last_save_all_time = now
 

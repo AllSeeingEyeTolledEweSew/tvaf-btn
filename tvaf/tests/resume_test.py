@@ -1,11 +1,15 @@
 import pathlib
 import tempfile
+import time
 import unittest
 
 import libtorrent as lt
 
+from tvaf import driver as driver_lib
 from tvaf import resume as resume_lib
 
+from . import lib
+from . import request_test_utils
 from . import tdummy
 from . import test_utils
 
@@ -39,16 +43,21 @@ class BaseTest(unittest.TestCase):
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.resume_data_dir = self.config_dir.joinpath(
             resume_lib.RESUME_DATA_DIR_NAME)
+        self.tick_driver = driver_lib.TickDriver()
+        self.alert_driver = driver_lib.AlertDriver(session=self.session)
         self.resume = resume_lib.ResumeService(session=self.session,
                                                config_dir=self.config_dir,
+                                               tick_driver=self.tick_driver,
                                                inline=True)
-        self.driver = test_utils.InlineDriver()
-        self.driver.session = self.session
-        self.driver.handlers.append(self.resume.handle_alert)
-        self.driver.tickers.append(self.resume)
+        self.alert_driver.add(self.resume.handle_alert)
+        self.resume.start()
 
     def tearDown(self):
         self.tempdir.cleanup()
+
+    def pump_events(self):
+        self.alert_driver.pump_alerts()
+        self.tick_driver.tick(time.monotonic())
 
     def assert_atp_equal(self, got, expected):
         self.assertEqual(atp_comparable(got), atp_comparable(expected))
@@ -125,32 +134,36 @@ class AbortTest(BaseTest):
             if isinstance(alert, lt.block_finished_alert):
                 have_block.add((alert.piece_index, alert.block_index))
 
-        self.driver.handlers.append(handle_alert)
+        self.alert_driver.add(handle_alert)
         atp = self.torrent.atp()
         atp.flags &= ~lt.torrent_flags.paused
         atp.save_path = self.tempdir.name
         handle = self.session.add_torrent(atp)
-
-        def is_downloading():
-            status = handle.status()
-            return status.state == status.downloading
-
-        self.driver.pump(is_downloading, msg="downloading state")
+        request_test_utils.wait_done_checking_or_error(handle)
         # NB: bug in libtorrent where add_piece accepts str but not bytes
         handle.add_piece(0, self.torrent.pieces[0].decode(), 0)
-        self.driver.pump(lambda: have_block, msg="piece finish")
+
+        for _ in lib.loop_until_timeout(5, msg="piece finish"):
+            self.pump_events()
+            if have_block:
+                break
+
         self.session.pause()
         self.resume.abort()
 
-        def check_atp():
+        for _ in lib.loop_until_timeout(5, msg="resume data write"):
+            self.pump_events()
             atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
-            if not atps:
-                return False
-            atp = atps[0]
-            return atp.have_pieces and atp.have_pieces[0]
+            if atps:
+                atp = atps[0]
+                if atp.have_pieces and atp.have_pieces[0]:
+                    break
 
-        self.driver.pump(check_atp, msg="resume data write")
-        self.driver.pump(self.resume.done, msg="resume data write")
+        for _ in lib.loop_until_timeout(5, msg="resume data write"):
+            self.pump_events()
+            if self.resume.done():
+                break
+
         self.resume.wait()
 
     def test_finished(self):
@@ -158,33 +171,33 @@ class AbortTest(BaseTest):
         atp.flags &= ~lt.torrent_flags.paused
         atp.save_path = self.tempdir.name
         handle = self.session.add_torrent(atp)
-
-        def is_downloading():
-            status = handle.status()
-            return status.state == status.downloading
-
-        self.driver.pump(is_downloading, msg="downloading state")
+        request_test_utils.wait_done_checking_or_error(handle)
         for i, piece in enumerate(self.torrent.pieces):
             # NB: bug in libtorrent where add_piece accepts str but not bytes
             handle.add_piece(i, piece.decode(), 0)
 
-        def is_finished():
+        for _ in lib.loop_until_timeout(5, msg="finished state"):
+            self.pump_events()
             status = handle.status()
-            return status.state in (status.finished, status.seeding)
+            if status.state in (status.finished, status.seeding):
+                break
 
-        self.driver.pump(is_finished, msg="finished state")
         self.session.pause()
         self.resume.abort()
 
-        def check_atp():
+        for _ in lib.loop_until_timeout(5, msg="resume data write"):
+            self.pump_events()
             atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
-            if not atps:
-                return False
-            atp = atps[0]
-            return atp.have_pieces and all(atp.have_pieces)
+            if atps:
+                atp = atps[0]
+                if atp.have_pieces and all(atp.have_pieces):
+                    break
 
-        self.driver.pump(check_atp, msg="resume data write")
-        self.driver.pump(self.resume.done, msg="finalize")
+        for _ in lib.loop_until_timeout(5, msg="finalize"):
+            self.pump_events()
+            if self.resume.done():
+                break
+
         self.resume.wait()
 
     def test_finish_remove_abort_quickly(self):
@@ -192,21 +205,17 @@ class AbortTest(BaseTest):
         atp.flags &= ~lt.torrent_flags.paused
         atp.save_path = self.tempdir.name
         handle = self.session.add_torrent(atp)
-
-        def is_downloading():
-            status = handle.status()
-            return status.state == status.downloading
-
-        self.driver.pump(is_downloading, msg="downloading state")
+        request_test_utils.wait_done_checking_or_error(handle)
         for i, piece in enumerate(self.torrent.pieces):
             # NB: bug in libtorrent where add_piece accepts str but not bytes
             handle.add_piece(i, piece.decode(), 0)
 
-        def is_finished():
+        for _ in lib.loop_until_timeout(5, msg="finished state"):
+            self.pump_events()
             status = handle.status()
-            return status.state in (status.finished, status.seeding)
+            if status.state in (status.finished, status.seeding):
+                break
 
-        self.driver.pump(is_finished, msg="finished state")
         # Remove, pause and abort before we process any alerts. ResumeService
         # should try to save_resume_data() on an invalid handle. This is
         # timing-dependent but I don't have a way to force it.
@@ -214,10 +223,14 @@ class AbortTest(BaseTest):
         self.session.pause()
         self.resume.abort()
 
-        def no_resume_data():
-            return not list(
-                resume_lib.iter_resume_data_from_disk(self.config_dir))
+        for _ in lib.loop_until_timeout(5, msg="resume data delete"):
+            self.pump_events()
+            if not list(resume_lib.iter_resume_data_from_disk(self.config_dir)):
+                break
 
-        self.driver.pump(no_resume_data, msg="resume data delete")
-        self.driver.pump(self.resume.done, msg="finalize")
+        for _ in lib.loop_until_timeout(5, msg="finalize"):
+            self.pump_events()
+            if self.resume.done():
+                break
+
         self.resume.wait()

@@ -768,33 +768,191 @@ class torrent_alert(alert):
     handle: torrent_handle
     torrent_name: str
 
+class tracker_alert(torrent_alert):
+    local_endpoint: Tuple[str, int]
+    def tracker_url(self) -> str: ...
+
+class torrent_removed_alert(torrent_alert):
+    info_hash: sha1_hash
+
 class read_piece_alert(torrent_alert):
     error: error_code
     buffer: bytes
     piece: int
     size: int
 
-class piece_finished_alert(torrent_alert):
-    piece_index: int
+class peer_alert(torrent_alert):
+    endpoint: Tuple[str, int]
+    pid: sha1_hash
+
+class tracker_error_alert(tracker_alert):
+    error: error_code
+    def error_message(self) -> str: ...
+    status_code: int
+    times_in_row: int
+
+class tracker_warning_alert(tracker_alert):
+    ...
+
+class tracker_reply_alert(tracker_alert):
+    num_peers: int
+
+class tracker_announce_alert(tracker_alert):
+    event: int
 
 class hash_failed_alert(torrent_alert):
     piece_index: int
 
-class torrent_paused_alert(torrent_alert):
+class peer_ban_alert(peer_alert):
     ...
 
-class torrent_resumed_alert(torrent_alert):
-    ...
-
-class add_torrent_alert(torrent_alert):
+class peer_error_alert(peer_alert):
     error: error_code
-    params: add_torrent_params
+    op: operation_t
 
-class torrent_removed_alert(torrent_alert):
-    info_hash: sha1_hash
+class invalid_request_alert(peer_alert):
+    request: peer_request
 
 class torrent_error_alert(torrent_alert):
     error: error_code
+
+class torrent_finished_alert(torrent_alert):
+    ...
+
+class piece_finished_alert(torrent_alert):
+    piece_index: int
+
+class block_finished_alert(peer_alert):
+    piece_index: int
+    block_index: int
+
+class block_downloading_alert(peer_alert):
+    piece_index: int
+    block_index: int
+
+class storage_moved_alert(torrent_alert):
+    def storage_path(self) -> str: ...
+
+class storage_move_failed_alert(torrent_alert):
+    def file_path(self) -> str: ...
+    error: error_code
+    op: operation_t
+
+class torrent_deleted_alert(torrent_alert):
+    info_hash: sha1_hash
+
+class torrent_paused_alert(torrent_alert):
+    ...
+
+class torrent_checked_alert(torrent_alert):
+    ...
+
+class url_seed_alert(torrent_alert):
+    error: error_code
+    def error_message(self) -> str: ...
+    def server_url(self) -> str: ...
+
+class file_error_alert(torrent_alert):
+    error: error_code
+    def filename(self) -> str: ...
+
+class metadata_failed_alert(torrent_alert):
+    error: error_code
+
+class metadata_received_alert(torrent_alert):
+    ...
+
+class listen_failed_alert(alert):
+    address: str
+    port: int
+    def listen_interface(self) -> str: ...
+    error: error_code
+    op: operation_t
+    socket_type: int
+
+class listen_succeeded_alert(alert):
+    address: str
+    port: int
+    socket_type: int
+
+class socket_type_t(int):
+    name: str
+    names:Dict[str, socket_type_t]
+    values:Dict[int, socket_type_t]
+
+    tcp: socket_type_t
+    tcp_ssl: socket_type_t
+    udp: socket_type_t
+    i2p: socket_type_t
+    socks5: socket_type_t
+    utp_ssl: socket_type_t
+
+class portmap_error_alert(alert):
+    mapping: int
+    error: error_code
+    map_transport: portmap_transport
+
+class portmap_alert(alert):
+    mapping: int
+    external_port: int
+    map_protocol: portmap_protocol
+    map_transport: portmap_transport
+
+class portmap_log_alert(alert):
+    map_transport: portmap_transport
+
+class fastresume_rejected_alert(torrent_alert):
+    error: error_code
+    def file_path(self) -> str: ...
+    op: operation_t
+
+class peer_blocked_alert(peer_alert):
+    reason: reason_t
+
+class reason_t(int):
+    name: str
+    names:Dict[str, reason_t]
+    values:Dict[int, reason_t]
+
+    ip_filter: reason_t
+    port_filter: reason_t
+    i2p_mixed: reason_t
+    privileged_ports: reason_t
+    utp_disabled: reason_t
+    tcp_disabled: reason_t
+    invalid_local_interface: reason_t
+
+class scrape_reply_alert(tracker_alert):
+    incomplete: int
+    complete: int
+
+class scrape_failed_alert(tracker_alert):
+    def error_message(self) -> str: ...
+    error: error_code
+
+class udp_error_alert(alert):
+    endpoint: Tuple[str, int]
+    error: error_code
+
+class external_ip_alert(alert):
+    external_address: str
+
+class save_resume_data_alert(torrent_alert):
+    params: add_torrent_params
+
+class file_completed_alert(torrent_alert):
+    index: int
+
+class file_renamed_alert(torrent_alert):
+    index: int
+    def new_name(self) -> str: ...
+
+class file_rename_failed_alert(torrent_alert):
+    index: int
+    error: error_code
+
+class torrent_resumed_alert(torrent_alert):
+    ...
 
 class state_changed_alert(torrent_alert):
     state: torrent_status.states
@@ -803,17 +961,219 @@ class state_changed_alert(torrent_alert):
 class state_update_alert(alert):
     status: List[torrent_status]
 
-class torrent_deleted_alert(torrent_alert):
+class i2p_alert(alert):
+    error: error_code
+
+class dht_reply_alert(tracker_alert):
+    num_peers: int
+
+class dht_announce_alert(alert):
+    ip: str
+    port: int
     info_hash: sha1_hash
+
+class dht_get_peers_alert(alert):
+    info_hash: sha1_hash
+
+class peer_unsnubbed_alert(peer_alert):
+    ...
+
+class peer_snubbed_alert(peer_alert):
+    ...
+
+class peer_connect_alert(peer_alert):
+    ...
+
+class peer_disconnected_alert(peer_alert):
+    socket_type: int
+    op: operation_t
+    error: error_code
+    reason: int
+
+class request_dropped_alert(peer_alert):
+    block_index: int
+    piece_index: int
+
+class block_timeout_alert(peer_alert):
+    block_index: int
+    piece_index: int
+
+class unwanted_block_alert(peer_alert):
+    block_index: int
+    piece_index: int
+
+class torrent_delete_failed_alert(torrent_alert):
+    error: error_code
+    info_hash: sha1_hash
+
+class save_resume_data_failed_alert(torrent_alert):
+    error: error_code
+
+class performance_alert(torrent_alert):
+    warning_code: performance_warning_t
+
+class performance_warning_t(int):
+    name: str
+    names:Dict[str, performance_warning_t]
+    values:Dict[int, performance_warning_t]
+
+    outstanding_disk_buffer_limit_reached: performance_warning_t
+    outstanding_request_limit_reached: performance_warning_t
+    upload_limit_too_low: performance_warning_t
+    download_limit_too_low: performance_warning_t
+    send_buffer_watermark_too_low: performance_warning_t
+    too_many_optimistic_unchoke_slots: performance_warning_t
+    too_high_disk_queue_limit: performance_warning_t
+    too_few_outgoing_ports: performance_warning_t
+    too_few_file_descriptors: performance_warning_t
+
+class stats_alert(torrent_alert):
+    transferred: List[int]
+    interval: int
+
+class stats_channel(int):
+    name: str
+    names:Dict[str, stats_channel]
+    values:Dict[int, stats_channel]
+
+    upload_payload: stats_channel
+    upload_protocol: stats_channel
+    upload_ip_protocol: stats_channel
+    download_payload: stats_channel
+    download_protocol: stats_channel
+    download_ip_protocol: stats_channel
+
+class cache_flushed_alert(torrent_alert):
+    ...
+
+class incoming_connection_alert(alert):
+    socket_type: int
+    endpoint: Tuple[str, int]
+
+class torrent_need_cert_alert(torrent_alert):
+    ...
+
+class add_torrent_alert(torrent_alert):
+    error: error_code
+    params: add_torrent_params
+
+class dht_outgoing_get_peers_alert(alert):
+    info_hash: sha1_hash
+    obfuscated_info_hash: sha1_hash
+    endpoint: Tuple[str, int]
+
+class log_alert(alert):
+    def log_message(self) -> str: ...
+
 
 class torrent_log_alert(torrent_alert):
     def log_message(self) -> str: ...
 
-class save_resume_data_alert(torrent_alert):
-    params: add_torrent_params
+class peer_log_alert(peer_alert):
+    def log_message(self) -> str: ...
 
-class save_resume_data_failed_alert(torrent_alert):
+class picker_log_alert(peer_alert):
+    picker_flags: int
+
+class lsd_error_alert(alert):
     error: error_code
+
+class _DHTActiveRequest(TypedDict):
+    type: str
+    outstanding_requests: int
+    timeouts: int
+    responses: int
+    branch_factor: int
+    nodes_left: int
+    last_sent: int
+    first_timeout: int
+
+class _DHTRoutingBucket(TypedDict):
+    num_nodes: int
+    num_replacements: int
+
+class dht_stats_alert(alert):
+    active_requests: List[_DHTActiveRequest]
+    routing_table: List[_DHTRoutingBucket]
+
+class dht_log_alert(alert):
+    module: int
+    def log_message(self)-> str: ...
+
+class dht_pkt_alert(alert):
+    pkt_buf: bytes
+
+class _DHTImmutableItem(TypedDict):
+    key: sha1_hash
+    value: bytes
+
+class dht_immutable_item_alert(alert):
+    target: sha1_hash
+    item: _DHTImmutableItem
+
+class _DHTMutableItem(TypedDict):
+    key: bytes
+    value: bytes
+    signature: bytes
+    seq: int
+    salt: bytes
+    authoritative: bool
+
+class dht_mutable_item_alert(alert):
+    key: bytes
+    signature: bytes
+    seq: int
+    salt: str
+    item: _DHTMutableItem
+    authoritative: bool
+
+class dht_put_alert(alert):
+    target: sha1_hash
+    public_key: bytes
+    signature: bytes
+    salt: str
+    seq: int
+    num_success: int
+
+class session_stats_alert(alert):
+    values: Dict[str, int]
+
+class session_stats_header_alert(alert):
+    ...
+
+class dht_get_peers_reply_alert(alert):
+    info_hash: sha1_hash
+    def num_peers(self) -> int: ...
+    def peers(self) -> List[Tuple[str, int]]: ...
+
+class block_uploaded_alert(peer_alert):
+    block_index: int
+    piece_index: int
+
+class alerts_dropped_alert(alert):
+    dropped_alerts: List[bool]
+
+class socks5_alert(alert):
+    error: error_code
+    op: operation_t
+    ip: Tuple[str, int]
+
+class dht_live_nodes_alert(alert):
+    node_id: sha1_hash
+    num_nodes: int
+    nodes: List[Tuple[sha1_hash, Tuple[str, int]]]
+
+class dht_sample_infohashes_alert(alert):
+    endpoint: Tuple[str, int]
+    interval: datetime.timedelta
+    num_infohashes: int
+    num_samples: int
+    samples: List[sha1_hash]
+    num_nodes: int
+    nodes: List[Tuple[sha1_hash, Tuple[str, int]]]
+
+class dht_bootstrap_alert(alert):
+    ...
 
 
 class _UTPStats(TypedDict):

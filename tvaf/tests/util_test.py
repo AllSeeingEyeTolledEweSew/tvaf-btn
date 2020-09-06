@@ -2,6 +2,10 @@
 # accompanying UNLICENSE file.
 """Tests for the tvaf.util module."""
 
+import select
+import selectors
+import threading
+import time
 import unittest
 
 from tvaf import util
@@ -95,3 +99,50 @@ class TestEnumPiecewiseRanges(unittest.TestCase):
         self.assertSequenceEqual(
             list(util.enum_piecewise_ranges(1024, 0, 2048)), [(0, 0, 1024),
                                                               (1, 1024, 2048)])
+
+
+class TestSelectablePipe(unittest.TestCase):
+
+    def test_select_write_before(self):
+        rfile, wfile = util.selectable_pipe()
+        wfile.write(b"\0")
+        result = select.select((rfile,), (), ())
+        self.assertEqual(result, ([rfile], [], []))
+
+    def test_select_write_from_thread(self):
+        rfile, wfile = util.selectable_pipe()
+
+        def write_from_thread():
+            # Is there a way to synchronize this?
+            time.sleep(0.1)
+            wfile.write(b"\0")
+
+        threading.Thread(target=write_from_thread).start()
+        result = select.select((rfile,), (), ())
+        self.assertEqual(result, ([rfile], [], []))
+
+    def test_default_selector_write_before(self):
+        rfile, wfile = util.selectable_pipe()
+        wfile.write(b"\0")
+        selector = selectors.DefaultSelector()
+        selector.register(rfile, selectors.EVENT_READ)
+        events = selector.select()
+        self.assertEqual(len(events), 1)
+        key, _ = events[0]
+        self.assertEqual(key.fileobj, rfile)
+
+    def test_default_selector_write_from_thread(self):
+        rfile, wfile = util.selectable_pipe()
+
+        def write_from_thread():
+            # Is there a way to synchronize this?
+            time.sleep(0.1)
+            wfile.write(b"\0")
+
+        selector = selectors.DefaultSelector()
+        selector.register(rfile, selectors.EVENT_READ)
+        threading.Thread(target=write_from_thread).start()
+        events = selector.select()
+        self.assertEqual(len(events), 1)
+        key, _ = events[0]
+        self.assertEqual(key.fileobj, rfile)

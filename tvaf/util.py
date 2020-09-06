@@ -2,6 +2,10 @@
 # accompanying UNLICENSE file.
 """Utility functions for tvaf."""
 
+import io
+import os
+import socket
+import sys
 from typing import Iterator
 from typing import Tuple
 
@@ -105,3 +109,19 @@ def enum_piecewise_ranges(piece_length: int, start: int,
         if r_stop > stop:
             r_stop = stop
         yield piece, r_start, r_stop
+
+
+def selectable_pipe() -> Tuple[io.RawIOBase, io.RawIOBase]:
+    if sys.platform == "win32":
+        rsock, wsock = socket.socketpair()
+        rsock.setblocking(False)
+        wsock.setblocking(False)
+        # NB: buffering=None implies a *default buffer size*; buffering=0 is
+        # required for an unbuffered object
+        rfile = rsock.makefile(mode="rb", buffering=0)
+        wfile = wsock.makefile(mode="wb", buffering=0)
+        return rfile, wfile
+    rfd, wfd = os.pipe()
+    os.set_blocking(rfd, False)
+    os.set_blocking(wfd, False)
+    return io.FileIO(rfd, mode="rb"), io.FileIO(wfd, mode="wb")

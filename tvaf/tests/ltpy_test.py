@@ -319,7 +319,3 @@ class TestTranslateExceptions(unittest.TestCase):
             with ltpy.translate_exceptions():
                 raise RuntimeError(lt.libtorrent_category().message(
                     ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT))
-
-    def test_pass_invalid(self):
-        with ltpy.translate_exceptions_pass_invalid():
-            lt.torrent_handle().pause()

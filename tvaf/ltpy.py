@@ -385,12 +385,3 @@ def translate_exceptions() -> Generator:
         if translated:
             raise translated from exc
         raise
-
-
-@contextlib.contextmanager
-def translate_exceptions_pass_invalid() -> Generator:
-    try:
-        with translate_exceptions():
-            yield
-    except InvalidTorrentHandleError:
-        pass

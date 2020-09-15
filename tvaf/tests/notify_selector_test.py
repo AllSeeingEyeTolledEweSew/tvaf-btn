@@ -2,6 +2,7 @@ import selectors
 import threading
 import time
 import unittest
+from typing import Type
 
 from tvaf import notify_selector
 from tvaf import util
@@ -9,7 +10,7 @@ from tvaf import util
 
 class NotifySelectorTest(unittest.TestCase):
 
-    TEST_CLASS = notify_selector.NotifySelector
+    TEST_CLASS: Type[selectors.BaseSelector] = notify_selector.NotifySelector
 
     def test_register_while_selecting(self):
         rfile, wfile = util.selectable_pipe()

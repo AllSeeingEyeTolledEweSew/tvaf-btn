@@ -1,80 +1,63 @@
-import concurrent.futures
 import io
 
-import libtorrent as lt
-
 from tvaf import torrent_io
-from tvaf import types
 
 from . import request_test_utils
-from . import tdummy
 
 
 class TestBufferedTorrentIO(request_test_utils.RequestServiceTestCase):
 
     def setUp(self):
         super().setUp()
-        self.executor = concurrent.futures.ThreadPoolExecutor()
+        atp = self.torrent.atp()
+        self.service.configure_add_torrent_params(atp)
+        self.session.add_torrent(atp)
+        self.feed_pieces()
 
     def open(self):
-        tslice = types.TorrentSlice(info_hash=tdummy.INFOHASH,
-                                    start=0,
-                                    stop=tdummy.LEN)
         return torrent_io.BufferedTorrentIO(
             request_service=self.service,
-            tslice=tslice,
-            get_torrent=lambda: lt.bencode(tdummy.DICT),
-            user="tvaf")
+            info_hash=self.torrent.infohash,
+            start=0,
+            stop=self.torrent.length,
+            get_add_torrent_params=self.torrent.atp)
 
     def test_read_some(self):
-        future = self.executor.submit(self.open().read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
+        data = self.open().read(1024)
+        self.assertEqual(data, self.torrent.data[:1024])
 
     def test_read_with_explicit_close(self):
         fp = self.open()
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
+        data = fp.read(1024)
+        self.assertEqual(data, self.torrent.data[:1024])
         fp.close()
         self.assertTrue(fp.closed)
 
     def test_context_manager_with_read(self):
         with self.open() as fp:
-            future = self.executor.submit(fp.read, 1024)
-            self.feed_pieces()
-            self.pump_alerts(future.done, msg="read")
-            self.assertEqual(future.result(), tdummy.DATA[:1024])
+            data = fp.read(1024)
+            self.assertEqual(data, self.torrent.data[:1024])
 
     def test_read_all(self):
-        future = self.executor.submit(self.open().read)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA)
+        data = self.open().read()
+        self.assertEqual(data, self.torrent.data)
 
     def test_readinto(self):
         array = bytearray(1024)
-        future = self.executor.submit(self.open().readinto, array)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="readinto")
-        self.assertEqual(future.result(), 1024)
-        self.assertEqual(array, tdummy.DATA[:1024])
+        value = self.open().readinto(array)
+        self.assertEqual(value, 1024)
+        self.assertEqual(array, self.torrent.data[:1024])
 
     def test_read1(self):
-        future = self.executor.submit(self.open().read1)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read1")
-        self.assertEqual(future.result(), tdummy.PIECES[0])
+        data = self.open().read1()
+        self.assertEqual(data, self.torrent.pieces[0])
 
     def test_readinto1(self):
-        array = bytearray(tdummy.LEN)
-        future = self.executor.submit(self.open().readinto1, array)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="readinto1")
-        self.assertEqual(future.result(), len(tdummy.PIECES[0]))
-        self.assertEqual(array[:len(tdummy.PIECES[0])], tdummy.PIECES[0])
+        array = bytearray(self.torrent.length)
+        value = self.open().readinto1(array)
+        self.assertEqual(value, len(self.torrent.pieces[0]))
+        self.assertEqual(array[:len(self.torrent.pieces[0])],
+                         self.torrent.pieces[0])
 
     def test_misc_methods(self):
         fp = self.open()
@@ -92,50 +75,39 @@ class TestBufferedTorrentIO(request_test_utils.RequestServiceTestCase):
         fp = self.open()
 
         fp.seek(0, io.SEEK_END)
-        self.assertEqual(fp.tell(), tdummy.LEN)
+        self.assertEqual(fp.tell(), self.torrent.length)
 
         fp.seek(1024)
         self.assertEqual(fp.tell(), 1024)
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA[1024:2048])
+        data = fp.read(1024)
+        self.assertEqual(data, self.torrent.data[1024:2048])
 
     def test_second_read_buffered(self):
         fp = self.open()
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
+        data = fp.read(1024)
+        self.assertEqual(data, self.torrent.data[:1024])
 
-        # The data should be buffered, so we shouldn't need to pump_alerts
+        # The data should be buffered
         second = fp.read(1024)
-        self.assertEqual(second, tdummy.DATA[1024:2048])
+        self.assertEqual(second, self.torrent.data[1024:2048])
 
     def test_second_read_partial_buffer(self):
         fp = self.open()
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="first read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
+        data = fp.read(1024)
+        self.assertEqual(data, self.torrent.data[:1024])
 
-        # The data should be partially buffered. We'll need to pump_alerts
-        # again.
-        future = self.executor.submit(fp.read, tdummy.PIECE_LENGTH)
-        self.pump_alerts(future.done, msg="second read")
-        self.assertEqual(future.result(),
-                         tdummy.DATA[1024:tdummy.PIECE_LENGTH + 1024])
+        # The data should be partially buffered
+        data = fp.read(self.torrent.piece_length)
+        self.assertEqual(
+            data, self.torrent.data[1024:self.torrent.piece_length + 1024])
 
     def test_seek_resets_buffer(self):
         fp = self.open()
-        future = self.executor.submit(fp.read, 1024)
-        self.feed_pieces()
-        self.pump_alerts(future.done, msg="first read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
+        data = fp.read(1024)
+        self.assertEqual(data, self.torrent.data[:1024])
 
         # Seek back to the start. The buffer should reset, but reads should
         # work as normal.
         fp.seek(0)
-        future = self.executor.submit(fp.read, 1024)
-        self.pump_alerts(future.done, msg="second read")
-        self.assertEqual(future.result(), tdummy.DATA[:1024])
+        data = fp.read(1024)
+        self.assertEqual(data, self.torrent.data[:1024])

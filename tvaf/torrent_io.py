@@ -2,13 +2,15 @@ import errno
 import io
 import mmap
 import threading
+from typing import Callable
 from typing import List
 from typing import Sequence
 from typing import Union
 
+import libtorrent as lt
+
 from tvaf import ltpy
 from tvaf import request as request_lib
-from tvaf import types
 from tvaf import xmemoryview as xmv
 
 ReadintoTarget = Union[bytearray, mmap.mmap, memoryview]
@@ -25,13 +27,14 @@ class BufferedTorrentIO(io.BufferedIOBase):
     # indicates most files in multi-file torrents are piece-misaligned.
 
     def __init__(self, *, request_service: request_lib.RequestService,
-                 tslice: types.TorrentSlice, get_torrent: types.GetTorrent,
-                 user: str):
+                 info_hash: str, start: int, stop: int,
+                 get_add_torrent_params: Callable[[], lt.add_torrent_params]):
         super().__init__()
         self._request_service = request_service
-        self._tslice = tslice
-        self._get_torrent = get_torrent
-        self._user = user
+        self._info_hash = info_hash
+        self._start = start
+        self._stop = stop
+        self._get_add_torrent_params = get_add_torrent_params
 
         self._read_lock = threading.RLock()
         self._offset = 0
@@ -47,7 +50,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
             elif whence == io.SEEK_CUR:
                 offset += self._offset
             elif whence == io.SEEK_END:
-                offset += self._tslice.stop - self._tslice.start
+                offset += self._stop - self._start
             else:
                 raise ValueError("Invalid value for whence: %s" % whence)
 
@@ -93,10 +96,10 @@ class BufferedTorrentIO(io.BufferedIOBase):
 
         # By convention, negative size means read all
         if size < 0:
-            size = self._tslice.stop - self._offset
+            size = self._stop - self._offset
 
         # Clamp size
-        size = min(self._tslice.stop - self._offset, size)
+        size = min(self._stop - self._offset, size)
 
         # Consume the buffer
         if self._buffer and size > 0:
@@ -120,30 +123,32 @@ class BufferedTorrentIO(io.BufferedIOBase):
             stop = self._offset + size
 
         # Submit a new request.
-        tslice = types.TorrentSlice(info_hash=self._tslice.info_hash,
-                                    start=self._offset,
-                                    stop=stop)
-        params = request_lib.Params(tslice=tslice,
-                                    get_torrent=self._get_torrent,
-                                    user=self._user,
-                                    mode=request_lib.Mode.READ)
-        request = self._request_service.add_request(params)
+        request = self._request_service.add_request(
+            info_hash=self._info_hash,
+            start=self._offset,
+            stop=stop,
+            mode=request_lib.Mode.READ,
+            get_add_torrent_params=self._get_add_torrent_params)
 
         chunk = xmv.EMPTY
-        while request.has_next():
+        while True:
             try:
                 # TODO: timeouts
-                chunk = request.get_next()
+                next_chunk = request.read()
+                assert next_chunk is not None
             except OSError:  # pylint: disable=try-except-raise
                 # Do this here because ltpy.Error has some subtypes that also
                 # inherit OSError.
                 raise
             except ltpy.Error as exc:
                 raise OSError(errno.EIO, str(exc)) from exc
-            except request_lib.CancelledError as exc:
+            except request_lib.CanceledError as exc:
                 raise OSError(errno.ECANCELED, str(exc)) from exc
             except request_lib.Error as exc:
                 raise OSError(errno.EIO, str(exc)) from exc
+            if len(next_chunk) == 0:
+                break
+            chunk = next_chunk
             if read1:
                 # We requested a 1-byte read. Now expand the chunk, up to the
                 # requested size.

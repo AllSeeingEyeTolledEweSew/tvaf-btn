@@ -1,17 +1,16 @@
 import pathlib
 import tempfile
-import time
 import unittest
 
 import libtorrent as lt
 
 from tvaf import driver as driver_lib
+from tvaf import ltpy
 from tvaf import resume as resume_lib
 
 from . import lib
 from . import request_test_utils
 from . import tdummy
-from . import test_utils
 
 
 def atp_dict_fixup(atp_dict):
@@ -34,30 +33,33 @@ def atp_comparable(atp):
     return atp_dict_fixup(lt.write_resume_data(atp))
 
 
-class BaseTest(unittest.TestCase):
+class IterResumeDataTest(unittest.TestCase):
+
+    maxDiff = None
+
+    TORRENT1 = tdummy.Torrent.single_file(name=b"1.txt", length=1024)
+    TORRENT2 = tdummy.Torrent.single_file(name=b"2.txt", length=1024)
+    TORRENT3 = tdummy.Torrent.single_file(name=b"3.txt", length=1024)
 
     def setUp(self):
-        self.session = test_utils.create_isolated_session()
-        self.torrent = tdummy.DEFAULT
         self.tempdir = tempfile.TemporaryDirectory()
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.resume_data_dir = self.config_dir.joinpath(
             resume_lib.RESUME_DATA_DIR_NAME)
-        self.tick_driver = driver_lib.TickDriver()
-        self.alert_driver = driver_lib.AlertDriver(session=self.session)
-        self.resume = resume_lib.ResumeService(session=self.session,
-                                               config_dir=self.config_dir,
-                                               tick_driver=self.tick_driver,
-                                               inline=True)
-        self.alert_driver.add(self.resume.handle_alert)
-        self.resume.start()
 
-    def tearDown(self):
-        self.tempdir.cleanup()
+        def write(torrent):
+            self.resume_data_dir.mkdir(parents=True, exist_ok=True)
+            path = self.resume_data_dir.joinpath(
+                torrent.infohash).with_suffix(".resume")
+            atp = torrent.atp()
+            atp.ti = None
+            atp_data = lt.bencode(lt.write_resume_data(atp))
+            path.write_bytes(atp_data)
+            ti_data = lt.bencode(torrent.dict)
+            path.with_suffix(".torrent").write_bytes(ti_data)
 
-    def pump_events(self):
-        self.alert_driver.pump_alerts()
-        self.tick_driver.tick(time.monotonic())
+        write(self.TORRENT1)
+        write(self.TORRENT2)
 
     def assert_atp_equal(self, got, expected):
         self.assertEqual(atp_comparable(got), atp_comparable(expected))
@@ -70,27 +72,8 @@ class BaseTest(unittest.TestCase):
         self.assertEqual(set(atp_hashable(atp) for atp in got),
                          set(atp_hashable(atp) for atp in expected))
 
-
-class IterResumeDataTest(BaseTest):
-
-    maxDiff = None
-
-    TORRENT1 = tdummy.Torrent.single_file(name=b"1.txt", length=1024)
-    TORRENT2 = tdummy.Torrent.single_file(name=b"2.txt", length=1024)
-    TORRENT3 = tdummy.Torrent.single_file(name=b"3.txt", length=1024)
-
-    def setUp(self):
-        super().setUp()
-
-        def write(torrent):
-            self.resume_data_dir.mkdir(parents=True, exist_ok=True)
-            path = self.resume_data_dir.joinpath(
-                torrent.infohash).with_suffix(".resume")
-            data = lt.bencode(lt.write_resume_data(torrent.atp()))
-            path.write_bytes(data)
-
-        write(self.TORRENT1)
-        write(self.TORRENT2)
+    def tearDown(self):
+        self.tempdir.cleanup()
 
     def test_normal(self):
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
@@ -125,16 +108,34 @@ class IterResumeDataTest(BaseTest):
             set(atps), set((self.TORRENT1.atp(), self.TORRENT2.atp())))
 
 
-class AbortTest(BaseTest):
+class TerminateTest(unittest.TestCase):
+
+    def setUp(self):
+        self.session_service = lib.create_isolated_session_service()
+        self.session = self.session_service.session
+        self.torrent = tdummy.DEFAULT
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.config_dir = pathlib.Path(self.tempdir.name)
+        self.resume_data_dir = self.config_dir.joinpath(
+            resume_lib.RESUME_DATA_DIR_NAME)
+        self.alert_driver = driver_lib.AlertDriver(
+            session_service=self.session_service)
+        self.resume = resume_lib.ResumeService(session=self.session,
+                                               config_dir=self.config_dir,
+                                               alert_driver=self.alert_driver,
+                                               pedantic=True)
+        self.resume.start()
+        self.alert_driver.start()
+
+    def tearDown(self):
+        self.resume.terminate()
+        self.resume.join()
+        self.alert_driver.terminate()
+        self.alert_driver.join()
+
+        self.tempdir.cleanup()
 
     def test_mid_download(self):
-        have_block = set()
-
-        def handle_alert(alert):
-            if isinstance(alert, lt.block_finished_alert):
-                have_block.add((alert.piece_index, alert.block_index))
-
-        self.alert_driver.add(handle_alert)
         atp = self.torrent.atp()
         atp.flags &= ~lt.torrent_flags.paused
         atp.save_path = self.tempdir.name
@@ -144,27 +145,29 @@ class AbortTest(BaseTest):
         handle.add_piece(0, self.torrent.pieces[0].decode(), 0)
 
         for _ in lib.loop_until_timeout(5, msg="piece finish"):
-            self.pump_events()
-            if have_block:
+            status = handle.status(flags=lt.torrent_handle.query_pieces)
+            if any(status.pieces):
                 break
 
-        self.session.pause()
-        self.resume.abort()
-
-        for _ in lib.loop_until_timeout(5, msg="resume data write"):
-            self.pump_events()
-            atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
-            if atps:
-                atp = atps[0]
-                if atp.have_pieces and atp.have_pieces[0]:
+        # TODO: maybe we need to move this into ResumeService
+        iterator = self.alert_driver.iter_alerts(lt.alert_category.storage,
+                                                 lt.cache_flushed_alert,
+                                                 handle=handle)
+        with iterator:
+            handle.flush_cache()
+            for alert in iterator:
+                if isinstance(alert, lt.cache_flushed_alert):
                     break
 
-        for _ in lib.loop_until_timeout(5, msg="resume data write"):
-            self.pump_events()
-            if self.resume.done():
-                break
+        self.session.pause()
+        self.resume.terminate()
+        self.resume.join()
 
-        self.resume.wait()
+        atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
+        self.assertEqual(len(atps), 1)
+        atp = atps[0]
+        self.assertNotEqual(len(atp.have_pieces), 0)
+        self.assertTrue(atp.have_pieces[0])
 
     def test_finished(self):
         atp = self.torrent.atp()
@@ -177,30 +180,44 @@ class AbortTest(BaseTest):
             handle.add_piece(i, piece.decode(), 0)
 
         for _ in lib.loop_until_timeout(5, msg="finished state"):
-            self.pump_events()
             status = handle.status()
             if status.state in (status.finished, status.seeding):
                 break
 
         self.session.pause()
-        self.resume.abort()
+        self.resume.terminate()
+        self.resume.join()
 
-        for _ in lib.loop_until_timeout(5, msg="resume data write"):
-            self.pump_events()
-            atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
-            if atps:
-                atp = atps[0]
-                if atp.have_pieces and all(atp.have_pieces):
-                    break
+        atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
+        self.assertEqual(len(atps), 1)
+        atp = atps[0]
+        self.assertNotEqual(len(atp.have_pieces), 0)
+        self.assertTrue(all(atp.have_pieces))
 
-        for _ in lib.loop_until_timeout(5, msg="finalize"):
-            self.pump_events()
-            if self.resume.done():
+    def test_remove_before_save(self):
+        for _ in lib.loop_until_timeout(5, msg="remove-before-save"):
+            atp = self.torrent.atp()
+            atp.flags &= ~lt.torrent_flags.paused
+            atp.save_path = self.tempdir.name
+            handle = self.session.add_torrent(atp)
+            request_test_utils.wait_done_checking_or_error(handle)
+
+            try:
+                with ltpy.translate_exceptions():
+                    self.session.remove_torrent(handle)
+                    self.resume.save(handle)
                 break
+            except ltpy.InvalidTorrentHandleError:
+                pass
 
-        self.resume.wait()
+        self.session.pause()
+        self.resume.terminate()
+        self.resume.join()
 
-    def test_finish_remove_abort_quickly(self):
+        atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
+        self.assertEqual(atps, [])
+
+    def test_finish_remove_terminate(self):
         atp = self.torrent.atp()
         atp.flags &= ~lt.torrent_flags.paused
         atp.save_path = self.tempdir.name
@@ -211,26 +228,30 @@ class AbortTest(BaseTest):
             handle.add_piece(i, piece.decode(), 0)
 
         for _ in lib.loop_until_timeout(5, msg="finished state"):
-            self.pump_events()
             status = handle.status()
             if status.state in (status.finished, status.seeding):
                 break
 
-        # Remove, pause and abort before we process any alerts. ResumeService
-        # should try to save_resume_data() on an invalid handle. This is
-        # timing-dependent but I don't have a way to force it.
+        # Remove, pause and terminate before we process any alerts.
+        # ResumeService should try to save_resume_data() on an invalid handle.
+        # This is timing-dependent but I don't have a way to force it.
         self.session.remove_torrent(handle)
         self.session.pause()
-        self.resume.abort()
+        self.resume.terminate()
+        self.resume.join()
 
-        for _ in lib.loop_until_timeout(5, msg="resume data delete"):
-            self.pump_events()
-            if not list(resume_lib.iter_resume_data_from_disk(self.config_dir)):
-                break
+        atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
+        self.assertEqual(atps, [])
 
-        for _ in lib.loop_until_timeout(5, msg="finalize"):
-            self.pump_events()
-            if self.resume.done():
-                break
 
-        self.resume.wait()
+# TODO: test underflow, with and without pedantic
+
+# TODO: test magnets
+
+# TODO: test io errors, with and without pedantic
+
+# TODO: test io errors when loading
+
+# TODO: at end of tests, load atp into new session
+
+# TODO: test save with invalid handle

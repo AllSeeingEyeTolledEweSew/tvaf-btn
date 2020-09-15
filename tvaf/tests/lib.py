@@ -19,6 +19,24 @@ from typing import Generator
 import apsw
 
 import tvaf.types
+from tvaf import config as config_lib
+from tvaf import session as session_lib
+
+
+def create_isolated_config() -> config_lib.Config:
+    return config_lib.Config(session_enable_dht=False,
+                             session_enable_lsd=False,
+                             session_enable_natpmp=False,
+                             session_enable_upnp=False,
+                             session_listen_interfaces="127.0.0.1:0",
+                             session_alert_mask=0)
+
+
+def create_isolated_session_service(*,
+                                    alert_mask: int = 0
+                                   ) -> session_lib.SessionService:
+    return session_lib.SessionService(alert_mask=alert_mask,
+                                      config=create_isolated_config())
 
 
 def loop_until_timeout(timeout: float, msg: str = "condition") -> Generator:

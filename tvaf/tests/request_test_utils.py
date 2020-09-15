@@ -1,6 +1,5 @@
 import pathlib
 import tempfile
-import time
 import unittest
 
 import libtorrent as lt
@@ -9,11 +8,10 @@ from tvaf import config as config_lib
 from tvaf import driver as driver_lib
 from tvaf import lt4604
 from tvaf import request as request_lib
-from tvaf import types
+from tvaf import resume as resume_lib
 
 from . import lib
 from . import tdummy
-from . import test_utils
 
 
 def wait_done_checking_or_error(handle: lt.torrent_handle):
@@ -26,99 +24,95 @@ def wait_done_checking_or_error(handle: lt.torrent_handle):
             break
 
 
+def read_all(request: request_lib.Request, msg="read all data", timeout=5):
+    chunks = []
+    for _ in lib.loop_until_timeout(timeout, msg=msg):
+        chunk = request.read(timeout=0)
+        if chunk is not None:
+            if len(chunk) == 0:
+                break
+            chunks.append(bytes(chunk))
+    return b"".join(chunks)
+
+
 class RequestServiceTestCase(unittest.TestCase):
     """Tests for tvaf.dal.create_schema()."""
 
     def setUp(self):
+        self.torrent = tdummy.DEFAULT
         self.tempdir = tempfile.TemporaryDirectory()
         self.config_dir = pathlib.Path(self.tempdir.name)
-        self.config = config_lib.Config(
-            torrent_default_save_path=str(self.config_dir))
+        self.config = config_lib.Config()
         self.init_session()
 
-    def init_session(self):
-        self.session = test_utils.create_isolated_session()
-        self.service = request_lib.RequestService(session=self.session,
-                                                  config=self.config,
-                                                  config_dir=self.config_dir)
-        self.alert_driver = driver_lib.AlertDriver(session=self.session)
-        self.tick_driver = driver_lib.TickDriver()
-        self.lt4604_fixup = lt4604.Fixup(tick_driver=self.tick_driver)
+    def teardown_session(self):
+        self.service.terminate()
+        self.service.join()
+        self.resume_service.terminate()
+        self.resume_service.join()
+        self.alert_driver.terminate()
+        self.alert_driver.join()
 
-        self.alert_driver.add(self.service.handle_alert)
-        self.alert_driver.add(self.lt4604_fixup.handle_alert)
+    def init_session(self):
+        self.session_service = lib.create_isolated_session_service()
+        self.session = self.session_service.session
+        self.alert_driver = driver_lib.AlertDriver(
+            session_service=self.session_service)
+        self.resume_service = resume_lib.ResumeService(
+            config_dir=self.config_dir,
+            alert_driver=self.alert_driver,
+            session=self.session)
+        self.service = request_lib.RequestService(
+            session=self.session,
+            config=self.config,
+            config_dir=self.config_dir,
+            alert_driver=self.alert_driver,
+            resume_service=self.resume_service)
+        self.lt4604_fixup = lt4604.Fixup(alert_driver=self.alert_driver)
+
+        self.alert_driver.start()
+        # Not currently starting ResumeService
+        self.service.start()
+        self.resume_service.start()
 
     def tearDown(self):
+        self.teardown_session()
         self.tempdir.cleanup()
-
-    def pump_alerts(self, condition, msg="condition", timeout=5):
-        condition_deadline = time.monotonic() + timeout
-        while not condition():
-            now = time.monotonic()
-            self.assertLess(now, condition_deadline, msg=f"{msg} timed out")
-            self.tick_driver.tick(now)
-            self.alert_driver.pump_alerts()
 
     def feed_pieces(self, piece_indexes=None):
         if not piece_indexes:
-            piece_indexes = list(range(len(tdummy.PIECES)))
+            piece_indexes = list(range(len(self.torrent.pieces)))
         handle = self.wait_for_torrent()
         # https://github.com/arvidn/libtorrent/issues/4980: add_piece() while
         # checking silently fails in libtorrent 1.2.8.
         wait_done_checking_or_error(handle)
         for i in piece_indexes:
             # NB: bug in libtorrent where add_piece accepts str but not bytes
-            handle.add_piece(i, tdummy.PIECES[i].decode(), 0)
-
-    def read_all(self, req, msg="read all data", timeout=5):
-        chunks = []
-
-        def read_and_check():
-            while req.has_next():
-                chunk = req.get_next(timeout=0)
-                if not chunk:
-                    break
-                chunks.append(bytes(chunk))
-            return not req.has_next()
-
-        self.pump_alerts(read_and_check, msg=msg, timeout=timeout)
-        return b"".join(chunks)
-
-    def pump_and_find_first_alert(self, condition, timeout=5):
-        deadline = time.monotonic() + timeout
-        while True:
-            alert = self.session.wait_for_alert(
-                int((deadline - time.monotonic()) * 1000))
-            if not alert:
-                assert False, "condition timed out"
-            saved = None
-            for alert in self.session.pop_alerts():
-                self.service.handle_alert(alert)
-                if condition(alert) and saved is None:
-                    saved = alert
-            if saved is not None:
-                return saved
+            handle.add_piece(i, self.torrent.pieces[i].decode(), 0)
 
     def add_req(self,
                 mode=request_lib.Mode.READ,
-                infohash=tdummy.INFOHASH,
-                start=0,
-                stop=len(tdummy.DATA),
-                user="tvaf",
-                get_torrent=lambda: lt.bencode(tdummy.DICT)):
-        tslice = types.TorrentSlice(info_hash=infohash, start=start, stop=stop)
-        params = request_lib.Params(tslice=tslice,
-                                    mode=mode,
-                                    user=user,
-                                    get_torrent=get_torrent)
-        return self.service.add_request(params)
+                start=None,
+                stop=None,
+                get_add_torrent_params=None):
+        if start is None:
+            start = 0
+        if stop is None:
+            stop = self.torrent.length
+        if get_add_torrent_params is None:
+            get_add_torrent_params = self.torrent.atp
+        return self.service.add_request(
+            mode=mode,
+            info_hash=self.torrent.infohash,
+            start=start,
+            stop=stop,
+            get_add_torrent_params=get_add_torrent_params)
 
     def wait_for_torrent(self):
-
-        def find():
-            return self.session.find_torrent(tdummy.SHA1_HASH)
-
-        self.pump_alerts(lambda: find().is_valid(), msg="add")
-        handle = find()
-        self.assertTrue(handle.is_valid())
+        handle = None
+        for _ in lib.loop_until_timeout(5, msg="add torrent"):
+            handle = self.session.find_torrent(
+                lt.sha1_hash(bytes.fromhex(self.torrent.infohash)))
+            if handle.is_valid():
+                break
         return handle

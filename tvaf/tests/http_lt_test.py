@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import tempfile
 import unittest
 
 import flask
@@ -9,22 +10,23 @@ from tvaf.http import lt as http_lt
 
 from . import lib
 from . import tdummy
-from . import test_utils
 
 
 class TestV1Base(unittest.TestCase):
 
     def setUp(self):
-        self.session = test_utils.create_isolated_session()
+        self.session = lib.create_isolated_session_service().session
         self.app = flask.Flask(__name__)
         self.v1_blueprint = http_lt.V1Blueprint(self.session)
         self.app.register_blueprint(self.v1_blueprint.blueprint)
         self.app.config["TESTING"] = True
         self.client = self.app.test_client()
         self.client.__enter__()
+        self.tempdir = tempfile.TemporaryDirectory()
 
     def tearDown(self):
         self.client.__exit__(None, None, None)
+        self.tempdir.cleanup()
 
 
 class TestSingleTorrent(TestV1Base, lib.TestCase):
@@ -44,7 +46,9 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
     def test_valid(self):
         torrent = tdummy.DEFAULT
 
-        self.session.add_torrent(torrent.atp())
+        atp = torrent.atp()
+        atp.save_path = self.tempdir.name
+        self.session.add_torrent(atp)
         response = self.client.get("/torrents/%s" % torrent.infohash)
         self.assertEqual(response.status_code, 200)
         data = response.json
@@ -76,7 +80,9 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
     def test_valid_stable(self):
         torrent = tdummy.DEFAULT_STABLE
 
-        self.session.add_torrent(torrent.atp())
+        atp = torrent.atp()
+        atp.save_path = self.tempdir.name
+        self.session.add_torrent(atp)
         response = self.client.get("/torrents/%s" % torrent.infohash)
         self.assertEqual(response.status_code, 200)
         data = response.json
@@ -97,7 +103,9 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
     def test_query_fields(self):
         torrent = tdummy.DEFAULT
 
-        self.session.add_torrent(torrent.atp())
+        atp = torrent.atp()
+        atp.save_path = self.tempdir.name
+        self.session.add_torrent(atp)
         response = self.client.get("/torrents/%s?fields=pieces,info_hash" %
                                    torrent.infohash)
         self.assertEqual(response.status_code, 200)
@@ -117,7 +125,9 @@ class TestTorrents(TestV1Base, lib.TestCase):
     def test_valid_stable(self):
         torrent = tdummy.DEFAULT_STABLE
 
-        self.session.add_torrent(torrent.atp())
+        atp = torrent.atp()
+        atp.save_path = self.tempdir.name
+        self.session.add_torrent(atp)
         response = self.client.get("/torrents")
         self.assertEqual(response.status_code, 200)
         data = response.json
@@ -140,7 +150,9 @@ class TestTorrents(TestV1Base, lib.TestCase):
     def test_query_fields(self):
         torrent = tdummy.DEFAULT
 
-        self.session.add_torrent(torrent.atp())
+        atp = torrent.atp()
+        atp.save_path = self.tempdir.name
+        self.session.add_torrent(atp)
         response = self.client.get("/torrents?fields=pieces,info_hash")
         self.assertEqual(response.status_code, 200)
         data = response.json

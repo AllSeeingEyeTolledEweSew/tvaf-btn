@@ -1,4 +1,4 @@
-import os
+import tempfile
 
 import libtorrent as lt
 
@@ -6,7 +6,6 @@ from tvaf.http import serialization
 
 from . import lib
 from . import tdummy
-from . import test_utils
 
 
 class TorrentInfoSerializerTest(lib.TestCase):
@@ -29,8 +28,13 @@ class TorrentInfoSerializerTest(lib.TestCase):
 class TorrentStatusSerializer(lib.TestCase):
 
     def setUp(self):
-        self.session = test_utils.create_isolated_session()
+        self.session = lib.create_isolated_session_service().session
+        self.tempdir = tempfile.TemporaryDirectory()
         self.atp = lt.add_torrent_params()
+        self.atp.save_path = self.tempdir.name
+
+    def tearDown(self):
+        self.tempdir.cleanup()
 
     def test_serialize_default_fields(self):
         self.atp.ti = tdummy.DEFAULT_STABLE.torrent_info()
@@ -38,7 +42,7 @@ class TorrentStatusSerializer(lib.TestCase):
         serializer = serialization.TorrentStatusSerializer()
         result = serializer.serialize(handle.status())
         self.assertGreater(result.pop("added_time"), 0)
-        self.assertEqual(result.pop("save_path"), os.getcwd())
+        self.assertEqual(result.pop("save_path"), self.tempdir.name)
         self.assert_golden_json(result)
 
     def test_serialize_stable_fields(self):
@@ -54,8 +58,13 @@ class TorrentStatusSerializer(lib.TestCase):
 class TorrentHandleSerializer(lib.TestCase):
 
     def setUp(self):
-        self.session = test_utils.create_isolated_session()
+        self.session = lib.create_isolated_session_service().session
+        self.tempdir = tempfile.TemporaryDirectory()
         self.atp = lt.add_torrent_params()
+        self.atp.save_path = self.tempdir.name
+
+    def tearDown(self):
+        self.tempdir.cleanup()
 
     def test_serialize_default_fields(self):
         self.atp.ti = tdummy.DEFAULT_STABLE.torrent_info()

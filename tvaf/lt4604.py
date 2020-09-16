@@ -21,7 +21,7 @@ from tvaf import task as task_lib
 
 # This approach lets us avoid subscribing to piece_progress alerts.
 
-HAVE_BUG = (tuple(int(i) for i in lt.version.split(".")) < (1, 2, 7))
+HAVE_BUG = (tuple(int(i) for i in lt.__version__.split(".")) < (1, 2, 7))
 _LOG = logging.getLogger(__name__)
 _HASH_TIMEOUT = 3
 _ISSUE_URL = "https://github.com/arvidn/libtorrent/issues/4604"

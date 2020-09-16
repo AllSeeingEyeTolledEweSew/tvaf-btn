@@ -11,6 +11,8 @@ from typing import TypedDict
 from typing import Union
 from typing import overload
 
+_ConvertsToString = Union[str, bytes]
+
 class tracker_source(int):
     name: str
     names:Dict[str, tracker_source]
@@ -94,6 +96,55 @@ class file_flags_t:
     flag_symlink: int
 
 
+class create_torrent:
+    @overload
+    def __init__(self, fs:file_storage, piece_size:int=..., pad_file_limit:int=..., flags:int=...): ...
+    @overload
+    def __init__(self, ti:torrent_info): ...
+    def generate(self) -> Dict[bytes, Any]: ...
+    def files(self) -> file_storage: ...
+    def set_comment(self, comment:str) -> None: ...
+    def set_creator(self, creator:str) -> None: ...
+    def set_hash(self, index:int, b:bytes) -> None: ...
+    def set_file_hash(self, index:int, b:bytes) -> None: ...
+    def add_url_seed(self, url:_ConvertsToString) -> None: ...
+    def add_http_seed(self, url:_ConvertsToString) -> None: ...
+    def add_node(self, addr:str, port:int) -> None: ...
+    def add_tracker(self, announce_url:str, tier:int=...) -> None: ...
+    def set_priv(self, priv:bool) -> None: ...
+    def num_pieces(self) -> int: ...
+    def piece_length(self) -> int: ...
+    def piece_size(self, index:int) -> int: ...
+    def priv(self) -> bool: ...
+    def set_root_cert(self, pem:_ConvertsToString) -> None: ...
+    def add_collection(self, c:_ConvertsToString) -> None: ...
+    def add_similar_torrent(self, ih:sha1_hash) -> None: ...
+
+    merkle: int
+    modification_time: int
+    optimize_alignment: int
+    symlinks: int
+
+class create_torrent_flags_t:
+    merkle: int
+    modification_time: int
+    optimize_alignment: int
+    symlinks: int
+
+@overload
+def add_files(t:create_torrent, fs:file_storage, path:str, flags:int=...) -> None: ...
+@overload
+def add_files(t:create_torrent, fs:file_storage, path:str, predicate: Callable[[str], bool], flags:int=...) -> None: ...
+
+@overload
+def set_piece_hashes(t:create_torrent, path:str, callback:Callable[[int], Any]) -> None: ...
+@overload
+def set_piece_hashes(t:create_torrent, path:str) -> None: ...
+
+
+def generate_fingerprint(name:_ConvertsToString, major:int, minor:int, rev:int, tag:int) -> str: ...
+
+
 class announce_entry:
     def __init__(self, url:str) -> None: ...
     url: str
@@ -107,10 +158,14 @@ class announce_entry:
 
 
 class sha1_hash:
-    def __init__(self, info_hash:bytes) -> None: ...
+    def __init__(self, info_hash:_ConvertsToString) -> None: ...
+    def clear(self) -> None: ...
     def is_all_zeros(self) -> bool: ...
     def to_bytes(self) -> bytes: ...
-    def __str__(self) -> str: ...
+    def to_string(self) -> str: ...
+
+
+peer_id = sha1_hash
 
 
 class _WebSeed(TypedDict):
@@ -123,10 +178,21 @@ _Entry = Union[bytes, Dict[bytes, Any], List, int]
     
 
 class torrent_info:
-    def __init__(self, entry:_Entry) -> None: ...
+    @overload
+    def __init__(self, entry:_Entry): ...
+    @overload
+    def __init__(self, entry:_Entry, limits:Dict[str, Any]): ...
+    @overload
+    def __init__(self, filename:str): ...
+    @overload
+    def __init__(self, filename:str, limits:Dict[str, Any]): ...
+    @overload
+    def __init__(self, info_hash:sha1_hash): ...
+    @overload
+    def __init__(self, ti:torrent_info): ...
     def add_http_seed(self, url:str, extern_auth:str, extra_headers:List[Tuple[str, str]]) -> None: ...
     def add_node(self, hostname:str, port:int) -> None: ...
-    def add_tracker(self, url:str, tier:int, source:tracker_source) -> None: ...
+    def add_tracker(self, url:str, tier:int, source:tracker_source=...) -> None: ...
     def add_url_seed(self, url:str, extern_auth:str, extra_headers:List[Tuple[str, str]]) -> None: ...
     def collections(self) -> List[str]: ...
     def comment(self) -> str: ...
@@ -788,7 +854,6 @@ class peer_alert(torrent_alert):
 class tracker_error_alert(tracker_alert):
     error: error_code
     def error_message(self) -> str: ...
-    status_code: int
     times_in_row: int
 
 class tracker_warning_alert(tracker_alert):
@@ -1370,6 +1435,80 @@ create_ut_metadata_plugin: str
 create_ut_pex_plugin: str
 create_smart_ban_plugin: str
 
+class choking_algorithm_t(int):
+    name: str
+    names:Dict[str, choking_algorithm_t]
+    values:Dict[int, choking_algorithm_t]
+
+    fixed_slots_choker: choking_algorithm_t
+    rate_based_choker: choking_algorithm_t
+
+class seed_choking_algorithm_t(int):
+    name: str
+    names:Dict[str, seed_choking_algorithm_t]
+    values:Dict[int, seed_choking_algorithm_t]
+
+    round_robin: seed_choking_algorithm_t
+    fastest_upload: seed_choking_algorithm_t
+    anti_leech: seed_choking_algorithm_t
+
+class suggest_mode_t(int):
+    name: str
+    names:Dict[str, suggest_mode_t]
+    values:Dict[int, suggest_mode_t]
+
+    no_piece_suggestions: suggest_mode_t
+    suggest_read_cache: suggest_mode_t
+
+class io_buffer_mode_t(int):
+    name: str
+    names:Dict[str, io_buffer_mode_t]
+    values:Dict[int, io_buffer_mode_t]
+
+    enable_os_cache: io_buffer_mode_t
+    disable_os_cache: io_buffer_mode_t
+
+class bandwidth_mixed_algo_t(int):
+    name: str
+    names:Dict[str, bandwidth_mixed_algo_t]
+    values:Dict[int, bandwidth_mixed_algo_t]
+
+    prefer_tcp: bandwidth_mixed_algo_t
+    peer_proportional: bandwidth_mixed_algo_t
+
+class enc_policy(int):
+    name: str
+    names:Dict[str, enc_policy]
+    values:Dict[int, enc_policy]
+
+    pe_forced: enc_policy
+    pe_enabled: enc_policy
+    pe_disabled: enc_policy
+
+class enc_level(int):
+    name: str
+    names:Dict[str, enc_level]
+    values:Dict[int, enc_level]
+
+    pe_rc4: enc_level
+    pe_plaintext: enc_level
+    pe_both: enc_level
+
+
+class proxy_type_t(int): 
+    name: str
+    names:Dict[str, proxy_type_t]
+    values:Dict[int, proxy_type_t]
+
+    none: proxy_type_t
+    socks4: proxy_type_t
+    socks5: proxy_type_t
+    socks5_pw: proxy_type_t
+    http: proxy_type_t
+    http_pw: proxy_type_t
+    i2p_proxy: proxy_type_t
+
+
 def bdecode(_:bytes) -> _Entry: ...
 def bencode(_:Optional[_Entry]) -> bytes: ...
 
@@ -1380,4 +1519,4 @@ def make_magnet_uri(ti:torrent_info) -> str: ...
 def parse_magnet_uri(uri:str) -> add_torrent_params: ...
 def parse_magnet_uri_dict(uri:str) -> Dict[str, Any]: ...
 
-version:str
+__version__:str

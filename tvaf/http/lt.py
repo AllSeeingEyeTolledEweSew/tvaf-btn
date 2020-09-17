@@ -81,7 +81,7 @@ class V1Blueprint(http_util.Blueprint):
         super().__init__("v1", __name__)
         self.session = session
 
-    def find_torrent(self, info_hash: str):
+    def find_torrent(self, info_hash: str) -> lt.torrent_handle:
         try:
             info_hash_bytes = bytes.fromhex(info_hash)
         except ValueError as exc:

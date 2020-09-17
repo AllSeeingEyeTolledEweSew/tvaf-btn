@@ -9,8 +9,10 @@ import time
 import weakref
 from typing import Any
 from typing import Collection
+from typing import Deque
 from typing import Dict
 from typing import Iterable
+from typing import Iterator as TypingIterator
 from typing import List
 from typing import Optional
 from typing import Set
@@ -31,7 +33,7 @@ _LOG = logging.getLogger(__name__)
 def log_alert(alert: lt.alert,
               message: str = "",
               args: Iterable[Any] = (),
-              method=None):
+              method=None) -> None:
     prefix = "%s"
     prefix_args = [alert.__class__.__name__]
     torrent_name = getattr(alert, "torrent_name", None)
@@ -77,10 +79,10 @@ class CheckpointTimeout(Error):
 
 class Iterator(collections.abc.Iterator, contextlib.AbstractContextManager):
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._condition = threading.Condition(threading.RLock())
-        self._deque: collections.deque[lt.alert] = collections.deque()
-        self._exception: Optional[Exception] = None
+        self._deque: Deque[lt.alert] = collections.deque()
+        self._exception: Optional[BaseException] = None
         self._safe: bool = True
         self._notify_safe_file: Optional[io.RawIOBase] = None
 
@@ -95,13 +97,13 @@ class Iterator(collections.abc.Iterator, contextlib.AbstractContextManager):
                 self._set_safe()
                 self._condition.wait()
 
-    def set_safe(self):
+    def set_safe(self) -> None:
         with self._condition:
             if not self._exception:
                 raise ValueError("must be closed before being marked safe")
             self._set_safe()
 
-    def _set_safe(self):
+    def _set_safe(self) -> None:
         with self._condition:
             if self._safe:
                 return
@@ -126,7 +128,7 @@ class Iterator(collections.abc.Iterator, contextlib.AbstractContextManager):
             self._condition.notify_all()
             return True
 
-    def close(self, exception: Exception = None):
+    def close(self, exception: BaseException = None) -> None:
         with self._condition:
             if self._exception:
                 return
@@ -144,7 +146,7 @@ class Iterator(collections.abc.Iterator, contextlib.AbstractContextManager):
         with self._condition:
             return self._safe
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.close()
         self.set_safe()
 
@@ -155,13 +157,13 @@ _Type = Type[lt.alert]
 class _IndexEntry:
 
     def __init__(self, iterator: Iterator, types: Collection[_Type],
-                 handle: Optional[lt.torrent_handle], alert_mask: int):
+                 handle: Optional[lt.torrent_handle], alert_mask: int) -> None:
         self.ref = weakref.ref(iterator)
         self.types = set(types)
         self.handle = handle
         self.alert_mask = alert_mask
 
-    def accept(self, alert: lt.alert):
+    def accept(self, alert: lt.alert) -> bool:
         if self.handle:
             if isinstance(alert,
                           lt.torrent_alert) and alert.handle != self.handle:
@@ -179,7 +181,7 @@ class _IndexEntry:
 
 class _Index:
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Holders indexed by their filter parameters. If type or handle is
         # None, it indicates the type/handle is not filtered, and those
         # iterators should receive all alerts
@@ -206,7 +208,7 @@ class _Index:
                 if not handle_to_entries:
                     del self.type_to_handle_to_entries[type_]
 
-    def iter_entries(self):
+    def iter_entries(self) -> TypingIterator[_IndexEntry]:
         for handle_to_entries in self.type_to_handle_to_entries.values():
             for entries in handle_to_entries.values():
                 for entry in entries:
@@ -237,7 +239,7 @@ class _Index:
         return iter_to_alerts
 
 
-def _dying_gasp(wfile: io.RawIOBase):
+def _dying_gasp(wfile: io.RawIOBase) -> None:
     # It's hard to reason about whether there are any cases where the rfile
     # could get closed before the wfile, especially if we change the code; but
     # this could only happen after we no longer care about it.  Capture
@@ -249,7 +251,7 @@ def _dying_gasp(wfile: io.RawIOBase):
 
 
 def _close_if_removed(session: lt.session, handle: lt.torrent_handle,
-                      iterator: Iterator):
+                      iterator: Iterator) -> None:
     if not ltpy.handle_in_session(handle, session):
         # TODO: make this constructor nicer
         ec = lt.error_code(ltpy.LibtorrentErrorValue.INVALID_TORRENT_HANDLE,
@@ -259,7 +261,7 @@ def _close_if_removed(session: lt.session, handle: lt.torrent_handle,
 
 class _IteratorCollection:
 
-    def __init__(self, *, session_service: session_lib.SessionService):
+    def __init__(self, *, session_service: session_lib.SessionService) -> None:
         self._session_service = session_service
         self._session = session_service.session
         self._lock = threading.Lock()
@@ -309,7 +311,7 @@ class _IteratorCollection:
                                                  self._session, handle,
                                                  iterator)
 
-            def close_on_error(_):
+            def close_on_error(_) -> None:
                 exc = future.exception()
                 if exc is not None:
                     iterator.close(exc)
@@ -318,7 +320,7 @@ class _IteratorCollection:
 
         return iterator
 
-    def _select_events_locked(self, timeout: float = None):
+    def _select_events_locked(self, timeout: float = None) -> None:
         self._lock.release()
         try:
             events = self._selector.select(timeout=timeout)
@@ -348,7 +350,7 @@ class _IteratorCollection:
             if iterator is not None and iterator.is_safe():
                 self._unsafe_iters.discard(iterator)
 
-    def _dispatch_locked(self, alerts: List[lt.alert]):
+    def _dispatch_locked(self, alerts: List[lt.alert]) -> None:
         assert not self._unsafe_iters
 
         self._alerts = alerts
@@ -380,7 +382,7 @@ class _IteratorCollection:
             self._alert_to_index.clear()
             return True
 
-    def pump_alerts(self, timeout: float = None):
+    def pump_alerts(self, timeout: float = None) -> None:
         if not self.wait_for_checkpoint(timeout=timeout):
             raise CheckpointTimeout()
 
@@ -390,7 +392,7 @@ class _IteratorCollection:
         with self._lock:
             self._dispatch_locked(alerts)
 
-    def close(self, exception: Exception):
+    def close(self, exception: BaseException) -> None:
         with self._lock:
             for entry in self._index.iter_entries():
                 iterator = entry.ref()
@@ -403,7 +405,7 @@ class AlertDriver(task_lib.Task):
     ABORT_CHECK_INTERVAL = 1.0
     CHECKPOINT_TIMEOUT = 10.0
 
-    def __init__(self, *, session_service: session_lib.SessionService):
+    def __init__(self, *, session_service: session_lib.SessionService) -> None:
         super().__init__(title="AlertDriver", thread_name="alert-driver")
         self._session = session_service.session
         self._collection = _IteratorCollection(session_service=session_service)
@@ -421,7 +423,7 @@ class AlertDriver(task_lib.Task):
                                     handle=handle,
                                     start=start)
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         self._collection.close(DriverShutdown())
         try:
             self._notify_wfile.write(b"\0")
@@ -433,7 +435,7 @@ class AlertDriver(task_lib.Task):
             timeout = self.CHECKPOINT_TIMEOUT
         self._collection.pump_alerts(timeout=timeout)
 
-    def _try_pump_alerts(self):
+    def _try_pump_alerts(self) -> None:
         try:
             self.pump_alerts()
         except CheckpointTimeout:
@@ -441,9 +443,11 @@ class AlertDriver(task_lib.Task):
                 "Some alert iterators still marked unsafe after %ss. Alert "
                 "handling cannot proceed.", self.CHECKPOINT_TIMEOUT)
 
-    def _run_select(self):
+    def _run_select(self) -> None:
         with ltpy.translate_exceptions():
-            self._session.set_alert_fd(self._notify_wfile.fileno())
+            # TODO: how do I make this type kosher?
+            session = cast(Any, self._session)
+            session.set_alert_fd(self._notify_wfile.fileno())
 
         selector = selectors.DefaultSelector()
         selector.register(self._notify_rfile, selectors.EVENT_READ)
@@ -451,16 +455,16 @@ class AlertDriver(task_lib.Task):
         while not self._terminated.is_set():
             self._try_pump_alerts()
             for key, _ in selector.select():
-                key.fileobj.read()
+                cast(io.RawIOBase, key.fileobj).read()
 
-    def _run_polling(self):
+    def _run_polling(self) -> None:
         while not self._terminated.is_set():
             self._try_pump_alerts()
             with ltpy.translate_exceptions():
                 self._session.wait_for_alert(
                     int(self.ABORT_CHECK_INTERVAL * 1000))
 
-    def _run(self):
+    def _run(self) -> None:
         if hasattr(self._session, "set_alert_fd"):
             self._run_select()
         else:

@@ -22,6 +22,7 @@ from typing import Any
 from typing import Dict
 from typing import Iterator
 from typing import List
+from typing import Mapping
 from typing import Optional
 from typing import Tuple
 from typing import Union
@@ -51,7 +52,7 @@ class Stat:
     perms: int = -1
     mtime: Optional[int] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.perms == -1:
             if self.filetype == stat_lib.S_IFDIR:
                 self.perms = 0o555
@@ -115,7 +116,7 @@ class Node:
                  filetype: int = None,
                  perms: int = None,
                  size: int = None,
-                 mtime: int = None):
+                 mtime: int = None) -> None:
         self.name = name
         self.parent = parent
         self.filetype = filetype
@@ -231,7 +232,11 @@ def _partial_traverse(
 class Dir(Node, abc.ABC):
     """A virtual directory."""
 
-    def __init__(self, *, perms: int = None, mtime: int = None, size: int = 0):
+    def __init__(self,
+                 *,
+                 perms: int = None,
+                 mtime: int = None,
+                 size: int = 0) -> None:
         super().__init__(filetype=stat_lib.S_IFDIR,
                          perms=perms,
                          mtime=mtime,
@@ -330,7 +335,7 @@ class Dir(Node, abc.ABC):
 class DictDir(Dir, abc.ABC):
 
     @abc.abstractmethod
-    def get_dict(self) -> Dict[str, Node]:
+    def get_dict(self) -> Mapping[str, Node]:
         raise mkoserror(errno.ENOSYS)
 
     def get_node(self, name: str) -> Optional[Node]:
@@ -351,17 +356,17 @@ class StaticDir(DictDir):
         children: A name-to-Node dictionary.
     """
 
-    def __init__(self, *, mtime: int = None, perms: int = None):
+    def __init__(self, *, mtime: int = None, perms: int = None) -> None:
         super().__init__(mtime=mtime, perms=perms)
         self.children: Dict[str, Node] = {}
 
-    def mkchild(self, name: str, node: Node):
+    def mkchild(self, name: str, node: Node) -> None:
         """Adds a child node."""
         node.name = name
         node.parent = self
         self.children[name] = node
 
-    def get_dict(self):
+    def get_dict(self) -> Mapping[str, Node]:
         return self.children
 
 
@@ -378,7 +383,7 @@ class File(Node, abc.ABC):
                  *,
                  perms: int = None,
                  size: int = None,
-                 mtime: int = None):
+                 mtime: int = None) -> None:
         super().__init__(filetype=stat_lib.S_IFREG,
                          perms=perms,
                          size=size,
@@ -416,7 +421,7 @@ class Symlink(Node):
                  *,
                  target: SymlinkTarget = None,
                  perms: int = None,
-                 mtime: int = None):
+                 mtime: int = None) -> None:
         super().__init__(filetype=stat_lib.S_IFLNK,
                          perms=perms,
                          mtime=mtime,

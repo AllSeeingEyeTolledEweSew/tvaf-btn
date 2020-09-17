@@ -32,7 +32,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
 
     # pylint: disable=too-many-public-methods
 
-    def __init__(self, *args, root: fs.Dir, **kwargs):
+    def __init__(self, *args, root: fs.Dir, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.cur_dir = root
 
@@ -52,22 +52,22 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
             suffix="",
             prefix="",
             dir=None,  # pylint: disable=redefined-builtin
-            mode="wb"):
+            mode="wb") -> None:
         raise fs.mkoserror(errno.EROFS)
 
-    def mkdir(self, path: str):
+    def mkdir(self, path: str) -> None:
         raise fs.mkoserror(errno.EROFS)
 
-    def rmdir(self, path: str):
+    def rmdir(self, path: str) -> None:
         raise fs.mkoserror(errno.EROFS)
 
-    def rename(self, src: str, dst: str):
+    def rename(self, src: str, dst: str) -> None:
         raise fs.mkoserror(errno.EROFS)
 
-    def chmod(self, path: str, mode: str):
+    def chmod(self, path: str, mode: str) -> None:
         raise fs.mkoserror(errno.EROFS)
 
-    def utime(self, path: str, timeval):
+    def utime(self, path: str, timeval) -> None:
         raise fs.mkoserror(errno.EROFS)
 
     def get_user_by_uid(self, uid: int) -> str:
@@ -94,7 +94,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
             raise fs.mkoserror(errno.EINVAL)
         return symlink
 
-    def chdir(self, path: str):
+    def chdir(self, path: str) -> None:
         self.cur_dir = self._traverse_to_dir(path)
         self.cwd = str(self.cur_dir.abspath())
 
@@ -163,7 +163,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
 
 class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
 
-    def __init__(self, *, auth_service: auth.AuthService):
+    def __init__(self, *, auth_service: auth.AuthService) -> None:
         # pylint: disable=super-init-not-called
         self.auth_service = auth_service
 
@@ -173,23 +173,23 @@ class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
                  homedir: str,
                  perm: str = "elr",
                  msg_login: str = "Login successful.",
-                 msg_quit: str = "Goodbye."):
+                 msg_quit: str = "Goodbye.") -> None:
         raise NotImplementedError
 
-    def add_anonymous(self, homedir: str, **kwargs):
+    def add_anonymous(self, homedir: str, **kwargs) -> None:
         raise NotImplementedError
 
-    def remove_user(self, username: str):
+    def remove_user(self, username: str) -> None:
         raise NotImplementedError
 
     def override_perm(self,
                       username: str,
                       directory: str,
                       perm: str,
-                      recursive=False):
+                      recursive=False) -> None:
         raise NotImplementedError
 
-    def has_user(self, username: str):
+    def has_user(self, username: str) -> bool:
         raise NotImplementedError
 
     def get_msg_login(self, username: str) -> str:
@@ -207,16 +207,17 @@ class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
     def get_perms(self, username: str) -> str:
         return cast(str, self.read_perms)
 
-    def validate_authentication(self, username: str, password: str, handler):
+    def validate_authentication(self, username: str, password: str,
+                                handler) -> None:
         try:
             self.auth_service.auth_password_plain(username, password)
         except auth.AuthenticationFailed as exc:
             raise pyftpdlib.authorizers.AuthenticationFailed(exc)
 
-    def impersonate_user(self, username: str, password: str):
+    def impersonate_user(self, username: str, password: str) -> None:
         self.auth_service.push_user(username)
 
-    def terminate_impersonation(self, username: str):
+    def terminate_impersonation(self, username: str) -> None:
         self.auth_service.pop_user()
 
 
@@ -227,7 +228,7 @@ class _FTPHandler(pyftpdlib.handlers.FTPHandler):
     use_sendfile = False
 
     def __init__(self, *args, root: fs.Dir, auth_service: auth.AuthService,
-                 **kwargs):
+                 **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.authorizer = _Authorizer(auth_service=auth_service)
         self.abstracted_fs = _partialclass(_FS, root=root)
@@ -236,7 +237,7 @@ class _FTPHandler(pyftpdlib.handlers.FTPHandler):
 class FTPD(config_lib.HasConfig):
 
     def __init__(self, *, config: config_lib.Config, root: fs.Dir,
-                 auth_service: auth.AuthService):
+                 auth_service: auth.AuthService) -> None:
         self.auth_service = auth_service
         self.root = root
 
@@ -247,7 +248,7 @@ class FTPD(config_lib.HasConfig):
 
         self.set_config(config)
 
-    def set_config(self, config: config_lib.Config):
+    def set_config(self, config: config_lib.Config) -> None:
         config.setdefault("ftp_enabled", True)
         config.setdefault("ftp_bind_address", "localhost")
         config.setdefault("ftp_port", 8821)
@@ -288,12 +289,12 @@ class FTPD(config_lib.HasConfig):
                                            target=self.server.serve_forever)
             self.thread.start()
 
-    def abort(self):
+    def abort(self) -> None:
         with self._lock:
             if self.server is not None:
                 self.server.close_all()
 
-    def wait(self):
+    def wait(self) -> None:
         with self._lock:
             if self.thread is not None:
                 self.thread.join()

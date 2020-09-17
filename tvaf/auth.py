@@ -18,13 +18,13 @@ class AuthenticationFailed(Error):
 
 class _UserContext(contextlib.AbstractContextManager):
 
-    def __init__(self, auth_service: AuthService):
+    def __init__(self, auth_service: AuthService) -> None:
         self.auth_service = auth_service
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         pass
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.auth_service.pop_user()
 
 
@@ -33,10 +33,10 @@ class AuthService:
     USER = "tvaf"
     PASSWORD = "U15OwvGt"
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._local = threading.local()
 
-    def auth_password_plain(self, user: str, password: str):
+    def auth_password_plain(self, user: str, password: str) -> None:
         if (user, password) == (self.USER, self.PASSWORD):
             return
         raise AuthenticationFailed()
@@ -50,6 +50,6 @@ class AuthService:
     def get_user(self) -> Optional[str]:
         return cast(Optional[str], getattr(self._local, "user", None))
 
-    def pop_user(self):
+    def pop_user(self) -> None:
         assert self.get_user() is not None
         self._local.user = None

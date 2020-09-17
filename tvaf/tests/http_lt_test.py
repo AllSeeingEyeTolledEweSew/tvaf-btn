@@ -14,7 +14,7 @@ from . import tdummy
 
 class TestV1Base(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.session = lib.create_isolated_session_service().session
         self.app = flask.Flask(__name__)
         self.v1_blueprint = http_lt.V1Blueprint(self.session)
@@ -24,26 +24,26 @@ class TestV1Base(unittest.TestCase):
         self.client.__enter__()
         self.tempdir = tempfile.TemporaryDirectory()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.client.__exit__(None, None, None)
         self.tempdir.cleanup()
 
 
 class TestSingleTorrent(TestV1Base, lib.TestCase):
 
-    def test_malformed_url(self):
+    def test_malformed_url(self) -> None:
         response = self.client.get("/torrents/wxyz")
         self.assertEqual(response.status_code, 404)
 
-    def test_short_hex(self):
+    def test_short_hex(self) -> None:
         response = self.client.get("/torrents/abcd1234")
         self.assertEqual(response.status_code, 404)
 
-    def test_missing_torrent(self):
+    def test_missing_torrent(self) -> None:
         response = self.client.get("/torrents/%s" % ("0" * 40))
         self.assertEqual(response.status_code, 404)
 
-    def test_valid(self):
+    def test_valid(self) -> None:
         torrent = tdummy.DEFAULT
 
         atp = torrent.atp()
@@ -77,7 +77,7 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
         # Check remaining data against golden
         self.assert_golden_json(data)
 
-    def test_valid_stable(self):
+    def test_valid_stable(self) -> None:
         torrent = tdummy.DEFAULT_STABLE
 
         atp = torrent.atp()
@@ -100,7 +100,7 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
         # Check remaining data against golden
         self.assert_golden_json(data)
 
-    def test_query_fields(self):
+    def test_query_fields(self) -> None:
         torrent = tdummy.DEFAULT
 
         atp = torrent.atp()
@@ -117,12 +117,12 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
 
 class TestTorrents(TestV1Base, lib.TestCase):
 
-    def test_empty(self):
+    def test_empty(self) -> None:
         response = self.client.get("/torrents")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, [])
 
-    def test_valid_stable(self):
+    def test_valid_stable(self) -> None:
         torrent = tdummy.DEFAULT_STABLE
 
         atp = torrent.atp()
@@ -147,7 +147,7 @@ class TestTorrents(TestV1Base, lib.TestCase):
         # check remaining data against golden
         self.assert_golden_json(data)
 
-    def test_query_fields(self):
+    def test_query_fields(self) -> None:
         torrent = tdummy.DEFAULT
 
         atp = torrent.atp()

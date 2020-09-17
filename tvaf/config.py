@@ -103,5 +103,5 @@ class Config(dict, MutableMapping[str, Any]):
 
 class HasConfig:
 
-    def set_config(self, config: Config):
+    def set_config(self, config: Config) -> None:
         pass

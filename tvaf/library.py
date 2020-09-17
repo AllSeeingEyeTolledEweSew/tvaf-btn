@@ -44,7 +44,7 @@ TorrentFileOpener = Callable[[types.TorrentSlice, types.GetTorrent], io.IOBase]
 class TorrentFile(fs.File):
 
     def __init__(self, *, opener: TorrentFileOpener, tslice: types.TorrentSlice,
-                 get_torrent: types.GetTorrent, hints: Hints):
+                 get_torrent: types.GetTorrent, hints: Hints) -> None:
         super().__init__(size=len(tslice), mtime=hints.get("mtime"))
         self.opener = opener
         self.tslice = tslice
@@ -57,7 +57,7 @@ class TorrentFile(fs.File):
         return self.opener(self.tslice, self.get_torrent)
 
 
-def _is_valid_path(path: List[str]):
+def _is_valid_path(path: List[str]) -> bool:
     for part in path:
         if "/" in part:
             return False
@@ -69,7 +69,7 @@ def _is_valid_path(path: List[str]):
 class _V1TorrentAccess(fs.StaticDir):
 
     def __init__(self, libs: LibraryService, info_hash: str,
-                 info: protocol.Info, access: Access):
+                 info: protocol.Info, access: Access) -> None:
         assert access.redirect_to is None
         super().__init__()
 

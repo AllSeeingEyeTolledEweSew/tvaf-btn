@@ -149,25 +149,37 @@ class TerminateTest(unittest.TestCase):
             if any(status.pieces):
                 break
 
-        # TODO: maybe we need to move this into ResumeService
-        iterator = self.alert_driver.iter_alerts(lt.alert_category.storage,
-                                                 lt.cache_flushed_alert,
-                                                 handle=handle)
-        with iterator:
-            handle.flush_cache()
-            for alert in iterator:
-                if isinstance(alert, lt.cache_flushed_alert):
-                    break
+        # In 1.2.11+, save_resume_data() includes downloaded-but-not-checked
+        # pieces in the unfinished_pieces field. See
+        # https://github.com/arvidn/libtorrent/issues/5121
+        if (ltpy.version_info < (1, 2, 11)):
+            iterator = self.alert_driver.iter_alerts(lt.alert_category.storage,
+                                                     lt.cache_flushed_alert,
+                                                     handle=handle)
+            with iterator:
+                handle.flush_cache()
+                for alert in iterator:
+                    if isinstance(alert, lt.cache_flushed_alert):
+                        break
 
         self.session.pause()
         self.resume.terminate()
         self.resume.join()
 
+        def atp_have_piece(atp:lt.add_torrent_params, index:int) -> bool:
+            if atp.have_pieces[index]:
+                return True
+            ti = self.torrent.torrent_info()
+            num_blocks = ((ti.piece_size(index) - 1) // 16384 + 1)
+            bitmask = atp.unfinished_pieces.get(index, [])
+            if len(bitmask) < num_blocks:
+                return False
+            return all(bitmask[i] for i in range(num_blocks))
+
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.assertEqual(len(atps), 1)
         atp = atps[0]
-        self.assertNotEqual(len(atp.have_pieces), 0)
-        self.assertTrue(atp.have_pieces[0])
+        self.assertTrue(atp_have_piece(atp, 0))
 
     def test_finished(self):
         atp = self.torrent.atp()

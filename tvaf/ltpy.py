@@ -391,3 +391,6 @@ def handle_in_session(handle: lt.torrent_handle, session: lt.session) -> bool:
     with translate_exceptions():
         # DOES block
         return session.find_torrent(handle.info_hash()) == handle
+
+
+version_info = tuple(int(i) for i in lt.__version__.split("."))

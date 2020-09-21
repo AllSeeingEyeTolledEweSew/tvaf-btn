@@ -50,6 +50,8 @@ class RequestServiceTestCase(unittest.TestCase):
         self.service.join()
         self.resume_service.terminate()
         self.resume_service.join()
+        self.lt4604_fixup.terminate()
+        self.lt4604_fixup.join()
         self.alert_driver.terminate()
         self.alert_driver.join()
 
@@ -71,9 +73,9 @@ class RequestServiceTestCase(unittest.TestCase):
         self.lt4604_fixup = lt4604.Fixup(alert_driver=self.alert_driver)
 
         self.alert_driver.start()
-        # Not currently starting ResumeService
         self.service.start()
         self.resume_service.start()
+        self.lt4604_fixup.start()
 
     def tearDown(self):
         self.teardown_session()
@@ -86,6 +88,8 @@ class RequestServiceTestCase(unittest.TestCase):
         # https://github.com/arvidn/libtorrent/issues/4980: add_piece() while
         # checking silently fails in libtorrent 1.2.8.
         wait_done_checking_or_error(handle)
+        if handle.status().errc.value() != 0:
+            return
         for i in piece_indexes:
             # NB: bug in libtorrent where add_piece accepts str but not bytes
             handle.add_piece(i, self.torrent.pieces[i].decode(), 0)

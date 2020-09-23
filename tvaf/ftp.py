@@ -266,8 +266,8 @@ class FTPD(config_lib.HasConfig):
                 return
 
             # Address changed or shutting down, kill the current server
-            self.abort()
-            self.wait()
+            self.terminate()
+            self.join()
 
             # Just shutting down
             if address is None:
@@ -289,12 +289,12 @@ class FTPD(config_lib.HasConfig):
                                            target=self.server.serve_forever)
             self.thread.start()
 
-    def abort(self) -> None:
+    def terminate(self) -> None:
         with self._lock:
             if self.server is not None:
                 self.server.close_all()
 
-    def wait(self) -> None:
+    def join(self) -> None:
         with self._lock:
             if self.thread is not None:
                 self.thread.join()

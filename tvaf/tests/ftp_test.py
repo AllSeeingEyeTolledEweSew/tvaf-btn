@@ -77,8 +77,8 @@ class BaseFTPTest(unittest.TestCase):
 
     def tearDown(self):
         self.ftp.quit()
-        self.ftpd.abort()
-        self.ftpd.wait()
+        self.ftpd.terminate()
+        self.ftpd.join()
 
 
 class TestPathStructure(BaseFTPTest):

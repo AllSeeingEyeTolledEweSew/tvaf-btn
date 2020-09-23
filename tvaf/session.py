@@ -57,10 +57,10 @@ def parse_config(config: config_lib.Config) -> Dict[str, Any]:
 
         if key not in settings:
             raise config_lib.InvalidConfigError(f"no setting named {key}")
-        # pylint: disable=unidiomatic-typecheck
-        if type(settings[key]) != type(value):
+        if settings[key].__class__ != value.__class__:
             raise config_lib.InvalidConfigError(
-                f"{key} should be {type(settings[key])}, not {type(value)}")
+                f"{key} should be {settings[key].__class__}, "
+                f"not {value.__class__}")
 
         settings[key] = value
 

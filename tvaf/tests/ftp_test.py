@@ -5,11 +5,11 @@ import unittest
 import libtorrent as lt
 
 from tvaf import auth
-from tvaf import config as config_lib
 from tvaf import ftp
 from tvaf import library
 from tvaf import types
 
+from . import lib
 from . import tdummy
 
 
@@ -62,9 +62,7 @@ class BaseFTPTest(unittest.TestCase):
             (ih, idx)]
 
         self.auth_service = auth.AuthService()
-        # We would normally do an empty config, but we set ftp_port=0 to avoid
-        # collisions with anything else on the system
-        self.config = config_lib.Config(ftp_port=0)
+        self.config = lib.create_isolated_config()
         self.ftpd = ftp.FTPD(root=self.libs.root,
                              auth_service=self.auth_service,
                              config=self.config)

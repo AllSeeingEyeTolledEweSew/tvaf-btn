@@ -73,35 +73,35 @@ class Config(dict, MutableMapping[str, Any]):
         with config_dir.joinpath(FILENAME).open(mode="w") as fp:
             json.dump(self, fp, sort_keys=True, indent=4)
 
-    def _get(self, key: str, type_: Type[_T], type_name: str) -> Optional[_T]:
+    def _get(self, key: str, type_: Type[_T]) -> Optional[_T]:
         value = self.get(key)
         if key in self and not isinstance(value, type_):
-            raise InvalidConfigError(f"\"{key}\": {value!r} is not {type_name}")
+            raise InvalidConfigError(f"\"{key}\": {value!r} is not a {type_}")
         return value
 
-    def _require(self, key: str, type_: Type[_T], type_name: str) -> _T:
-        value = self._get(key, type_, type_name)
+    def _require(self, key: str, type_: Type[_T]) -> _T:
+        value = self._get(key, type_)
         if value is None:
             raise InvalidConfigError(f"\"{key}\": missing")
         return value
 
     def get_int(self, key: str) -> Optional[int]:
-        return self._get(key, int, "int")
+        return self._get(key, int)
 
     def get_str(self, key: str) -> Optional[str]:
-        return self._get(key, str, "str")
+        return self._get(key, str)
 
     def get_bool(self, key: str) -> Optional[bool]:
-        return self._get(key, bool, "bool")
+        return self._get(key, bool)
 
     def require_int(self, key: str) -> int:
-        return self._require(key, int, "int")
+        return self._require(key, int)
 
     def require_str(self, key: str) -> str:
-        return self._require(key, str, "str")
+        return self._require(key, str)
 
     def require_bool(self, key: str) -> bool:
-        return self._require(key, bool, "bool")
+        return self._require(key, bool)
 
 
 class HasConfig(abc.ABC):

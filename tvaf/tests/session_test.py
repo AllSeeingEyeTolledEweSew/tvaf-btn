@@ -8,6 +8,15 @@ from tvaf import session as session_lib
 from . import lib
 
 
+class DummyException(Exception):
+
+    pass
+
+
+def _raise_dummy() -> None:
+    raise DummyException()
+
+
 class TestSession(unittest.TestCase):
 
     def test_session(self):
@@ -91,6 +100,18 @@ class TestSession(unittest.TestCase):
         session_service.set_config(config)
         settings = session_service.session.get_settings()
         self.assertEqual(settings["close_redundant_connections"], False)
+
+    def test_stage_revert(self):
+        config = lib.create_isolated_config()
+        session_service = session_lib.SessionService(config=config)
+
+        config["session_close_redundant_connections"] = False
+        with self.assertRaises(DummyException):
+            with session_service.stage_config(config):
+                _raise_dummy()
+
+        settings = session_service.session.get_settings()
+        self.assertEqual(settings["close_redundant_connections"], True)
 
     def test_settings_base(self):
         config = lib.create_isolated_config()

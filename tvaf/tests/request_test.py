@@ -20,6 +20,10 @@ class DummyException(Exception):
     pass
 
 
+def _raise_dummy():
+    raise DummyException()
+
+
 class TestCleanup(request_test_utils.RequestServiceTestCase):
 
     maxDiff = None
@@ -70,11 +74,7 @@ class TestAddRemove(request_test_utils.RequestServiceTestCase):
             req.read(timeout=5)
 
     def test_fetch_error(self):
-
-        def raise_dummy():
-            raise DummyException("dummy")
-
-        req = self.add_req(get_add_torrent_params=raise_dummy)
+        req = self.add_req(get_add_torrent_params=_raise_dummy)
         with self.assertRaises(request_lib.FetchError):
             req.read(timeout=5)
 
@@ -317,3 +317,14 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
         self.config["torrent_default_storage_mode"] = "invalid"
         with self.assertRaises(config_lib.InvalidConfigError):
             self.service.set_config(self.config)
+
+    def test_stage_revert(self):
+        self.config["torrent_default_storage_mode"] = "allocate"
+        with self.assertRaises(DummyException):
+            with self.service.stage_config(self.config):
+                _raise_dummy()
+
+        atp = lt.add_torrent_params()
+        self.service.configure_add_torrent_params(atp)
+        self.assertEqual(atp.storage_mode,
+                         lt.storage_mode_t.storage_mode_sparse)

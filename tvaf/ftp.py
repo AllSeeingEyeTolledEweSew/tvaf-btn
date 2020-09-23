@@ -1,9 +1,12 @@
+import contextlib
 import errno
 import functools
 import io
 import os
+import socket as socket_lib
 import threading
 import time
+from typing import Iterator
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -18,6 +21,7 @@ import pyftpdlib.servers
 import tvaf.config as config_lib
 from tvaf import auth
 from tvaf import fs
+from tvaf import task as task_lib
 
 
 def _partialclass(cls, *args, **kwds):
@@ -234,70 +238,77 @@ class _FTPHandler(pyftpdlib.handlers.FTPHandler):
         self.abstracted_fs = _partialclass(_FS, root=root)
 
 
-class FTPD(config_lib.HasConfig):
+class FTPD(task_lib.Task, config_lib.HasConfig):
 
     def __init__(self, *, config: config_lib.Config, root: fs.Dir,
                  auth_service: auth.AuthService) -> None:
-        self.auth_service = auth_service
-        self.root = root
+        super().__init__(title="FTPD", thread_name="ftpd")
+        self._auth_service = auth_service
+        self._root = root
 
-        self._lock = threading.RLock()
-        self.server: Optional[pyftpdlib.servers.FTPServer] = None
-        self.thread: Optional[threading.Thread] = None
+        # TODO: fixup typing here
+        self._lock: threading.Condition = \
+                threading.Condition(threading.RLock())  # type: ignore
+        self._server: Optional[pyftpdlib.servers.FTPServer] = None
         self._address: Optional[Tuple] = None
 
         self.set_config(config)
 
-    def set_config(self, config: config_lib.Config) -> None:
+    @property
+    def socket(self):
+        with self._lock:
+            if self._server is None:
+                return None
+            return self._server.socket
+
+    @contextlib.contextmanager
+    def stage_config(self, config: config_lib.Config) -> Iterator[None]:
         config.setdefault("ftp_enabled", True)
         config.setdefault("ftp_bind_address", "localhost")
         config.setdefault("ftp_port", 8821)
 
+        address: Optional[Tuple] = None
+        socket: Optional[socket_lib.socket] = None
+
+        # Only parse address and port if enabled
+        if config.require_bool("ftp_enabled"):
+            address = (config.require_str("ftp_bind_address"),
+                       config.require_int("ftp_port"))
+
         with self._lock:
-            address: Optional[Tuple] = None
+            if address != self._address and address is not None:
+                socket = socket_lib.create_server(address)
 
-            # Only parse address and port if enabled
-            if config.require_bool("ftp_enabled"):
-                address = (config.require_str("ftp_bind_address"),
-                           config.require_int("ftp_port"))
+            yield
 
-            # No change
+            if self._terminated.is_set():
+                return
             if address == self._address:
                 return
 
-            # Address changed or shutting down, kill the current server
-            self.terminate()
-            self.join()
+            self._address = address
+            self._terminate()
 
-            # Just shutting down
-            if address is None:
+            if socket is None:
                 return
 
-            # We have a new address
             handler = _partialclass(_FTPHandler,
-                                    root=self.root,
-                                    auth_service=self.auth_service)
-            # ThreadedFTPServer binds its socket in its constructor
-            try:
-                server = pyftpdlib.servers.ThreadedFTPServer(address, handler)
-            except OSError as exc:
-                raise config_lib.InvalidConfigError(str(exc)) from exc
+                                    root=self._root,
+                                    auth_service=self._auth_service)
+            self._server = pyftpdlib.servers.ThreadedFTPServer(socket, handler)
 
-            self._address = address
-            self.server = server
-            self.thread = threading.Thread(name="ftpd",
-                                           target=self.server.serve_forever)
-            self.thread.start()
-
-    def terminate(self) -> None:
+    def _terminate(self):
         with self._lock:
-            if self.server is not None:
-                self.server.close_all()
+            if self._server is not None:
+                self._server.close_all()
+                self._server = None
+            self._lock.notify_all()
 
-    def join(self) -> None:
-        with self._lock:
-            if self.thread is not None:
-                self.thread.join()
-            self.thread = None
-            self.server = None
-            self._address = None
+    def _run(self):
+        while not self._terminated.is_set():
+            with self._lock:
+                if self._server is None:
+                    self._lock.wait()
+                server = self._server
+            if server:
+                server.serve_forever()

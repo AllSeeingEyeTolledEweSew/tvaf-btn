@@ -4,6 +4,7 @@ import threading
 from typing import Any
 from typing import Collection
 from typing import Dict
+from typing import Iterator
 
 import libtorrent as lt
 
@@ -54,16 +55,17 @@ def parse_config(config: config_lib.Config) -> Dict[str, Any]:
         if key in _BLACKLIST:
             continue
 
+        if key not in settings:
+            raise config_lib.InvalidConfigError(f"no setting named {key}")
+        # pylint: disable=unidiomatic-typecheck
+        if type(settings[key]) != type(value):
+            raise config_lib.InvalidConfigError(
+                f"{key} should be {type(settings[key])}, not {type(value)}")
+
         settings[key] = value
 
     # Update our static overrides
     settings.update(_OVERRIDES)
-
-    # Special validation to avoid later unfriendly TypeError
-    alert_mask = settings["alert_mask"]
-    if not isinstance(alert_mask, int):
-        raise config_lib.InvalidConfigError(
-            f"alert_mask is {alert_mask!r}, not int")
 
     return settings
 
@@ -168,21 +170,16 @@ class SessionService(config_lib.HasConfig):
         # As far as I can tell, apply_settings never partially fails
         self.session.apply_settings(deltas)
 
-    def set_config(self, config: config_lib.Config):
-        with _translate_exceptions():
-            settings = parse_config(config)
-            with self._lock:
-                config_alert_mask: int = settings["alert_mask"]
-                self._dec_alert_mask_bits_locked(self._config_alert_mask)
-                self._inc_alert_mask_bits_locked(config_alert_mask)
-                settings["alert_mask"] = self._get_alert_mask_locked()
+    @contextlib.contextmanager
+    def stage_config(self, config: config_lib.Config) -> Iterator[None]:
+        settings = parse_config(config)
 
-                try:
-                    self._apply_settings_locked(settings)
-                except Exception:
-                    self._dec_alert_mask_bits_locked(config_alert_mask)
-                    self._inc_alert_mask_bits_locked(self._config_alert_mask)
-                    raise
-
-                self._settings = settings
-                self._config_alert_mask = config_alert_mask
+        with self._lock:
+            yield
+            config_alert_mask: int = settings["alert_mask"]
+            self._dec_alert_mask_bits_locked(self._config_alert_mask)
+            self._inc_alert_mask_bits_locked(config_alert_mask)
+            settings["alert_mask"] = self._get_alert_mask_locked()
+            self._apply_settings_locked(settings)
+            self._settings = settings
+            self._config_alert_mask = config_alert_mask

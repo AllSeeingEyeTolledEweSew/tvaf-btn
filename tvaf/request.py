@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import collections
 import collections.abc
+import contextlib
 import enum
 import logging
 import pathlib
@@ -646,7 +647,8 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
         self._terminated.wait()
         self._log_terminate()
 
-    def set_config(self, config: config_lib.Config):
+    @contextlib.contextmanager
+    def stage_config(self, config: config_lib.Config) -> Iterator[None]:
         config.setdefault(
             "torrent_default_save_path",
             str(self._config_dir.joinpath(DEFAULT_DOWNLOAD_DIR_NAME)))
@@ -687,7 +689,9 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
                     f"invalid storage mode {maybe_name}")
             atp_settings["storage_mode"] = mode
 
-        self._atp_settings = atp_settings
+        with self._lock:
+            yield
+            self._atp_settings = atp_settings
 
     def configure_add_torrent_params(self, atp: lt.add_torrent_params):
         atp_settings = self._atp_settings

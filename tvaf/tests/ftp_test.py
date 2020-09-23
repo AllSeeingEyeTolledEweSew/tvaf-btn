@@ -14,7 +14,12 @@ from . import tdummy
 
 
 class DummyException(Exception):
+
     pass
+
+
+def _raise_dummy() -> None:
+    raise DummyException()
 
 
 SINGLE = tdummy.Torrent.single_file(name=b"test.txt", length=16384 * 9 + 1000)
@@ -63,7 +68,8 @@ class BaseFTPTest(unittest.TestCase):
         self.ftpd = ftp.FTPD(root=self.libs.root,
                              auth_service=self.auth_service,
                              config=self.config)
-        self.address = self.ftpd.server.socket.getsockname()
+        self.ftpd.start()
+        self.address = self.ftpd.socket.getsockname()
         self.connect()
 
     def connect(self):
@@ -222,7 +228,7 @@ class TestConfig(BaseFTPTest):
         self.ftpd.set_config(self.config)
         with self.assertRaises(EOFError):
             self.ftp.pwd()
-        self.address = self.ftpd.server.socket.getsockname()
+        self.address = self.ftpd.socket.getsockname()
         self.connect()
         self.assertEqual(self.ftp.pwd(), "/")
 
@@ -233,12 +239,12 @@ class TestConfig(BaseFTPTest):
         with self.assertRaises(EOFError):
             self.ftp.pwd()
 
-        self.assertIsNone(self.ftpd.server)
+        self.assertIsNone(self.ftpd.socket)
 
         self.config["ftp_enabled"] = True
         self.ftpd.set_config(self.config)
 
-        self.address = self.ftpd.server.socket.getsockname()
+        self.address = self.ftpd.socket.getsockname()
         self.connect()
         self.assertEqual(self.ftp.pwd(), "/")
 
@@ -248,13 +254,13 @@ class TestConfig(BaseFTPTest):
 
     def test_bad_change(self):
         self.config["ftp_port"] = -1
-        with self.assertRaises(config_lib.InvalidConfigError):
+        with self.assertRaises(OverflowError):
             self.ftpd.set_config(self.config)
 
         # Try reconfigure with good port
         self.config["ftp_port"] = 0
         self.ftpd.set_config(self.config)
-        self.address = self.ftpd.server.socket.getsockname()
+        self.address = self.ftpd.socket.getsockname()
         self.connect()
         self.assertEqual(self.ftp.pwd(), "/")
 
@@ -262,3 +268,22 @@ class TestConfig(BaseFTPTest):
         # Ensure we set some default values
         self.assertEqual(self.config["ftp_enabled"], True)
         self.assertEqual(self.config["ftp_bind_address"], "localhost")
+
+    def test_stage_revert(self):
+        self.connect()
+
+        self.config["ftp_enabled"] = False
+        with self.assertRaises(DummyException):
+            with self.ftpd.stage_config(self.config):
+                _raise_dummy()
+
+        # Should still be connected
+        self.assertEqual(self.ftp.pwd(), "/")
+
+        self.config["ftp_bind_address"] = "127.0.0.1"
+        with self.assertRaises(DummyException):
+            with self.ftpd.stage_config(self.config):
+                _raise_dummy()
+
+        # Should still be connected
+        self.assertEqual(self.ftp.pwd(), "/")

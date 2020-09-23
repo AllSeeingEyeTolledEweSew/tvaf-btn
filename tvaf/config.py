@@ -2,9 +2,13 @@
 # accompanying UNLICENSE file.
 from __future__ import annotations
 
+import abc
+import contextlib
 import json
 import pathlib
 from typing import Any
+from typing import Callable
+from typing import ContextManager
 from typing import MutableMapping
 from typing import Optional
 from typing import Type
@@ -21,16 +25,15 @@ from typing import TypeVar
 # places, or complex metaclass code. All type conversion also needs to be
 # centralized, which impacts modularity.
 
-# I considered "staging" config updates, such that e.g. when the FTP port is
-# changed, we would:
+# Config updates are "staged" such that e.g. when the FTP port is changed, we:
 #  - bind a socket to the new port
 #  - attempt any other config changes
 #  - if other changes fail, close the new socket
 #  - if other changes succeed, start the ftp server on the new port and close
 #    the old server.
-# Pros: minimizes operational interruption.
-# Cons: this breaks on changes such as changing the ftp binding from 0.0.0.0:21
-#       to 127.0.0.1:21, as the old server blocks the new binding.
+# This makes certain changes impossible, such as changing the ftp binding from
+# 0.0.0.0:21 to 127.0.0.1:21, as the old server breaks the new binding. However
+# I notice that nginx has the same limitation, so it's probably good enough.
 
 # In Python we prefer to work with "disposable" objects which are configured
 # only once, and re-created as necessary. However, tvaf's top-level App code
@@ -101,7 +104,18 @@ class Config(dict, MutableMapping[str, Any]):
         return self._require(key, bool, "bool")
 
 
-class HasConfig:
+class HasConfig(abc.ABC):
+
+    @abc.abstractmethod
+    def stage_config(self, config: Config) -> ContextManager[None]:
+        return contextlib.nullcontext()
 
     def set_config(self, config: Config) -> None:
-        pass
+        with self.stage_config(config):
+            pass
+
+
+def set_config(config: Config, *stages: Callable[[Config], ContextManager]):
+    with contextlib.ExitStack() as stack:
+        for stage in stages:
+            stack.enter_context(stage(config))

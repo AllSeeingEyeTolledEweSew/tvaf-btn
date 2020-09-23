@@ -152,7 +152,7 @@ class TerminateTest(unittest.TestCase):
         # In 1.2.11+, save_resume_data() includes downloaded-but-not-checked
         # pieces in the unfinished_pieces field. See
         # https://github.com/arvidn/libtorrent/issues/5121
-        if (ltpy.version_info < (1, 2, 11)):
+        if ltpy.version_info < (1, 2, 11):
             iterator = self.alert_driver.iter_alerts(lt.alert_category.storage,
                                                      lt.cache_flushed_alert,
                                                      handle=handle)
@@ -166,7 +166,7 @@ class TerminateTest(unittest.TestCase):
         self.resume.terminate()
         self.resume.join()
 
-        def atp_have_piece(atp:lt.add_torrent_params, index:int) -> bool:
+        def atp_have_piece(atp: lt.add_torrent_params, index: int) -> bool:
             if atp.have_pieces[index]:
                 return True
             ti = self.torrent.torrent_info()

@@ -30,7 +30,8 @@ def create_isolated_config() -> config_lib.Config:
                              session_enable_upnp=False,
                              session_listen_interfaces="127.0.0.1:0",
                              session_alert_mask=0,
-                             ftp_port=0)
+                             ftp_port=0,
+                             http_port=0)
 
 
 def create_isolated_session_service(*,

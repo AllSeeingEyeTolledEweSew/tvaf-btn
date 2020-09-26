@@ -6,7 +6,7 @@ import unittest
 import flask
 import libtorrent as lt
 
-from tvaf.http import lt as http_lt
+from tvaf.http import ltapi
 
 from . import lib
 from . import tdummy
@@ -17,7 +17,7 @@ class TestV1Base(unittest.TestCase):
     def setUp(self) -> None:
         self.session = lib.create_isolated_session_service().session
         self.app = flask.Flask(__name__)
-        self.v1_blueprint = http_lt.V1Blueprint(self.session)
+        self.v1_blueprint = ltapi.V1Blueprint(self.session)
         self.app.register_blueprint(self.v1_blueprint.blueprint)
         self.app.config["TESTING"] = True
         self.client = self.app.test_client()

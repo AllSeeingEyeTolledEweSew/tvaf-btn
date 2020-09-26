@@ -61,11 +61,11 @@ class HTTPD(task_lib.Task, config_lib.HasConfig):
         self._lock: threading.Condition = \
                 threading.Condition(threading.RLock())  # type: ignore
 
-        self._v1_blueprint = ltapi.V1Blueprint(session)
+        self._ltapiv1_blueprint = ltapi.V1Blueprint(session)
 
         self._flask = flask.Flask(__name__)
-        self._flask.register_blueprint(self._v1_blueprint.blueprint,
-                                       url_prefix="/v1")
+        self._flask.register_blueprint(self._ltapiv1_blueprint.blueprint,
+                                       url_prefix="/lt/v1")
 
         self._address: Optional[Tuple[str, int]] = None
         self._server: Optional[socketserver.BaseServer] = None

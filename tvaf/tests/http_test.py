@@ -29,7 +29,7 @@ class HTTPDTest(unittest.TestCase):
         return requests.get(url)
 
     def test_get(self):
-        resp = self.get("/v1/torrents")
+        resp = self.get("/lt/v1/torrents")
         resp.raise_for_status()
         self.assertEqual(resp.json(), [])
 
@@ -38,13 +38,13 @@ class HTTPDTest(unittest.TestCase):
         self.httpd.set_config(self.config)
 
         with self.assertRaises(requests.ConnectionError):
-            self.get("/v1/torrents")
+            self.get("/lt/v1/torrents")
 
         self.config["http_enabled"] = True
         self.httpd.set_config(self.config)
         self.host = "%s:%d" % self.httpd.socket.getsockname()
 
-        resp = self.get("/v1/torrents")
+        resp = self.get("/lt/v1/torrents")
         resp.raise_for_status()
         self.assertEqual(resp.json(), [])
 
@@ -53,6 +53,6 @@ class HTTPDTest(unittest.TestCase):
         self.httpd.set_config(self.config)
         self.host = "%s:%d" % self.httpd.socket.getsockname()
 
-        resp = self.get("/v1/torrents")
+        resp = self.get("/lt/v1/torrents")
         resp.raise_for_status()
         self.assertEqual(resp.json(), [])

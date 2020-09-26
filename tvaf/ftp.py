@@ -2,6 +2,7 @@ import contextlib
 import errno
 import functools
 import io
+import logging
 import os
 import socket as socket_lib
 import threading
@@ -22,6 +23,8 @@ import tvaf.config as config_lib
 from tvaf import auth
 from tvaf import fs
 from tvaf import task as task_lib
+
+_LOG = logging.getLogger(__name__)
 
 
 def _partialclass(cls, *args, **kwds):
@@ -311,4 +314,8 @@ class FTPD(task_lib.Task, config_lib.HasConfig):
                     self._lock.wait()
                 server = self._server
             if server:
+                if _LOG.isEnabledFor(logging.INFO):
+                    host, port = server.socket.getsockname()
+                    _LOG.info("ftp server listening on %s:%s", host, port)
                 server.serve_forever()
+                _LOG.info("ftp server shut down")

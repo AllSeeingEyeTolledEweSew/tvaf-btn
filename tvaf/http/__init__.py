@@ -1,6 +1,7 @@
 import contextlib
 import http.server
 import io
+import logging
 import selectors
 import socket as socket_lib
 import socketserver
@@ -21,6 +22,8 @@ from tvaf import task as task_lib
 from tvaf.http import ltapi
 
 _BHRH = http.server.BaseHTTPRequestHandler
+
+_LOG = logging.getLogger(__name__)
 
 
 class _ThreadingWSGIServer(wsgiref.simple_server.WSGIServer,
@@ -124,4 +127,8 @@ class HTTPD(task_lib.Task, config_lib.HasConfig):
                     self._lock.wait()
                 server = self._server
             if server:
+                if _LOG.isEnabledFor(logging.INFO):
+                    host, port = server.socket.getsockname()
+                    _LOG.info("web server listening on %s:%s", host, port)
                 server.serve_forever()
+                logging.info("web server shut down")

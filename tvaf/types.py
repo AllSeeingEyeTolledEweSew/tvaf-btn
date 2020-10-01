@@ -15,9 +15,11 @@ import dataclasses
 from typing import Callable
 from typing import Optional
 
+import libtorrent as lt
+
 USER_UNKNOWN = "*unknown*"
 
-GetTorrent = Callable[[], bytes]
+ConfigureATP = Callable[[lt.add_torrent_params], None]
 
 
 @dataclasses.dataclass(frozen=True)

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import io
 import logging
 import pathlib
 import socket as socket_lib
 from typing import Optional
-
-import libtorrent as lt
 
 from tvaf import auth as auth_lib
 from tvaf import config as config_lib
@@ -87,23 +86,18 @@ class App(task_lib.Task):
         self._config.write_config_dir(self._config_dir)
 
     def _open(self, tslice: types.TorrentSlice,
-              get_torrent: types.GetTorrent) -> torrent_io.BufferedTorrentIO:
+              configure_atp: types.ConfigureATP) -> io.IOBase:
         user = self._auth_service.get_user()
         if user is None:
             raise auth_lib.AuthenticationFailed(
                 "Opening torrent outside of authentication!")
-
-        def get_add_torrent_params():
-            atp = lt.add_torrent_params()
-            atp.ti = get_torrent()
-            return atp
 
         return torrent_io.BufferedTorrentIO(
             request_service=self._request_service,
             info_hash=tslice.info_hash,
             start=tslice.start,
             stop=tslice.stop,
-            get_add_torrent_params=get_add_torrent_params)
+            configure_atp=configure_atp)
 
     def _set_config(self, config: config_lib.Config) -> None:
         config_lib.set_config(config, self._session_service.stage_config,

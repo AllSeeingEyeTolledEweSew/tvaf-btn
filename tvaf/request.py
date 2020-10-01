@@ -12,7 +12,6 @@ import pathlib
 import threading
 import weakref
 from typing import Any
-from typing import Callable
 from typing import Dict
 from typing import Iterable
 from typing import Iterator
@@ -28,6 +27,7 @@ from tvaf import driver as driver_lib
 from tvaf import ltpy
 from tvaf import resume as resume_lib
 from tvaf import task as task_lib
+from tvaf import types
 from tvaf import util
 from tvaf import xmemoryview as xmv
 
@@ -40,9 +40,6 @@ class Mode(enum.Enum):
 
     READ = "read"
     READAHEAD = "readahead"
-
-
-GetAddTorrentParams = Callable[[], lt.add_torrent_params]
 
 
 def _raise_notimplemented():
@@ -72,12 +69,12 @@ class TorrentRemovedError(CanceledError):
 class Request:
 
     def __init__(self, *, info_hash: str, start: int, stop: int, mode: Mode,
-                 get_add_torrent_params: GetAddTorrentParams):
+                 configure_atp: types.ConfigureATP):
         self.info_hash = info_hash
         self.start = start
         self.stop = stop
         self.mode = mode
-        self.get_add_torrent_params = get_add_torrent_params
+        self.configure_atp = configure_atp
 
         self._condition = threading.Condition()
         self._chunks: Dict[int, xmv.MemoryView] = {}
@@ -538,9 +535,9 @@ class _TorrentTask(task_lib.Task):
             self._prev_task = None
 
         with ltpy.translate_exceptions():
+            info_hash = lt.sha1_hash(bytes.fromhex(self._info_hash))
             # DOES block
-            handle = self._session.find_torrent(
-                lt.sha1_hash(bytes.fromhex(self._info_hash)))
+            handle = self._session.find_torrent(info_hash)
 
         if not handle.is_valid():
             with self._lock:
@@ -550,8 +547,10 @@ class _TorrentTask(task_lib.Task):
                 # Should we use different logic?
                 request = next(self._state.iter_requests())
 
+            atp = lt.add_torrent_params()
+            atp.info_hash = info_hash
             try:
-                atp = request.get_add_torrent_params()
+                request.configure_atp(atp)
             except Exception as exc:
                 raise FetchError() from exc
 
@@ -600,18 +599,17 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
         self.set_config(config)
 
     def add_request(self, *, info_hash: str, start: int, stop: int, mode: Mode,
-                    get_add_torrent_params: GetAddTorrentParams) -> Request:
+                    configure_atp: types.ConfigureATP) -> Request:
 
-        def get_configured_atp():
-            atp = get_add_torrent_params()
-            self.configure_add_torrent_params(atp)
-            return atp
+        def _configure_atp_with_settings(atp: lt.add_torrent_params) -> None:
+            configure_atp(atp)
+            self.configure_atp(atp)
 
         request = Request(info_hash=info_hash,
                           start=start,
                           stop=stop,
                           mode=mode,
-                          get_add_torrent_params=get_configured_atp)
+                          configure_atp=_configure_atp_with_settings)
 
         with self._lock:
             if self._terminated.is_set():
@@ -693,7 +691,7 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
             yield
             self._atp_settings = atp_settings
 
-    def configure_add_torrent_params(self, atp: lt.add_torrent_params):
+    def configure_atp(self, atp: lt.add_torrent_params):
         atp_settings = self._atp_settings
         for key, value in atp_settings.items():
             setattr(atp, key, value)

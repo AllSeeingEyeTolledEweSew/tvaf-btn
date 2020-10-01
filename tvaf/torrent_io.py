@@ -2,15 +2,13 @@ import errno
 import io
 import mmap
 import threading
-from typing import Callable
 from typing import List
 from typing import Sequence
 from typing import Union
 
-import libtorrent as lt
-
 from tvaf import ltpy
 from tvaf import request as request_lib
+from tvaf import types
 from tvaf import xmemoryview as xmv
 
 ReadintoTarget = Union[bytearray, mmap.mmap, memoryview]
@@ -28,13 +26,13 @@ class BufferedTorrentIO(io.BufferedIOBase):
 
     def __init__(self, *, request_service: request_lib.RequestService,
                  info_hash: str, start: int, stop: int,
-                 get_add_torrent_params: Callable[[], lt.add_torrent_params]):
+                 configure_atp: types.ConfigureATP):
         super().__init__()
         self._request_service = request_service
         self._info_hash = info_hash
         self._start = start
         self._stop = stop
-        self._get_add_torrent_params = get_add_torrent_params
+        self._configure_atp = configure_atp
 
         self._read_lock = threading.RLock()
         self._offset = 0
@@ -128,7 +126,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
             start=self._offset,
             stop=stop,
             mode=request_lib.Mode.READ,
-            get_add_torrent_params=self._get_add_torrent_params)
+            configure_atp=self._configure_atp)
 
         chunk = xmv.EMPTY
         while True:

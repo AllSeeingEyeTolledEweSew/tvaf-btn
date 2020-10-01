@@ -36,8 +36,8 @@ _LOG = logging.getLogger(__name__)
 
 Path = pathlib.PurePosixPath
 
-TorrentFileOpener = Callable[
-    [types.TorrentSlice, Callable[[lt.add_torrent_params], None]], io.IOBase]
+TorrentFileOpener = Callable[[types.TorrentSlice, types.ConfigureATP],
+                             io.IOBase]
 
 
 class Metadata(collections.UserDict, MutableMapping[str, Any]):
@@ -47,9 +47,8 @@ class Metadata(collections.UserDict, MutableMapping[str, Any]):
 
 class TorrentFile(fs.File):
 
-    def __init__(
-            self, *, opener: TorrentFileOpener, tslice: types.TorrentSlice,
-            configure_atp: Callable[[lt.add_torrent_params], None]) -> None:
+    def __init__(self, *, opener: TorrentFileOpener, tslice: types.TorrentSlice,
+                 configure_atp: types.ConfigureATP) -> None:
         super().__init__(size=len(tslice))
         self.opener = opener
         self.tslice = tslice

@@ -174,11 +174,14 @@ class Torrent:
 
     def atp(self):
         atp = lt.add_torrent_params()
-        atp.ti = self.torrent_info()
+        self.configure_atp(atp)
+        return atp
+
+    def configure_atp(self, atp: lt.add_torrent_params) -> None:
         # this is necessary so that
         # atp == read_resume_data(write_resume_data(atp))
         atp.info_hash = self.sha1_hash
-        return atp
+        atp.ti = self.torrent_info()
 
 
 DEFAULT = Torrent.single_file(piece_length=16384,

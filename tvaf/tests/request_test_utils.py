@@ -98,19 +98,18 @@ class RequestServiceTestCase(unittest.TestCase):
                 mode=request_lib.Mode.READ,
                 start=None,
                 stop=None,
-                get_add_torrent_params=None):
+                configure_atp=None):
         if start is None:
             start = 0
         if stop is None:
             stop = self.torrent.length
-        if get_add_torrent_params is None:
-            get_add_torrent_params = self.torrent.atp
-        return self.service.add_request(
-            mode=mode,
-            info_hash=self.torrent.infohash,
-            start=start,
-            stop=stop,
-            get_add_torrent_params=get_add_torrent_params)
+        if configure_atp is None:
+            configure_atp = self.torrent.configure_atp
+        return self.service.add_request(mode=mode,
+                                        info_hash=self.torrent.infohash,
+                                        start=start,
+                                        stop=stop,
+                                        configure_atp=configure_atp)
 
     def wait_for_torrent(self):
         handle = None

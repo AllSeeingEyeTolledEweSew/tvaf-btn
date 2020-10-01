@@ -1,6 +1,7 @@
 import io
 import stat as stat_lib
 import unittest
+from typing import Any
 from typing import Iterable
 from typing import Tuple
 from typing import Union
@@ -28,8 +29,7 @@ class TestLibraryService(unittest.TestCase):
 
     def setUp(self):
 
-        def opener(tslice: types.TorrentSlice,
-                   _: types.GetTorrent) -> io.BytesIO:
+        def opener(tslice: types.TorrentSlice, _: Any) -> io.BytesIO:
             return io.BytesIO(get_placeholder_data(tslice))
 
         self.torrents = {torrent.infohash: torrent for torrent in ltu.TORRENTS}

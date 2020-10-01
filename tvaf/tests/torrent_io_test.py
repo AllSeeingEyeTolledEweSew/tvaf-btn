@@ -10,7 +10,7 @@ class TestBufferedTorrentIO(request_test_utils.RequestServiceTestCase):
     def setUp(self):
         super().setUp()
         atp = self.torrent.atp()
-        self.service.configure_add_torrent_params(atp)
+        self.service.configure_atp(atp)
         self.session.add_torrent(atp)
         self.feed_pieces()
 
@@ -20,7 +20,7 @@ class TestBufferedTorrentIO(request_test_utils.RequestServiceTestCase):
             info_hash=self.torrent.infohash,
             start=0,
             stop=self.torrent.length,
-            get_add_torrent_params=self.torrent.atp)
+            configure_atp=self.torrent.configure_atp)
 
     def test_read_some(self):
         data = self.open().read(1024)

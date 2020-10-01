@@ -1,6 +1,7 @@
 import ftplib
 import io
 import unittest
+from typing import Any
 
 from tvaf import auth
 from tvaf import ftp
@@ -27,7 +28,7 @@ class BaseFTPTest(unittest.TestCase):
     def setUp(self):
         self.torrents = {t.infohash: t for t in (ltu.SINGLE, ltu.MULTI)}
 
-        def opener(tslice: types.TorrentSlice, _: types.GetTorrent):
+        def opener(tslice: types.TorrentSlice, _: Any):
             data = self.torrents[
                 tslice.info_hash].data[tslice.start:tslice.stop]
             raw = io.BytesIO(data)

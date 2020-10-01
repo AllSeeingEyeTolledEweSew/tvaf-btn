@@ -31,7 +31,7 @@ class TestCleanup(request_test_utils.RequestServiceTestCase):
     def setUp(self):
         super().setUp()
         atp = self.torrent.atp()
-        self.service.configure_add_torrent_params(atp)
+        self.service.configure_atp(atp)
         self.handle = self.session.add_torrent(atp)
         self.handle.prioritize_pieces([0] * len(self.torrent.pieces))
         # pylint: disable=protected-access
@@ -74,7 +74,7 @@ class TestAddRemove(request_test_utils.RequestServiceTestCase):
             req.read(timeout=5)
 
     def test_fetch_error(self):
-        req = self.add_req(get_add_torrent_params=_raise_dummy)
+        req = self.add_req(configure_atp=lambda atp: _raise_dummy())
         with self.assertRaises(request_lib.FetchError):
             req.read(timeout=5)
 
@@ -266,7 +266,7 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
                          config_lib.Config(torrent_default_save_path=save_path))
 
         atp = lt.add_torrent_params()
-        self.service.configure_add_torrent_params(atp)
+        self.service.configure_atp(atp)
 
         self.assertEqual(atp.save_path, save_path)
 
@@ -278,7 +278,7 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
         self.service.set_config(self.config)
 
         atp = lt.add_torrent_params()
-        self.service.configure_add_torrent_params(atp)
+        self.service.configure_atp(atp)
 
         self.assertEqual(atp.save_path, self.tempdir.name)
         self.assertEqual(
@@ -293,7 +293,7 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
         self.service.set_config(self.config)
 
         atp = lt.add_torrent_params()
-        self.service.configure_add_torrent_params(atp)
+        self.service.configure_atp(atp)
 
         self.assertEqual(atp.save_path, self.tempdir.name)
         self.assertEqual(atp.flags, lt.torrent_flags.default_flags)
@@ -325,6 +325,6 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
                 _raise_dummy()
 
         atp = lt.add_torrent_params()
-        self.service.configure_add_torrent_params(atp)
+        self.service.configure_atp(atp)
         self.assertEqual(atp.storage_mode,
                          lt.storage_mode_t.storage_mode_sparse)

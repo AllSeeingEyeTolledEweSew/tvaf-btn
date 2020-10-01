@@ -25,7 +25,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
     # indicates most files in multi-file torrents are piece-misaligned.
 
     def __init__(self, *, request_service: request_lib.RequestService,
-                 info_hash: str, start: int, stop: int,
+                 info_hash: types.InfoHash, start: int, stop: int,
                  configure_atp: types.ConfigureATP):
         super().__init__()
         self._request_service = request_service

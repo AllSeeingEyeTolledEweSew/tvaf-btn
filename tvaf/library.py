@@ -36,7 +36,8 @@ _LOG = logging.getLogger(__name__)
 
 Path = pathlib.PurePosixPath
 
-TorrentFileOpener = Callable[[str, int, int, types.ConfigureATP], io.IOBase]
+TorrentFileOpener = Callable[[types.InfoHash, int, int, types.ConfigureATP],
+                             io.IOBase]
 
 
 class Metadata(collections.UserDict, MutableMapping[str, Any]):
@@ -46,8 +47,9 @@ class Metadata(collections.UserDict, MutableMapping[str, Any]):
 
 class TorrentFile(fs.File):
 
-    def __init__(self, *, opener: TorrentFileOpener, info_hash: str, start: int,
-                 stop: int, configure_atp: types.ConfigureATP) -> None:
+    def __init__(self, *, opener: TorrentFileOpener, info_hash: types.InfoHash,
+                 start: int, stop: int,
+                 configure_atp: types.ConfigureATP) -> None:
         super().__init__(size=stop - start)
         self.opener = opener
         self.info_hash = info_hash
@@ -73,7 +75,7 @@ def _is_valid_path(path: List[str]) -> bool:
 
 class _V1TorrentInNetwork(fs.StaticDir):
 
-    def __init__(self, libs: LibraryService, info_hash: str,
+    def __init__(self, libs: LibraryService, info_hash: types.InfoHash,
                  info: protocol.Info, network: Network) -> None:
         super().__init__()
 
@@ -85,7 +87,7 @@ class _V1TorrentInNetwork(fs.StaticDir):
         for spec in info.iter_files():
             self._add_torrent_file(libs, info_hash, spec, network)
 
-    def _add_torrent_file(self, libs: LibraryService, info_hash: str,
+    def _add_torrent_file(self, libs: LibraryService, info_hash: types.InfoHash,
                           spec: protocol.FileSpec, network: Network):
         if spec.is_pad:
             return
@@ -123,7 +125,7 @@ class _V1TorrentInNetwork(fs.StaticDir):
 
 class _V1Torrent(fs.Dir):
 
-    def __init__(self, libs: LibraryService, info_hash: str,
+    def __init__(self, libs: LibraryService, info_hash: types.InfoHash,
                  info: protocol.Info):
         super().__init__()
         self.libs = libs
@@ -154,7 +156,7 @@ class _V1(fs.Dir):
         self.libs = libs
 
     def get_node(self, name: str) -> Optional[fs.Node]:
-        info_hash = name
+        info_hash = types.InfoHash(name)
         try:
             info_dict = self.libs.libraries.get_pseudo_info(info_hash,
                                                             exact_paths=True)
@@ -195,14 +197,17 @@ class UnknownTorrentError(Error):
 class PseudoInfoLibrary(abc.ABC):
 
     @abc.abstractmethod
-    def get(self, info_hash: str, exact_paths=False) -> protocol.BDict:
+    def get(self,
+            info_hash: types.InfoHash,
+            exact_paths=False) -> protocol.BDict:
         raise UnknownTorrentError(info_hash)
 
 
 class MetadataLibrary(abc.ABC):
 
     @abc.abstractmethod
-    def get(self, info_hash: str, file_index: int, *names: str) -> Metadata:
+    def get(self, info_hash: types.InfoHash, file_index: int,
+            *names: str) -> Metadata:
         return Metadata()
 
 
@@ -223,10 +228,10 @@ class Network:
         return False
 
     @abc.abstractmethod
-    def scrape(self, info_hash: str) -> ScrapeResponse:
+    def scrape(self, info_hash: types.InfoHash) -> ScrapeResponse:
         raise UnknownTorrentError(info_hash)
 
-    def can_access(self, info_hash: str) -> bool:
+    def can_access(self, info_hash: types.InfoHash) -> bool:
         try:
             self.scrape(info_hash)
         except UnknownTorrentError:
@@ -241,7 +246,7 @@ class Libraries:
         self.metadata: Dict[str, MetadataLibrary] = {}
         self.pseudo_info: Dict[str, PseudoInfoLibrary] = {}
 
-    def get_metadata(self, info_hash: str, file_index: int,
+    def get_metadata(self, info_hash: types.InfoHash, file_index: int,
                      *names: str) -> Metadata:
         result = Metadata()
         for library in list(self.metadata.values()):
@@ -254,7 +259,7 @@ class Libraries:
         return result
 
     def get_pseudo_info(self,
-                        info_hash: str,
+                        info_hash: types.InfoHash,
                         exact_paths=False) -> protocol.BDict:
         for library in list(self.pseudo_info.values()):
             try:
@@ -273,8 +278,8 @@ class LibraryService:
         self.browse_nodes: Dict[str, fs.Node] = {}
 
     @staticmethod
-    def get_torrent_path(info_hash: str) -> Path:
+    def get_torrent_path(info_hash: types.InfoHash) -> Path:
         return Path().joinpath("v1", info_hash)
 
-    def lookup_torrent(self, info_hash: str) -> fs.Node:
+    def lookup_torrent(self, info_hash: types.InfoHash) -> fs.Node:
         return self.root.traverse(self.get_torrent_path(info_hash))

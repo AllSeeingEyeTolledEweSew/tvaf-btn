@@ -11,6 +11,7 @@ import werkzeug.exceptions
 
 import tvaf.http.serialization as ser_lib
 from tvaf import ltpy
+from tvaf import types
 
 from . import util as http_util
 
@@ -81,7 +82,7 @@ class V1Blueprint(http_util.Blueprint):
         super().__init__("v1", __name__)
         self.session = session
 
-    def find_torrent(self, info_hash: str) -> lt.torrent_handle:
+    def find_torrent(self, info_hash: types.InfoHash) -> lt.torrent_handle:
         try:
             info_hash_bytes = bytes.fromhex(info_hash)
         except ValueError as exc:
@@ -94,7 +95,7 @@ class V1Blueprint(http_util.Blueprint):
         return handle
 
     @http_util.route("/torrents/<info_hash>")
-    def get_torrent(self, info_hash: str):
+    def get_torrent(self, info_hash: types.InfoHash):
         handle = self.find_torrent(info_hash)
         serializer = TorrentSerializer(get_torrent_fields())
         try:

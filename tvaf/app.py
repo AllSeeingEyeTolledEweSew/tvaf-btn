@@ -85,7 +85,7 @@ class App(task_lib.Task):
     def _save_config(self) -> None:
         self._config.write_config_dir(self._config_dir)
 
-    def _open(self, info_hash: str, start: int, stop: int,
+    def _open(self, info_hash: types.InfoHash, start: int, stop: int,
               configure_atp: types.ConfigureATP) -> io.IOBase:
         user = self._auth_service.get_user()
         if user is None:

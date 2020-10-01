@@ -10,7 +10,6 @@ import enum
 import logging
 import pathlib
 import threading
-import weakref
 from typing import Any
 from typing import Dict
 from typing import Iterable
@@ -19,6 +18,7 @@ from typing import Mapping
 from typing import MutableMapping
 from typing import Optional
 from typing import Set
+from weakref import WeakValueDictionary
 
 import libtorrent as lt
 
@@ -68,8 +68,8 @@ class TorrentRemovedError(CanceledError):
 
 class Request:
 
-    def __init__(self, *, info_hash: str, start: int, stop: int, mode: Mode,
-                 configure_atp: types.ConfigureATP):
+    def __init__(self, *, info_hash: types.InfoHash, start: int, stop: int,
+                 mode: Mode, configure_atp: types.ConfigureATP):
         self.info_hash = info_hash
         self.start = start
         self.stop = stop
@@ -391,7 +391,7 @@ class _TorrentTask(task_lib.Task):
 
     def __init__(self,
                  *,
-                 info_hash: str,
+                 info_hash: types.InfoHash,
                  alert_driver: driver_lib.AlertDriver,
                  resume_service: resume_lib.ResumeService,
                  session: lt.session,
@@ -591,15 +591,15 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
 
         self._lock = threading.RLock()
         # As of 3.8, WeakValueDictionary is unsubscriptable
-        self._torrent_tasks = weakref.WeakValueDictionary() \
-                # type: weakref.WeakValueDictionary[str, _TorrentTask]
+        self._torrent_tasks = WeakValueDictionary() \
+                # type: WeakValueDictionary[types.InfoHash, _TorrentTask]
 
         self._atp_settings: Mapping[str, Any] = {}
 
         self.set_config(config)
 
-    def add_request(self, *, info_hash: str, start: int, stop: int, mode: Mode,
-                    configure_atp: types.ConfigureATP) -> Request:
+    def add_request(self, *, info_hash: types.InfoHash, start: int, stop: int,
+                    mode: Mode, configure_atp: types.ConfigureATP) -> Request:
 
         def _configure_atp_with_settings(atp: lt.add_torrent_params) -> None:
             configure_atp(atp)

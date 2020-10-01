@@ -12,6 +12,7 @@ what you see when inserting into or selecting from the table.
 
 import dataclasses
 from typing import Callable
+from typing import NewType
 from typing import Optional
 
 import libtorrent as lt
@@ -19,6 +20,8 @@ import libtorrent as lt
 USER_UNKNOWN = "*unknown*"
 
 ConfigureATP = Callable[[lt.add_torrent_params], None]
+
+InfoHash = NewType("InfoHash", str)
 
 
 @dataclasses.dataclass

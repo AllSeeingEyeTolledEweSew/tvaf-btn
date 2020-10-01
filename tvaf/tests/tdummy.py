@@ -3,8 +3,11 @@
 
 import hashlib
 import random
+from typing import Optional
 
 import libtorrent as lt
+
+from tvaf import protocol
 
 PIECE_LENGTH = 16384
 NAME = b"test.txt"
@@ -96,7 +99,7 @@ class Torrent:
 
         self._data = None
         self._pieces = None
-        self._info = None
+        self._info: Optional[protocol.BDict] = None
         self._dict = None
         self._infohash_bytes = None
 
@@ -116,7 +119,7 @@ class Torrent:
         return self._pieces
 
     @property
-    def info(self):
+    def info(self) -> protocol.BDict:
         if self._info is None:
             self._info = {
                 b"piece length":

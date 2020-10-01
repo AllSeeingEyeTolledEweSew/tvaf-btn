@@ -58,7 +58,9 @@ class App(task_lib.Task):
 
         self._auth_service = auth_lib.AuthService()
 
-        self._library_service = library.LibraryService(opener=self._open)
+        self.libraries = library.Libraries()
+        self._library_service = library.LibraryService(opener=self._open,
+                                                       libraries=self.libraries)
 
         self._ftpd = ftp_lib.FTPD(auth_service=self._auth_service,
                                   root=self._library_service.root,

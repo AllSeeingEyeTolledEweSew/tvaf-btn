@@ -85,7 +85,7 @@ class App(task_lib.Task):
     def _save_config(self) -> None:
         self._config.write_config_dir(self._config_dir)
 
-    def _open(self, tslice: types.TorrentSlice,
+    def _open(self, info_hash: str, start: int, stop: int,
               configure_atp: types.ConfigureATP) -> io.IOBase:
         user = self._auth_service.get_user()
         if user is None:
@@ -94,9 +94,9 @@ class App(task_lib.Task):
 
         return torrent_io.BufferedTorrentIO(
             request_service=self._request_service,
-            info_hash=tslice.info_hash,
-            start=tslice.start,
-            stop=tslice.stop,
+            info_hash=info_hash,
+            start=start,
+            stop=stop,
             configure_atp=configure_atp)
 
     def _set_config(self, config: config_lib.Config) -> None:

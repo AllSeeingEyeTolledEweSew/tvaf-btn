@@ -10,7 +10,6 @@ Wherever possible, attribute names match table column names, and types match
 what you see when inserting into or selecting from the table.
 """
 
-import collections.abc
 import dataclasses
 from typing import Callable
 from typing import Optional
@@ -20,26 +19,6 @@ import libtorrent as lt
 USER_UNKNOWN = "*unknown*"
 
 ConfigureATP = Callable[[lt.add_torrent_params], None]
-
-
-@dataclasses.dataclass(frozen=True)
-class TorrentSlice(collections.abc.Sized):
-
-    info_hash: str = ""
-    start: int = 0
-    stop: int = 0
-
-    def __post_init__(self):
-        if self.start < 0:
-            raise ValueError(f"start: {self.start} < 0")
-        if self.stop < 0:
-            raise ValueError(f"stop: {self.stop} < 0")
-        if self.start > self.stop:
-            raise ValueError(f"start/stop: {self.start} > {self.stop}")
-        super().__setattr__("info_hash", self.info_hash.lower())
-
-    def __len__(self) -> int:
-        return self.stop - self.start
 
 
 @dataclasses.dataclass

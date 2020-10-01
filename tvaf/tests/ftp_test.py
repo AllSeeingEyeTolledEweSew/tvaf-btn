@@ -6,7 +6,6 @@ from typing import Any
 from tvaf import auth
 from tvaf import ftp
 from tvaf import library
-from tvaf import types
 
 from . import lib
 from . import library_test_utils as ltu
@@ -28,9 +27,8 @@ class BaseFTPTest(unittest.TestCase):
     def setUp(self):
         self.torrents = {t.infohash: t for t in (ltu.SINGLE, ltu.MULTI)}
 
-        def opener(tslice: types.TorrentSlice, _: Any):
-            data = self.torrents[
-                tslice.info_hash].data[tslice.start:tslice.stop]
+        def opener(info_hash: str, start: int, stop: int, _: Any):
+            data = self.torrents[info_hash].data[start:stop]
             raw = io.BytesIO(data)
             # bug in pyftpdlib: tries to access fileobj.name for debug logging
             raw.name = "<bytes>"

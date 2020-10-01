@@ -12,14 +12,13 @@ import libtorrent as lt
 from tvaf import fs
 from tvaf import library
 from tvaf import protocol
-from tvaf import types
 
 from . import library_test_utils as ltu
 from . import tdummy
 
 
-def get_placeholder_data(tslice: types.TorrentSlice) -> bytes:
-    data = "%s:%d:%d" % (tslice.info_hash, tslice.start, tslice.stop)
+def get_placeholder_data(info_hash: str, start: int, stop: int) -> bytes:
+    data = f"{info_hash}:{start}:{stop}"
     return data.encode()
 
 
@@ -29,8 +28,8 @@ class TestLibraryService(unittest.TestCase):
 
     def setUp(self):
 
-        def opener(tslice: types.TorrentSlice, _: Any) -> io.BytesIO:
-            return io.BytesIO(get_placeholder_data(tslice))
+        def opener(info_hash: str, start: int, stop: int, _: Any) -> io.BytesIO:
+            return io.BytesIO(get_placeholder_data(info_hash, start, stop))
 
         self.torrents = {torrent.infohash: torrent for torrent in ltu.TORRENTS}
         self.libraries = library.Libraries()
@@ -58,11 +57,12 @@ class TestLibraryService(unittest.TestCase):
         assert start is not None
         assert stop is not None
 
-        self.assertEqual(tfile.tslice.info_hash, info_hash)
-        self.assertEqual(tfile.tslice.start, start)
-        self.assertEqual(tfile.tslice.stop, stop)
+        self.assertEqual(tfile.info_hash, info_hash)
+        self.assertEqual(tfile.start, start)
+        self.assertEqual(tfile.stop, stop)
         self.assertEqual(
-            tfile.open(mode="rb").read(), get_placeholder_data(tfile.tslice))
+            tfile.open(mode="rb").read(),
+            get_placeholder_data(info_hash, start, stop))
 
         atp = lt.add_torrent_params()
         atp.info_hash = lt.sha1_hash(bytes.fromhex(info_hash))

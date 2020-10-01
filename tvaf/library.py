@@ -36,8 +36,7 @@ _LOG = logging.getLogger(__name__)
 
 Path = pathlib.PurePosixPath
 
-TorrentFileOpener = Callable[[types.TorrentSlice, types.ConfigureATP],
-                             io.IOBase]
+TorrentFileOpener = Callable[[str, int, int, types.ConfigureATP], io.IOBase]
 
 
 class Metadata(collections.UserDict, MutableMapping[str, Any]):
@@ -47,17 +46,20 @@ class Metadata(collections.UserDict, MutableMapping[str, Any]):
 
 class TorrentFile(fs.File):
 
-    def __init__(self, *, opener: TorrentFileOpener, tslice: types.TorrentSlice,
-                 configure_atp: types.ConfigureATP) -> None:
-        super().__init__(size=len(tslice))
+    def __init__(self, *, opener: TorrentFileOpener, info_hash: str, start: int,
+                 stop: int, configure_atp: types.ConfigureATP) -> None:
+        super().__init__(size=stop - start)
         self.opener = opener
-        self.tslice = tslice
+        self.info_hash = info_hash
+        self.start = start
+        self.stop = stop
         self.configure_atp = configure_atp
 
     def open_raw(self, mode: str = "r") -> io.IOBase:
         if set(mode) & set("wxa+"):
             raise fs.mkoserror(errno.EPERM)
-        return self.opener(self.tslice, self.configure_atp)
+        return self.opener(self.info_hash, self.start, self.stop,
+                           self.configure_atp)
 
 
 def _is_valid_path(path: List[str]) -> bool:
@@ -92,10 +94,9 @@ class _V1TorrentInNetwork(fs.StaticDir):
             return
 
         torrent_file = TorrentFile(opener=libs.opener,
-                                   tslice=types.TorrentSlice(
-                                       info_hash=info_hash,
-                                       start=spec.start,
-                                       stop=spec.stop),
+                                   info_hash=info_hash,
+                                   start=spec.start,
+                                   stop=spec.stop,
                                    configure_atp=network.configure_atp)
         self._by_index.mkchild(str(spec.index), torrent_file)
 

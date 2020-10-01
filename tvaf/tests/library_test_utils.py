@@ -6,6 +6,7 @@ import libtorrent as lt
 
 from tvaf import library
 from tvaf import protocol
+from tvaf import types
 
 from . import tdummy
 
@@ -44,9 +45,11 @@ TORRENTS = (SINGLE, MULTI, PADDED, CONFLICT_FILE, CONFLICT_FILE_DIR,
 class InfoLibrary(library.PseudoInfoLibrary):
 
     def __init__(self, *torrents: tdummy.Torrent):
-        self.torrents = {torrent.infohash: torrent for torrent in torrents}
+        self.torrents = {torrent.info_hash: torrent for torrent in torrents}
 
-    def get(self, info_hash: str, exact_paths=False) -> protocol.BDict:
+    def get(self,
+            info_hash: types.InfoHash,
+            exact_paths=False) -> protocol.BDict:
         try:
             return self.torrents[info_hash].info
         except KeyError:
@@ -58,7 +61,7 @@ class MetadataLibrary(library.MetadataLibrary):
     def __init__(self, metadata: Dict[Tuple[str, int], library.Metadata]):
         self.metadata = metadata
 
-    def get(self, info_hash: str, file_index: int,
+    def get(self, info_hash: types.InfoHash, file_index: int,
             *names: str) -> library.Metadata:
         return self.metadata.get((info_hash, file_index), library.Metadata())
 
@@ -66,10 +69,10 @@ class MetadataLibrary(library.MetadataLibrary):
 class Network(library.Network):
 
     def __init__(self, *torrents: tdummy.Torrent):
-        self.torrents = {torrent.infohash: torrent for torrent in torrents}
+        self.torrents = {torrent.info_hash: torrent for torrent in torrents}
 
     def configure_atp(self, atp: lt.add_torrent_params) -> None:
-        info_hash = str(atp.info_hash)
+        info_hash = types.InfoHash(str(atp.info_hash))
         try:
             atp.ti = self.torrents[info_hash].torrent_info()
         except KeyError:
@@ -92,12 +95,12 @@ def add_test_libraries(
         torrents = TORRENTS
     if metadata is None:
         metadata = {
-            (SINGLE.infohash, 0):
+            (SINGLE.info_hash, 0):
                 library.Metadata(mime_type="text/plain"),
-            (MULTI.infohash, 0):
+            (MULTI.info_hash, 0):
                 library.Metadata(mime_type="application/x-tar",
                                  content_encoding="gzip"),
-            (MULTI.infohash, 1):
+            (MULTI.info_hash, 1):
                 library.Metadata(mime_type="text/plain"),
         }
 

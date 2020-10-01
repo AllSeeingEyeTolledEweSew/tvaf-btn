@@ -50,7 +50,7 @@ class IterResumeDataTest(unittest.TestCase):
         def write(torrent):
             self.resume_data_dir.mkdir(parents=True, exist_ok=True)
             path = self.resume_data_dir.joinpath(
-                torrent.infohash).with_suffix(".resume")
+                torrent.info_hash).with_suffix(".resume")
             atp = torrent.atp()
             atp.ti = None
             atp_data = lt.bencode(lt.write_resume_data(atp))

@@ -17,7 +17,7 @@ class TestBufferedTorrentIO(request_test_utils.RequestServiceTestCase):
     def open(self):
         return torrent_io.BufferedTorrentIO(
             request_service=self.service,
-            info_hash=self.torrent.infohash,
+            info_hash=self.torrent.info_hash,
             start=0,
             stop=self.torrent.length,
             configure_atp=self.torrent.configure_atp)

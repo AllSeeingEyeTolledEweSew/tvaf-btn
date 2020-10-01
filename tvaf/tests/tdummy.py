@@ -8,6 +8,7 @@ from typing import Optional
 import libtorrent as lt
 
 from tvaf import protocol
+from tvaf import types
 
 PIECE_LENGTH = 16384
 NAME = b"test.txt"
@@ -101,7 +102,7 @@ class Torrent:
         self._pieces = None
         self._info: Optional[protocol.BDict] = None
         self._dict = None
-        self._infohash_bytes = None
+        self._info_hash_bytes = None
 
     @property
     def data(self):
@@ -156,18 +157,18 @@ class Torrent:
         return self._dict
 
     @property
-    def infohash_bytes(self):
-        if self._infohash_bytes is None:
-            self._infohash_bytes = hashlib.sha1(lt.bencode(self.info)).digest()
-        return self._infohash_bytes
+    def info_hash_bytes(self):
+        if self._info_hash_bytes is None:
+            self._info_hash_bytes = hashlib.sha1(lt.bencode(self.info)).digest()
+        return self._info_hash_bytes
 
     @property
-    def infohash(self):
-        return self.infohash_bytes.hex()
+    def info_hash(self) -> types.InfoHash:
+        return types.InfoHash(self.info_hash_bytes.hex())
 
     @property
     def sha1_hash(self):
-        return lt.sha1_hash(self.infohash_bytes)
+        return lt.sha1_hash(self.info_hash_bytes)
 
     def torrent_info(self):
         return lt.torrent_info(self.dict)

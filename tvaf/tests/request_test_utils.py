@@ -106,7 +106,7 @@ class RequestServiceTestCase(unittest.TestCase):
         if configure_atp is None:
             configure_atp = self.torrent.configure_atp
         return self.service.add_request(mode=mode,
-                                        info_hash=self.torrent.infohash,
+                                        info_hash=self.torrent.info_hash,
                                         start=start,
                                         stop=stop,
                                         configure_atp=configure_atp)
@@ -115,7 +115,7 @@ class RequestServiceTestCase(unittest.TestCase):
         handle = None
         for _ in lib.loop_until_timeout(5, msg="add torrent"):
             handle = self.session.find_torrent(
-                lt.sha1_hash(bytes.fromhex(self.torrent.infohash)))
+                lt.sha1_hash(bytes.fromhex(self.torrent.info_hash)))
             if handle.is_valid():
                 break
         return handle

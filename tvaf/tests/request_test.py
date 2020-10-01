@@ -68,7 +68,7 @@ class TestAddRemove(request_test_utils.RequestServiceTestCase):
         self.wait_for_torrent()
         self.assertEqual(
             [str(h.info_hash()) for h in self.session.get_torrents()],
-            [self.torrent.infohash])
+            [self.torrent.info_hash])
         self.service.discard_request(req)
         with self.assertRaises(request_lib.CanceledError):
             req.read(timeout=5)

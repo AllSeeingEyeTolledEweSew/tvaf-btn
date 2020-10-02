@@ -78,7 +78,6 @@ setuptools.setup(
     test_suite="tvaf.tests",
     python_requires=">=3.7",
     install_requires=[
-        "intervaltree>=3.0.2",
         "dataclasses-json>=0.3.7",
         "btn>=1.0.4",
     ],

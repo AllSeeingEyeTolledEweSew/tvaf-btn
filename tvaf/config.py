@@ -61,7 +61,7 @@ _T = TypeVar("_T")
 class Config(dict, MutableMapping[str, Any]):
 
     @classmethod
-    def from_config_dir(cls, config_dir: pathlib.Path):
+    def from_config_dir(cls: Type[_C], config_dir: pathlib.Path) -> _C:
         with config_dir.joinpath(FILENAME).open() as fp:
             try:
                 data = json.load(fp)
@@ -102,6 +102,9 @@ class Config(dict, MutableMapping[str, Any]):
 
     def require_bool(self, key: str) -> bool:
         return self._require(key, bool)
+
+
+_C = TypeVar("_C", bound=Config)
 
 
 class HasConfig(abc.ABC):

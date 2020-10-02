@@ -3,6 +3,8 @@
 
 import distutils.cmd
 import subprocess
+from typing import List
+from typing import Tuple
 
 import setuptools
 
@@ -10,31 +12,31 @@ import setuptools
 class FormatCommand(distutils.cmd.Command):
 
     description = "Run autoflake and yapf on python source files"
-    user_options = []
+    user_options:List[Tuple] = []
 
-    def initialize_options(self):
+    def initialize_options(self) -> None:
         pass
 
-    def finalize_options(self):
+    def finalize_options(self) -> None:
         pass
 
-    def run_isort(self):
+    def run_isort(self) -> None:
         subprocess.check_call(["isort", "-rc", "-y"])
 
-    def run_yapf(self):
+    def run_yapf(self) -> None:
         subprocess.check_call(["yapf", "-i", "-r", "."])
         # yapf does not fix certain hanging indents currently, see
         # https://github.com/google/yapf/issues/769
         # We work around this by calling selective autopep8 after yapf.
         subprocess.check_call(["autopep8", "-i", "-r", "--select", "E125", "."])
 
-    def run_autoflake(self):
+    def run_autoflake(self) -> None:
         subprocess.check_call([
             "autoflake", "-i", "-r", "--remove-all-unused-imports",
             "--remove-duplicate-keys", "--remove-unused-variables", "."
         ])
 
-    def run(self):
+    def run(self) -> None:
         self.run_isort()
         self.run_yapf()
         self.run_autoflake()
@@ -43,18 +45,18 @@ class FormatCommand(distutils.cmd.Command):
 class LintCommand(distutils.cmd.Command):
 
     description = "Run autoflake and yapf on python source files"
-    user_options = []
+    user_options:List[Tuple] = []
 
-    def initialize_options(self):
+    def initialize_options(self) -> None:
         pass
 
-    def finalize_options(self):
+    def finalize_options(self) -> None:
         pass
 
-    def run_mypy(self):
+    def run_mypy(self) -> None:
         subprocess.check_call(["mypy", "tvaf"])
 
-    def run(self):
+    def run(self) -> None:
         self.run_mypy()
 
 

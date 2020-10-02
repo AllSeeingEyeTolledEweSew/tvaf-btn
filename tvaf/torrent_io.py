@@ -1,17 +1,19 @@
 import errno
+import array
 import io
 import mmap
 import threading
 from typing import List
 from typing import Sequence
 from typing import Union
+from typing import Any
 
 from tvaf import ltpy
 from tvaf import request as request_lib
 from tvaf import types
 from tvaf import xmemoryview as xmv
 
-ReadintoTarget = Union[bytearray, mmap.mmap, memoryview]
+_ReadintoTarget = Union[bytearray, mmap.mmap, array.array[Any], memoryview]
 
 
 class BufferedTorrentIO(io.BufferedIOBase):
@@ -165,13 +167,14 @@ class BufferedTorrentIO(io.BufferedIOBase):
 
         return result
 
-    def readinto(self, out: ReadintoTarget) -> int:
+    def readinto(self, out: _ReadintoTarget) -> int:
         return self._readinto(out, False)
 
-    def readinto1(self, out: ReadintoTarget) -> int:
+    def readinto1(self, out: _ReadintoTarget) -> int:
         return self._readinto(out, True)
 
-    def _readinto(self, out: ReadintoTarget, read1: bool) -> int:
+    def _readinto(self, out: _ReadintoTarget, read1: bool) -> int:
+        assert not isinstance(out, array.array)
         if isinstance(out, memoryview):
             out = out.cast("B")
 

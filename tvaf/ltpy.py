@@ -354,7 +354,7 @@ def error_code_from_exception(exc: Exception) -> Optional[lt.error_code]:
     # We de-prefer libtorrent_category, assuming that some error codes start
     # life as libtorrent_category errors then get specialized into other
     # categories.
-    def cat_key(category):
+    def cat_key(category) -> int:
         return {
             GENERIC_CATEGORY: 0,
             LIBTORRENT_CATEGORY: 2,

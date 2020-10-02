@@ -258,11 +258,11 @@ class FTPD(task_lib.Task, config_lib.HasConfig):
         self.set_config(config)
 
     @property
-    def socket(self):
+    def socket(self) -> Optional[socket_lib.socket]:
         with self._lock:
             if self._server is None:
                 return None
-            return self._server.socket
+            return cast(socket_lib.socket, self._server.socket)
 
     @contextlib.contextmanager
     def stage_config(self, config: config_lib.Config) -> Iterator[None]:

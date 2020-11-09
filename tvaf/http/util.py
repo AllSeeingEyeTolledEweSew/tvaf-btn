@@ -8,14 +8,14 @@ _AppLike = Union[flask.Flask, flask.Blueprint]
 
 
 def route(rule: str, **options: Any) -> Callable[[Callable], Callable]:
-
     def decorator(func: Callable) -> Callable:
         name = func.__name__
         endpoint: str = options.pop("endpoint", name)
 
         def undecorate(target: Any, applike: _AppLike) -> None:
-            applike.add_url_rule(rule, endpoint, getattr(target, name),
-                                 **options)
+            applike.add_url_rule(
+                rule, endpoint, getattr(target, name), **options
+            )
 
         setattr(func, "_undecorate", undecorate)
         return func
@@ -24,7 +24,6 @@ def route(rule: str, **options: Any) -> Callable[[Callable], Callable]:
 
 
 class Blueprint:
-
     def __init__(self, name: str, import_name: str, **kwargs) -> None:
         self.blueprint = flask.Blueprint(name, import_name, **kwargs)
 

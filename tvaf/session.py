@@ -18,7 +18,7 @@ _OVERRIDES = {
     "handshake_client_version": "",
     "enable_lsd": False,
     "enable_dht": False,
-    "alert_queue_size": 2**32 - 1,
+    "alert_queue_size": 2 ** 32 - 1,
 }
 
 _BLACKLIST = {
@@ -42,13 +42,14 @@ def parse_config(config: config_lib.Config) -> Dict[str, Any]:
     settings_base_name = config.require_str("session_settings_base")
     if settings_base_name not in ("default_settings", "high_performance_seed"):
         raise config_lib.InvalidConfigError(
-            f"no settings pack named \"{settings_base_name}\"")
+            f'no settings pack named "{settings_base_name}"'
+        )
     settings: Dict[str, Any] = getattr(lt, settings_base_name)()
 
     for key, value in config.items():
         if not key.startswith("session_"):
             continue
-        key = key[len("session_"):]
+        key = key[len("session_") :]
         if key == "settings_base":
             continue
 
@@ -60,7 +61,8 @@ def parse_config(config: config_lib.Config) -> Dict[str, Any]:
         if settings[key].__class__ != value.__class__:
             raise config_lib.InvalidConfigError(
                 f"{key} should be {settings[key].__class__}, "
-                f"not {value.__class__}")
+                f"not {value.__class__}"
+            )
 
         settings[key] = value
 
@@ -101,11 +103,9 @@ del _init_alert_mask_name
 
 
 class SessionService(config_lib.HasConfig):
-
-    def __init__(self,
-                 *,
-                 alert_mask: int = 0,
-                 config: config_lib.Config = None):
+    def __init__(
+        self, *, alert_mask: int = 0, config: config_lib.Config = None
+    ):
         self._lock = threading.RLock()
         self._alert_mask_bit_count: Dict[int, int] = {}
         self._inc_alert_mask_bits_locked(alert_mask)
@@ -122,7 +122,8 @@ class SessionService(config_lib.HasConfig):
     def _inc_alert_mask_bits_locked(self, alert_mask: int):
         for bit in _get_mask_bits(alert_mask):
             self._alert_mask_bit_count[bit] = (
-                self._alert_mask_bit_count.get(bit, 0) + 1)
+                self._alert_mask_bit_count.get(bit, 0) + 1
+            )
 
     def _dec_alert_mask_bits_locked(self, alert_mask: int):
         for bit in _get_mask_bits(alert_mask):
@@ -158,8 +159,9 @@ class SessionService(config_lib.HasConfig):
         if not deltas:
             return
         if _LOG.isEnabledFor(logging.DEBUG):
-            delta_alert_mask = settings["alert_mask"] ^ self._settings[
-                "alert_mask"]
+            delta_alert_mask = (
+                settings["alert_mask"] ^ self._settings["alert_mask"]
+            )
             for bit in _get_mask_bits(delta_alert_mask):
                 mask = 1 << bit
                 name = _ALERT_MASK_NAME.get(mask, mask)

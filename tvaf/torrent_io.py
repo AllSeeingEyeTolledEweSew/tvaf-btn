@@ -3,7 +3,6 @@ import errno
 import io
 import mmap
 import threading
-from typing import Any
 from typing import List
 from typing import Sequence
 from typing import Union
@@ -13,7 +12,7 @@ from tvaf import request as request_lib
 from tvaf import types
 from tvaf import xmemoryview as xmv
 
-_ReadintoTarget = Union[bytearray, mmap.mmap, array.array[Any], memoryview]
+_ReadintoTarget = Union[bytearray, mmap.mmap, array.array, memoryview]
 
 
 class BufferedTorrentIO(io.BufferedIOBase):
@@ -26,9 +25,15 @@ class BufferedTorrentIO(io.BufferedIOBase):
     # have piece size of 1mb or 2mb; and only 1 uses bep47 padding, which
     # indicates most files in multi-file torrents are piece-misaligned.
 
-    def __init__(self, *, request_service: request_lib.RequestService,
-                 info_hash: types.InfoHash, start: int, stop: int,
-                 configure_atp: types.ConfigureATP):
+    def __init__(
+        self,
+        *,
+        request_service: request_lib.RequestService,
+        info_hash: types.InfoHash,
+        start: int,
+        stop: int,
+        configure_atp: types.ConfigureATP
+    ):
         super().__init__()
         self._request_service = request_service
         self._info_hash = info_hash
@@ -128,7 +133,8 @@ class BufferedTorrentIO(io.BufferedIOBase):
             start=self._offset,
             stop=stop,
             mode=request_lib.Mode.READ,
-            configure_atp=self._configure_atp)
+            configure_atp=self._configure_atp,
+        )
 
         chunk = xmv.EMPTY
         while True:
@@ -153,17 +159,17 @@ class BufferedTorrentIO(io.BufferedIOBase):
                 # We requested a 1-byte read. Now expand the chunk, up to the
                 # requested size.
                 stop = chunk.start + min(size, len(chunk.obj) - chunk.start)
-                chunk = xmv.MemoryView(obj=chunk.obj,
-                                       start=chunk.start,
-                                       stop=stop)
+                chunk = xmv.MemoryView(
+                    obj=chunk.obj, start=chunk.start, stop=stop
+                )
             result.append(chunk.to_memoryview())
             self._offset += len(chunk)
             size -= len(chunk)
 
         # Save the "leftovers" from the final chunk as our buffer
-        self._buffer = xmv.MemoryView(obj=chunk.obj,
-                                      start=chunk.stop,
-                                      stop=len(chunk.obj))
+        self._buffer = xmv.MemoryView(
+            obj=chunk.obj, start=chunk.stop, stop=len(chunk.obj)
+        )
 
         return result
 
@@ -184,7 +190,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
         offset = 0
         for buf in vec:
             buflen = len(buf)
-            out[offset:offset + buflen] = buf
+            out[offset : offset + buflen] = buf
             offset += buflen
         return offset
 

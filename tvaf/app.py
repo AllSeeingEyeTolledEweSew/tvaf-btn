@@ -41,29 +41,35 @@ class App(task_lib.Task):
         self._session_service = session_lib.SessionService(config=self._config)
         self._session = self._session_service.session
         self._alert_driver = driver_lib.AlertDriver(
-            session_service=self._session_service)
+            session_service=self._session_service
+        )
 
         self._resume_service = resume_lib.ResumeService(
             config_dir=self._config_dir,
             session=self._session,
-            alert_driver=self._alert_driver)
+            alert_driver=self._alert_driver,
+        )
 
         self._request_service = request_lib.RequestService(
             config_dir=self._config_dir,
             session=self._session,
             resume_service=self._resume_service,
             alert_driver=self._alert_driver,
-            config=self._config)
+            config=self._config,
+        )
 
         self._auth_service = auth_lib.AuthService()
 
         self.libraries = library.Libraries()
-        self._library_service = library.LibraryService(opener=self._open,
-                                                       libraries=self.libraries)
+        self._library_service = library.LibraryService(
+            opener=self._open, libraries=self.libraries
+        )
 
-        self._ftpd = ftp_lib.FTPD(auth_service=self._auth_service,
-                                  root=self._library_service.root,
-                                  config=self._config)
+        self._ftpd = ftp_lib.FTPD(
+            auth_service=self._auth_service,
+            root=self._library_service.root,
+            config=self._config,
+        )
         self._httpd = http_lib.HTTPD(config=self._config, session=self._session)
 
         self._lt4604_fixup = lt4604.Fixup(alert_driver=self._alert_driver)
@@ -85,24 +91,34 @@ class App(task_lib.Task):
     def _save_config(self) -> None:
         self._config.write_config_dir(self._config_dir)
 
-    def _open(self, info_hash: types.InfoHash, start: int, stop: int,
-              configure_atp: types.ConfigureATP) -> io.IOBase:
+    def _open(
+        self,
+        info_hash: types.InfoHash,
+        start: int,
+        stop: int,
+        configure_atp: types.ConfigureATP,
+    ) -> io.IOBase:
         user = self._auth_service.get_user()
         if user is None:
             raise auth_lib.AuthenticationFailed(
-                "Opening torrent outside of authentication!")
+                "Opening torrent outside of authentication!"
+            )
 
         return torrent_io.BufferedTorrentIO(
             request_service=self._request_service,
             info_hash=info_hash,
             start=start,
             stop=stop,
-            configure_atp=configure_atp)
+            configure_atp=configure_atp,
+        )
 
     def _set_config(self, config: config_lib.Config) -> None:
-        config_lib.set_config(config, self._session_service.stage_config,
-                              self._request_service.stage_config,
-                              self._ftpd.stage_config)
+        config_lib.set_config(
+            config,
+            self._session_service.stage_config,
+            self._request_service.stage_config,
+            self._ftpd.stage_config,
+        )
         self._config = config
 
     def reload_config(self) -> None:

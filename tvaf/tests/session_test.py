@@ -18,13 +18,13 @@ def _raise_dummy() -> None:
 
 
 class TestSession(unittest.TestCase):
-
     def test_session(self):
         init_alert_mask = lt.alert_category.error | lt.alert_category.peer
         config = lib.create_isolated_config()
         config["session_handshake_client_version"] = "test-version"
-        session_service = session_lib.SessionService(config=config,
-                                                     alert_mask=init_alert_mask)
+        session_service = session_lib.SessionService(
+            config=config, alert_mask=init_alert_mask
+        )
 
         # Test default config is added
         session_service.session.get_settings()
@@ -34,8 +34,9 @@ class TestSession(unittest.TestCase):
         config = lib.create_isolated_config()
         config["session_alert_mask"] = 2
 
-        session_service = session_lib.SessionService(alert_mask=1,
-                                                     config=config)
+        session_service = session_lib.SessionService(
+            alert_mask=1, config=config
+        )
 
         # Test required mask was added
         settings = session_service.session.get_settings()
@@ -121,24 +122,29 @@ class TestSession(unittest.TestCase):
         settings = session_service.session.get_settings()
 
         # Check settings pack was applied as default
-        self.assertEqual(settings["cache_size"],
-                         lt.high_performance_seed()["cache_size"])
+        self.assertEqual(
+            settings["cache_size"], lt.high_performance_seed()["cache_size"]
+        )
 
         # Check base pack name didn't get overwritten
-        self.assertEqual(config["session_settings_base"],
-                         "high_performance_seed")
+        self.assertEqual(
+            config["session_settings_base"], "high_performance_seed"
+        )
 
     def test_settings_base_invalid(self):
         with self.assertRaises(config_lib.InvalidConfigError):
-            session_lib.SessionService(config=config_lib.Config(
-                session_settings_base="invalid"))
+            session_lib.SessionService(
+                config=config_lib.Config(session_settings_base="invalid")
+            )
 
     def test_setting_invalid_type(self):
         with self.assertRaises(config_lib.InvalidConfigError):
-            session_lib.SessionService(config=config_lib.Config(
-                session_cache_size="invalid"))
+            session_lib.SessionService(
+                config=config_lib.Config(session_cache_size="invalid")
+            )
 
     def test_alert_mask_invalid_type(self):
         with self.assertRaises(config_lib.InvalidConfigError):
-            session_lib.SessionService(config=config_lib.Config(
-                session_alert_mask="invalid"))
+            session_lib.SessionService(
+                config=config_lib.Config(session_alert_mask="invalid")
+            )

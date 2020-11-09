@@ -26,13 +26,17 @@ _BHRH = http.server.BaseHTTPRequestHandler
 _LOG = logging.getLogger(__name__)
 
 
-class _ThreadingWSGIServer(wsgiref.simple_server.WSGIServer,
-                           http.server.ThreadingHTTPServer):
+class _ThreadingWSGIServer(
+    wsgiref.simple_server.WSGIServer, http.server.ThreadingHTTPServer
+):
 
     daemon_threads = False
 
-    def __init__(self, server_address: Tuple[str, int],
-                 RequestHandlerClass: Callable[..., _BHRH]):
+    def __init__(
+        self,
+        server_address: Tuple[str, int],
+        RequestHandlerClass: Callable[..., _BHRH],
+    ):
         super().__init__(server_address, RequestHandlerClass)
         self.selector = notify_selector.NotifySelector()
         self.selector.register(self, selectors.EVENT_READ)
@@ -57,18 +61,19 @@ class _ThreadingWSGIServer(wsgiref.simple_server.WSGIServer,
 
 
 class HTTPD(task_lib.Task, config_lib.HasConfig):
-
     def __init__(self, *, session: lt.session, config: config_lib.Config):
         super().__init__(title="HTTPD")
         # TODO: fixup typing here
-        self._lock: threading.Condition = \
-                threading.Condition(threading.RLock())  # type: ignore
+        self._lock: threading.Condition = threading.Condition(
+            threading.RLock()
+        )  # type: ignore
 
         self._ltapiv1_blueprint = ltapi.V1Blueprint(session)
 
         self._flask = flask.Flask(__name__)
-        self._flask.register_blueprint(self._ltapiv1_blueprint.blueprint,
-                                       url_prefix="/lt/v1")
+        self._flask.register_blueprint(
+            self._ltapiv1_blueprint.blueprint, url_prefix="/lt/v1"
+        )
 
         self._address: Optional[Tuple[str, int]] = None
         self._server: Optional[socketserver.BaseServer] = None
@@ -86,14 +91,17 @@ class HTTPD(task_lib.Task, config_lib.HasConfig):
 
         # Only parse address and port if enabled
         if config.require_bool("http_enabled"):
-            address = (config.require_str("http_bind_address"),
-                       config.require_int("http_port"))
+            address = (
+                config.require_str("http_bind_address"),
+                config.require_int("http_port"),
+            )
 
         with self._lock:
             if address != self._address and address is not None:
                 host, port = address
                 server = wsgiref.simple_server.make_server(
-                    host, port, self._flask, server_class=_ThreadingWSGIServer)
+                    host, port, self._flask, server_class=_ThreadingWSGIServer
+                )
 
             yield
 

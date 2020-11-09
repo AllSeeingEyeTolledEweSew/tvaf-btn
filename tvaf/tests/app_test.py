@@ -15,7 +15,6 @@ from . import tdummy
 
 
 class ConfigTest(unittest.TestCase):
-
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
         self.config_dir = pathlib.Path(self.tempdir.name)
@@ -37,14 +36,14 @@ class ConfigTest(unittest.TestCase):
 
 
 class ResumeDataTest(unittest.TestCase):
-
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.config = lib.create_isolated_config()
         self.config.write_config_dir(self.config_dir)
         self.resume_data_dir = self.config_dir.joinpath(
-            resume_lib.RESUME_DATA_DIR_NAME)
+            resume_lib.RESUME_DATA_DIR_NAME
+        )
         self.resume_data_dir.mkdir(parents=True, exist_ok=True)
         self.app = app_lib.App(self.config_dir)
         self.download_dir = self.config_dir.joinpath("download")
@@ -67,15 +66,16 @@ class ResumeDataTest(unittest.TestCase):
         resp.raise_for_status()
         self.assertEqual(resp.json(), [])
 
-    def write(self,
-              atp: lt.add_torrent_params,
-              ti: lt.torrent_info = None) -> None:
+    def write(
+        self, atp: lt.add_torrent_params, ti: lt.torrent_info = None
+    ) -> None:
         info_hash = str(atp.info_hash)
         base = self.resume_data_dir.joinpath(info_hash)
         base.with_suffix(".resume").write_bytes(lt.write_resume_data_buf(atp))
         if ti is not None:
             base.with_suffix(".torrent").write_bytes(
-                lt.bencode({b"info": lt.bdecode(ti.metadata())}))
+                lt.bencode({b"info": lt.bdecode(ti.metadata())})
+            )
 
     def test_existing(self) -> None:
         atp = tdummy.DEFAULT.atp()

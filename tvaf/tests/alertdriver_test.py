@@ -21,7 +21,8 @@ from . import tdummy
 @contextlib.contextmanager
 def make_some_alerts():
     session = lib.create_isolated_session_service(
-        alert_mask=lt.alert_category.session_log).session
+        alert_mask=lt.alert_category.session_log
+    ).session
     alert = session.wait_for_alert(10000)
     assert alert is not None
     alerts = session.pop_alerts()
@@ -40,7 +41,6 @@ def executor():
 
 
 class IteratorTest(unittest.TestCase):
-
     def test_close_inline_is_safe(self):
         iterator = driver_lib.Iterator()
 
@@ -171,7 +171,6 @@ class IteratorTest(unittest.TestCase):
 
 
 class Pumper(threading.Thread):
-
     def __init__(self, driver: driver_lib.AlertDriver):
         super().__init__()
         self.driver = driver
@@ -187,7 +186,6 @@ class Pumper(threading.Thread):
 
 
 class PumpAlertsConcurrencyTest(unittest.TestCase):
-
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
 
@@ -203,8 +201,9 @@ class PumpAlertsConcurrencyTest(unittest.TestCase):
         # Do some combination of possible concurrent things
         if flags & 1:
             driver.pump_alerts()
-        iterator = driver.iter_alerts(lt.alert_category.status,
-                                      lt.add_torrent_alert)
+        iterator = driver.iter_alerts(
+            lt.alert_category.status, lt.add_torrent_alert
+        )
         if flags & 2:
             driver.pump_alerts()
         atp = tdummy.DEFAULT.atp()
@@ -229,15 +228,16 @@ class PumpAlertsConcurrencyTest(unittest.TestCase):
 
 
 class IterAlertsTest(unittest.TestCase):
-
     def setUp(self):
         self.config = lib.create_isolated_config()
         # Always enable session log, for iterator tests requiring alerts
         self.session_service = session_lib.SessionService(
-            config=self.config, alert_mask=lt.alert_category.session_log)
+            config=self.config, alert_mask=lt.alert_category.session_log
+        )
         self.session = self.session_service.session
         self.driver = driver_lib.AlertDriver(
-            session_service=self.session_service)
+            session_service=self.session_service
+        )
         self.pumper = Pumper(self.driver)
         self.tempdir = tempfile.TemporaryDirectory()
 
@@ -245,8 +245,9 @@ class IterAlertsTest(unittest.TestCase):
         self.tempdir.cleanup()
 
     def test_iter_alerts(self):
-        iterator = self.driver.iter_alerts(lt.alert_category.status,
-                                           lt.add_torrent_alert)
+        iterator = self.driver.iter_alerts(
+            lt.alert_category.status, lt.add_torrent_alert
+        )
         atp = tdummy.DEFAULT.atp()
         atp.save_path = self.tempdir.name
         self.session.async_add_torrent(atp)
@@ -266,8 +267,9 @@ class IterAlertsTest(unittest.TestCase):
     def test_fork_with_handle(self):
         self.pumper.start()
 
-        iterator = self.driver.iter_alerts(lt.alert_category.status,
-                                           lt.add_torrent_alert)
+        iterator = self.driver.iter_alerts(
+            lt.alert_category.status, lt.add_torrent_alert
+        )
         # Trigger add and remove
         atp = tdummy.DEFAULT.atp()
         atp.save_path = self.tempdir.name
@@ -292,17 +294,20 @@ class IterAlertsTest(unittest.TestCase):
                         lt.add_torrent_alert,
                         lt.torrent_removed_alert,
                         handle=alert.handle,
-                        start=alert)
-                    forkee = threading.Thread(target=watch_handle,
-                                              args=(handle_iterator,))
+                        start=alert,
+                    )
+                    forkee = threading.Thread(
+                        target=watch_handle, args=(handle_iterator,)
+                    )
                     forkee.start()
                     break
                 assert False, f"saw unexpected {alert}"
 
         self.assertIsNotNone(forkee)
         forkee.join()
-        self.assertTrue(forkee_saw_types,
-                        [lt.add_torrent_alert, lt.torrent_removed_alert])
+        self.assertTrue(
+            forkee_saw_types, [lt.add_torrent_alert, lt.torrent_removed_alert]
+        )
         self.pumper.shutdown()
 
     def test_dead_iterator_detection(self):
@@ -334,11 +339,11 @@ class IterAlertsTest(unittest.TestCase):
 
 
 class DriverTest(unittest.TestCase):
-
     def setUp(self):
         self.session_service = lib.create_isolated_session_service()
         self.driver = driver_lib.AlertDriver(
-            session_service=self.session_service)
+            session_service=self.session_service
+        )
 
     def test_start_and_close(self):
         self.driver.start()

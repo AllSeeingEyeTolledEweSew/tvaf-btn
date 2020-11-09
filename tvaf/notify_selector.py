@@ -15,7 +15,6 @@ SENTINEL = _Sentinel()
 # publicly visible so I have to define FileDescriptorLike, etc. It seems to
 # typecheck if I leave everything un-annotated though.
 class NotifySelector(selectors.DefaultSelector):
-
     def __init__(self):
         super().__init__()
         self.notify_rfile, self.notify_wfile = util.selectable_pipe()

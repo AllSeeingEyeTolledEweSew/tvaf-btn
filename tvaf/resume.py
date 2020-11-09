@@ -30,7 +30,6 @@ class _Underflow(Exception):
 
 
 class _Counter:
-
     def __init__(self):
         self._condition = threading.Condition()
         self._value: int = 0
@@ -48,8 +47,10 @@ class _Counter:
     def wait_zero(self, timeout: float = None) -> bool:
         with self._condition:
             return bool(
-                self._condition.wait_for(lambda: self._value == 0,
-                                         timeout=timeout))
+                self._condition.wait_for(
+                    lambda: self._value == 0, timeout=timeout
+                )
+            )
 
 
 def _try_read(path: pathlib.Path) -> Optional[bytes]:
@@ -140,16 +141,18 @@ def _delete(path: pathlib.Path):
 
 
 class _ReceiverTask(task_lib.Task):
-
-    def __init__(self,
-                 *,
-                 counter: _Counter,
-                 resume_service: ResumeService,
-                 alert_driver: driver_lib.AlertDriver,
-                 session: lt.session,
-                 pedantic=False):
-        super().__init__(title="fastresume data receiver",
-                         thread_name="fastresume.receiver")
+    def __init__(
+        self,
+        *,
+        counter: _Counter,
+        resume_service: ResumeService,
+        alert_driver: driver_lib.AlertDriver,
+        session: lt.session,
+        pedantic=False
+    ):
+        super().__init__(
+            title="fastresume data receiver", thread_name="fastresume.receiver"
+        )
         self._counter = counter
         self._resume_service = resume_service
         self._session = session
@@ -159,9 +162,13 @@ class _ReceiverTask(task_lib.Task):
         self._check_executor = concurrent.futures.ThreadPoolExecutor()
         # We handle metadata_received_alert so we're sure to get it at shutdown
         self._iterator = alert_driver.iter_alerts(
-            lt.alert_category.status, lt.save_resume_data_alert,
-            lt.save_resume_data_failed_alert, lt.torrent_removed_alert,
-            lt.add_torrent_alert, lt.metadata_received_alert)
+            lt.alert_category.status,
+            lt.save_resume_data_alert,
+            lt.save_resume_data_failed_alert,
+            lt.torrent_removed_alert,
+            lt.add_torrent_alert,
+            lt.metadata_received_alert,
+        )
         self._pedantic = pedantic
 
     def _terminate(self):
@@ -173,16 +180,24 @@ class _ReceiverTask(task_lib.Task):
         if self._pedantic:
             task_lib.terminate_task_on_future_fail(self, future)
 
-    def _write_atp(self, check: concurrent.futures.Future,
-                   info_hash: lt.sha1_hash, data: bytes):
+    def _write_atp(
+        self,
+        check: concurrent.futures.Future,
+        info_hash: lt.sha1_hash,
+        data: bytes,
+    ):
         if not check.result():
             return
         path = self._resume_service.get_resume_data_path(info_hash)
         with _write_safe_log(path) as tmp_path:
             tmp_path.write_bytes(data)
 
-    def _write_ti(self, check: Optional[concurrent.futures.Future],
-                  info_hash: lt.sha1_hash, metadata: bytes):
+    def _write_ti(
+        self,
+        check: Optional[concurrent.futures.Future],
+        info_hash: lt.sha1_hash,
+        metadata: bytes,
+    ):
         if check is not None and not check.result():
             return
         path = self._resume_service.get_torrent_path(info_hash)
@@ -203,7 +218,8 @@ class _ReceiverTask(task_lib.Task):
                 "ResumeService received more save_resume_data[_failed]_alerts "
                 "than save_resume_data() calls we made. Either someone called "
                 "save_resume_data() outside of ResumeService, or there's a "
-                "bug in ResumeService")
+                "bug in ResumeService"
+            )
             if self._pedantic:
                 raise
 
@@ -223,8 +239,9 @@ class _ReceiverTask(task_lib.Task):
             # add_torrent_alert and torrent_removed_alert, so find_torrent()
             # will never return a handle after torrent_removed_alert was
             # posted. See https://github.com/arvidn/libtorrent/issues/5112
-            check = self._check_executor.submit(ltpy.handle_in_session, handle,
-                                                self._session)
+            check = self._check_executor.submit(
+                ltpy.handle_in_session, handle, self._session
+            )
 
             # Unconditionally submit to our IO queue, so when we terminate we
             # can wait for it to drain
@@ -262,12 +279,15 @@ class _ReceiverTask(task_lib.Task):
         elif isinstance(alert, lt.torrent_removed_alert):
             info_hash = alert.info_hash
             self._io_submit(
-                _delete, self._resume_service.get_resume_data_path(info_hash))
-            self._io_submit(_delete,
-                            self._resume_service.get_torrent_path(info_hash))
+                _delete, self._resume_service.get_resume_data_path(info_hash)
+            )
+            self._io_submit(
+                _delete, self._resume_service.get_torrent_path(info_hash)
+            )
         elif isinstance(alert, lt.metadata_received_alert):
-            self._resume_service.save(alert.handle,
-                                      flags=lt.torrent_handle.save_info_dict)
+            self._resume_service.save(
+                alert.handle, flags=lt.torrent_handle.save_info_dict
+            )
 
     def _run(self):
         with self._iterator:
@@ -280,17 +300,24 @@ class _ReceiverTask(task_lib.Task):
 
 
 class _TriggerTask(task_lib.Task):
-
-    def __init__(self, *, resume_service: ResumeService,
-                 alert_driver: driver_lib.AlertDriver):
-        super().__init__(title="fastresume save trigger",
-                         thread_name="fastresume.trigger")
+    def __init__(
+        self,
+        *,
+        resume_service: ResumeService,
+        alert_driver: driver_lib.AlertDriver
+    ):
+        super().__init__(
+            title="fastresume save trigger", thread_name="fastresume.trigger"
+        )
         self._resume_service = resume_service
         self._iterator = alert_driver.iter_alerts(
             lt.alert_category.storage | lt.alert_category.status,
-            lt.file_renamed_alert, lt.torrent_paused_alert,
-            lt.torrent_finished_alert, lt.storage_moved_alert,
-            lt.cache_flushed_alert)
+            lt.file_renamed_alert,
+            lt.torrent_paused_alert,
+            lt.torrent_finished_alert,
+            lt.storage_moved_alert,
+            lt.cache_flushed_alert,
+        )
 
     def _terminate(self):
         self._iterator.close()
@@ -299,14 +326,15 @@ class _TriggerTask(task_lib.Task):
         with self._iterator:
             for alert in self._iterator:
                 self._resume_service.save(
-                    alert.handle, flags=lt.torrent_handle.only_if_modified)
+                    alert.handle, flags=lt.torrent_handle.only_if_modified
+                )
 
 
 class _PeriodicTask(task_lib.Task):
-
     def __init__(self, resume_service: ResumeService):
-        super().__init__(title="fastresume periodic save",
-                         thread_name="fastresume.periodic")
+        super().__init__(
+            title="fastresume periodic save", thread_name="fastresume.periodic"
+        )
         self._resume_service = resume_service
 
     def _terminate(self):
@@ -315,30 +343,36 @@ class _PeriodicTask(task_lib.Task):
     def _run(self):
         while not self._terminated.wait(SAVE_ALL_INTERVAL):
             self._resume_service.save_all(
-                flags=lt.torrent_handle.only_if_modified)
+                flags=lt.torrent_handle.only_if_modified
+            )
 
 
 class ResumeService(task_lib.Task):
     """ResumeService owns resume data management."""
 
-    def __init__(self,
-                 *,
-                 config_dir: pathlib.Path,
-                 session: lt.session,
-                 alert_driver: driver_lib.AlertDriver,
-                 pedantic=False):
+    def __init__(
+        self,
+        *,
+        config_dir: pathlib.Path,
+        session: lt.session,
+        alert_driver: driver_lib.AlertDriver,
+        pedantic=False
+    ):
         super().__init__(title="ResumeService", thread_name="resume")
         self.data_dir = config_dir.joinpath(RESUME_DATA_DIR_NAME)
         self._counter = _Counter()
         self._session = session
 
-        self._receiver_task = _ReceiverTask(resume_service=self,
-                                            alert_driver=alert_driver,
-                                            counter=self._counter,
-                                            session=session,
-                                            pedantic=pedantic)
-        self._trigger_task = _TriggerTask(resume_service=self,
-                                          alert_driver=alert_driver)
+        self._receiver_task = _ReceiverTask(
+            resume_service=self,
+            alert_driver=alert_driver,
+            counter=self._counter,
+            session=session,
+            pedantic=pedantic,
+        )
+        self._trigger_task = _TriggerTask(
+            resume_service=self, alert_driver=alert_driver
+        )
         self._periodic_task = _PeriodicTask(resume_service=self)
 
         self._add_child(self._receiver_task, start=False)
@@ -371,15 +405,18 @@ class ResumeService(task_lib.Task):
         self._trigger_task.join()
         self._periodic_task.join()
 
-        self.save_all(flags=lt.torrent_handle.only_if_modified |
-                      lt.torrent_handle.flush_disk_cache)
+        self.save_all(
+            flags=lt.torrent_handle.only_if_modified
+            | lt.torrent_handle.flush_disk_cache
+        )
 
         # At this point, no more save()s will be issued
         _LOG.debug("waiting for final fastresume data")
         if not self._counter.wait_zero(timeout=15):
             _LOG.error(
                 "received less fastresume data than we expected. this is a "
-                "bug, and fastresume data may be incomplete")
+                "bug, and fastresume data may be incomplete"
+            )
 
         self._receiver_task.terminate()
         self._receiver_task.join()

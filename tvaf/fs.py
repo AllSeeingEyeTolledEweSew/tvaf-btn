@@ -47,6 +47,7 @@ class Stat:
         size: The size of the node.
         mtime: The last-modified time of the node.
     """
+
     filetype: int = 0
     size: int = 0
     perms: int = -1
@@ -74,8 +75,20 @@ class Stat:
         if st_mtime is None:
             st_mtime = int(time.time())
         st_ctime = st_mtime
-        return os.stat_result((st_mode, st_ino, st_dev, st_nlink, st_uid,
-                               st_gid, st_size, st_atime, st_mtime, st_ctime))
+        return os.stat_result(
+            (
+                st_mode,
+                st_ino,
+                st_dev,
+                st_nlink,
+                st_uid,
+                st_gid,
+                st_size,
+                st_atime,
+                st_mtime,
+                st_ctime,
+            )
+        )
 
 
 @dataclasses.dataclass
@@ -109,14 +122,16 @@ class Node:
             directories.
     """
 
-    def __init__(self,
-                 *,
-                 parent: Dir = None,
-                 name: str = None,
-                 filetype: int = None,
-                 perms: int = None,
-                 size: int = None,
-                 mtime: int = None) -> None:
+    def __init__(
+        self,
+        *,
+        parent: Dir = None,
+        name: str = None,
+        filetype: int = None,
+        perms: int = None,
+        size: int = None,
+        mtime: int = None
+    ) -> None:
         self.name = name
         self.parent = parent
         self.filetype = filetype
@@ -127,10 +142,12 @@ class Node:
     def stat(self) -> Stat:
         """Returns a minimalist Stat for this node."""
         assert self.filetype is not None
-        return Stat(filetype=self.filetype,
-                    perms=self.perms or 0,
-                    size=self.size or 0,
-                    mtime=self.mtime)
+        return Stat(
+            filetype=self.filetype,
+            perms=self.perms or 0,
+            size=self.size or 0,
+            mtime=self.mtime,
+        )
 
     def abspath(self) -> Path:
         parts: List[str] = []
@@ -152,16 +169,16 @@ class Node:
 
 
 def _partial_traverse(
-        cur_dir: Dir,
-        path: Path,
-        follow_symlinks=True) -> Tuple[Node, Path, Optional[OSError]]:
+    cur_dir: Dir, path: Path, follow_symlinks=True
+) -> Tuple[Node, Path, Optional[OSError]]:
     # TODO: refactor this into some classes, if we keep fs past v1.0.
     # pylint: disable=too-many-branches
 
     seen_symlink: Dict[Symlink, Optional[Node]] = {}
 
-    def inner(cur_dir: Dir, path: Path,
-              depth: int) -> Tuple[Node, Path, Optional[OSError]]:
+    def inner(
+        cur_dir: Dir, path: Path, depth: int
+    ) -> Tuple[Node, Path, Optional[OSError]]:
         if path.is_absolute():
             cur_dir = cur_dir.get_root()
             path = path.relative_to("/")
@@ -188,7 +205,7 @@ def _partial_traverse(
 
             # We looked up the next node. From here on, our remainder is
             # whatever we would lookup after this.
-            rest = lambda: Path().joinpath(*path.parts[i + 1:])
+            rest = lambda: Path().joinpath(*path.parts[i + 1 :])
 
             # Only do symlink lookup for the final path component if
             # follow_symlinks=True.
@@ -232,24 +249,23 @@ def _partial_traverse(
 class Dir(Node, abc.ABC):
     """A virtual directory."""
 
-    def __init__(self,
-                 *,
-                 perms: int = None,
-                 mtime: int = None,
-                 size: int = 0) -> None:
-        super().__init__(filetype=stat_lib.S_IFDIR,
-                         perms=perms,
-                         mtime=mtime,
-                         size=size)
+    def __init__(
+        self, *, perms: int = None, mtime: int = None, size: int = 0
+    ) -> None:
+        super().__init__(
+            filetype=stat_lib.S_IFDIR, perms=perms, mtime=mtime, size=size
+        )
 
     def stat(self) -> Stat:
         """Returns a default Stat for this node, with current mtime."""
         assert self.filetype is not None
         assert self.size is not None
-        return Stat(filetype=self.filetype,
-                    perms=self.perms or 0,
-                    size=self.size,
-                    mtime=self.mtime)
+        return Stat(
+            filetype=self.filetype,
+            perms=self.perms or 0,
+            size=self.size,
+            mtime=self.mtime,
+        )
 
     @abc.abstractmethod
     def get_node(self, name: str) -> Optional[Node]:
@@ -295,9 +311,9 @@ class Dir(Node, abc.ABC):
                 non-directory.
             OSError: If some other error occurs.
         """
-        node, _, ex = _partial_traverse(self,
-                                        Path(path),
-                                        follow_symlinks=follow_symlinks)
+        node, _, ex = _partial_traverse(
+            self, Path(path), follow_symlinks=follow_symlinks
+        )
         if ex is not None:
             raise ex  # pylint: disable=raising-bad-type
         return node
@@ -333,7 +349,6 @@ class Dir(Node, abc.ABC):
 
 
 class DictDir(Dir, abc.ABC):
-
     @abc.abstractmethod
     def get_dict(self) -> Mapping[str, Node]:
         raise mkoserror(errno.ENOSYS)
@@ -379,15 +394,12 @@ class File(Node, abc.ABC):
     Reading other files isn't currently implemented.
     """
 
-    def __init__(self,
-                 *,
-                 perms: int = None,
-                 size: int = None,
-                 mtime: int = None) -> None:
-        super().__init__(filetype=stat_lib.S_IFREG,
-                         perms=perms,
-                         size=size,
-                         mtime=mtime)
+    def __init__(
+        self, *, perms: int = None, size: int = None, mtime: int = None
+    ) -> None:
+        super().__init__(
+            filetype=stat_lib.S_IFREG, perms=perms, size=size, mtime=mtime
+        )
 
     @abc.abstractmethod
     def open_raw(self, mode: str = "r") -> io.IOBase:
@@ -416,25 +428,27 @@ SymlinkTarget = Union[str, os.PathLike, Node]
 
 
 class Symlink(Node):
-
-    def __init__(self,
-                 *,
-                 target: SymlinkTarget = None,
-                 perms: int = None,
-                 mtime: int = None) -> None:
-        super().__init__(filetype=stat_lib.S_IFLNK,
-                         perms=perms,
-                         mtime=mtime,
-                         size=0)
+    def __init__(
+        self,
+        *,
+        target: SymlinkTarget = None,
+        perms: int = None,
+        mtime: int = None
+    ) -> None:
+        super().__init__(
+            filetype=stat_lib.S_IFLNK, perms=perms, mtime=mtime, size=0
+        )
         self.target = target
 
     def stat(self) -> Stat:
         """Returns a minimalist Stat for this node."""
         assert self.filetype is not None
-        return Stat(filetype=self.filetype,
-                    perms=self.perms or 0,
-                    size=len(str(self.readlink())),
-                    mtime=self.mtime)
+        return Stat(
+            filetype=self.filetype,
+            perms=self.perms or 0,
+            size=len(str(self.readlink())),
+            mtime=self.mtime,
+        )
 
     def readlink(self) -> Path:
         if self.target is None:

@@ -36,8 +36,9 @@ _LOG = logging.getLogger(__name__)
 
 Path = pathlib.PurePosixPath
 
-TorrentFileOpener = Callable[[types.InfoHash, int, int, types.ConfigureATP],
-                             io.IOBase]
+TorrentFileOpener = Callable[
+    [types.InfoHash, int, int, types.ConfigureATP], io.IOBase
+]
 
 
 class Metadata(collections.UserDict, MutableMapping[str, Any]):
@@ -46,10 +47,15 @@ class Metadata(collections.UserDict, MutableMapping[str, Any]):
 
 
 class TorrentFile(fs.File):
-
-    def __init__(self, *, opener: TorrentFileOpener, info_hash: types.InfoHash,
-                 start: int, stop: int,
-                 configure_atp: types.ConfigureATP) -> None:
+    def __init__(
+        self,
+        *,
+        opener: TorrentFileOpener,
+        info_hash: types.InfoHash,
+        start: int,
+        stop: int,
+        configure_atp: types.ConfigureATP
+    ) -> None:
         super().__init__(size=stop - start)
         self.opener = opener
         self.info_hash = info_hash
@@ -60,8 +66,9 @@ class TorrentFile(fs.File):
     def open_raw(self, mode: str = "r") -> io.IOBase:
         if set(mode) & set("wxa+"):
             raise fs.mkoserror(errno.EPERM)
-        return self.opener(self.info_hash, self.start, self.stop,
-                           self.configure_atp)
+        return self.opener(
+            self.info_hash, self.start, self.stop, self.configure_atp
+        )
 
 
 def _is_valid_path(path: List[str]) -> bool:
@@ -74,9 +81,13 @@ def _is_valid_path(path: List[str]) -> bool:
 
 
 class _V1TorrentInNetwork(fs.StaticDir):
-
-    def __init__(self, libs: LibraryService, info_hash: types.InfoHash,
-                 info: protocol.Info, network: Network) -> None:
+    def __init__(
+        self,
+        libs: LibraryService,
+        info_hash: types.InfoHash,
+        info: protocol.Info,
+        network: Network,
+    ) -> None:
         super().__init__()
 
         self._by_path = fs.StaticDir()
@@ -87,19 +98,26 @@ class _V1TorrentInNetwork(fs.StaticDir):
         for spec in info.iter_files():
             self._add_torrent_file(libs, info_hash, spec, network)
 
-    def _add_torrent_file(self, libs: LibraryService, info_hash: types.InfoHash,
-                          spec: protocol.FileSpec, network: Network):
+    def _add_torrent_file(
+        self,
+        libs: LibraryService,
+        info_hash: types.InfoHash,
+        spec: protocol.FileSpec,
+        network: Network,
+    ):
         if spec.is_pad:
             return
         if spec.is_symlink:
             # TODO
             return
 
-        torrent_file = TorrentFile(opener=libs.opener,
-                                   info_hash=info_hash,
-                                   start=spec.start,
-                                   stop=spec.stop,
-                                   configure_atp=network.configure_atp)
+        torrent_file = TorrentFile(
+            opener=libs.opener,
+            info_hash=info_hash,
+            start=spec.start,
+            stop=spec.stop,
+            configure_atp=network.configure_atp,
+        )
         self._by_index.mkchild(str(spec.index), torrent_file)
 
         if not _is_valid_path(spec.full_path):
@@ -124,9 +142,12 @@ class _V1TorrentInNetwork(fs.StaticDir):
 
 
 class _V1Torrent(fs.Dir):
-
-    def __init__(self, libs: LibraryService, info_hash: types.InfoHash,
-                 info: protocol.Info):
+    def __init__(
+        self,
+        libs: LibraryService,
+        info_hash: types.InfoHash,
+        info: protocol.Info,
+    ):
         super().__init__()
         self.libs = libs
         self.info_hash = info_hash
@@ -139,18 +160,19 @@ class _V1Torrent(fs.Dir):
         if not network.can_access(self.info_hash):
             return None
 
-        return _V1TorrentInNetwork(self.libs, self.info_hash, self.info,
-                                   network)
+        return _V1TorrentInNetwork(
+            self.libs, self.info_hash, self.info, network
+        )
 
     def readdir(self) -> Iterator[fs.Dirent]:
         for name, network in list(self.libs.libraries.networks.items()):
             if network.can_access(self.info_hash):
-                yield fs.Dirent(name=name,
-                                stat=fs.Stat(filetype=stat_lib.S_IFDIR))
+                yield fs.Dirent(
+                    name=name, stat=fs.Stat(filetype=stat_lib.S_IFDIR)
+                )
 
 
 class _V1(fs.Dir):
-
     def __init__(self, libs: LibraryService):
         super().__init__(perms=0o444)
         self.libs = libs
@@ -158,8 +180,9 @@ class _V1(fs.Dir):
     def get_node(self, name: str) -> Optional[fs.Node]:
         info_hash = types.InfoHash(name)
         try:
-            info_dict = self.libs.libraries.get_pseudo_info(info_hash,
-                                                            exact_paths=True)
+            info_dict = self.libs.libraries.get_pseudo_info(
+                info_hash, exact_paths=True
+            )
         except Error:
             return None
         return _V1Torrent(self.libs, info_hash, protocol.Info(info_dict))
@@ -169,7 +192,6 @@ class _V1(fs.Dir):
 
 
 class _Browse(fs.DictDir):
-
     def __init__(self, libs: LibraryService):
         super().__init__()
         self.libs = libs
@@ -179,7 +201,6 @@ class _Browse(fs.DictDir):
 
 
 class _Root(fs.StaticDir):
-
     def __init__(self, libs: LibraryService):
         super().__init__()
         self.mkchild("v1", _V1(libs))
@@ -195,19 +216,18 @@ class UnknownTorrentError(Error):
 
 
 class PseudoInfoLibrary(abc.ABC):
-
     @abc.abstractmethod
-    def get(self,
-            info_hash: types.InfoHash,
-            exact_paths=False) -> protocol.BDict:
+    def get(
+        self, info_hash: types.InfoHash, exact_paths=False
+    ) -> protocol.BDict:
         raise UnknownTorrentError(info_hash)
 
 
 class MetadataLibrary(abc.ABC):
-
     @abc.abstractmethod
-    def get(self, info_hash: types.InfoHash, file_index: int,
-            *names: str) -> Metadata:
+    def get(
+        self, info_hash: types.InfoHash, file_index: int, *names: str
+    ) -> Metadata:
         return Metadata()
 
 
@@ -218,7 +238,6 @@ class ScrapeResponse:
 
 
 class Network:
-
     @abc.abstractmethod
     def configure_atp(self, atp: lt.add_torrent_params) -> None:
         raise UnknownTorrentError(str(atp.info_hash))
@@ -240,14 +259,14 @@ class Network:
 
 
 class Libraries:
-
     def __init__(self):
         self.networks: Dict[str, Network] = {}
         self.metadata: Dict[str, MetadataLibrary] = {}
         self.pseudo_info: Dict[str, PseudoInfoLibrary] = {}
 
-    def get_metadata(self, info_hash: types.InfoHash, file_index: int,
-                     *names: str) -> Metadata:
+    def get_metadata(
+        self, info_hash: types.InfoHash, file_index: int, *names: str
+    ) -> Metadata:
         result = Metadata()
         for library in list(self.metadata.values()):
             if all(name in result for name in names):
@@ -258,9 +277,9 @@ class Libraries:
                 pass
         return result
 
-    def get_pseudo_info(self,
-                        info_hash: types.InfoHash,
-                        exact_paths=False) -> protocol.BDict:
+    def get_pseudo_info(
+        self, info_hash: types.InfoHash, exact_paths=False
+    ) -> protocol.BDict:
         for library in list(self.pseudo_info.values()):
             try:
                 return library.get(info_hash, exact_paths=exact_paths)
@@ -270,7 +289,6 @@ class Libraries:
 
 
 class LibraryService:
-
     def __init__(self, *, opener: TorrentFileOpener, libraries: Libraries):
         self.opener = opener
         self.libraries = libraries

@@ -10,7 +10,6 @@ from . import lib
 
 
 class HTTPDTest(unittest.TestCase):
-
     def setUp(self) -> None:
         self.config = lib.create_isolated_config()
         self.session = session_lib.SessionService(config=self.config).session
@@ -25,7 +24,8 @@ class HTTPDTest(unittest.TestCase):
 
     def get(self, path: str) -> requests.Response:
         url = urllib.parse.urlunparse(
-            ("http", self.host, path, None, None, None))
+            ("http", self.host, path, None, None, None)
+        )
         return requests.get(url)
 
     def test_get(self):

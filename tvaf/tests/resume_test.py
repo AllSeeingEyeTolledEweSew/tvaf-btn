@@ -45,12 +45,14 @@ class IterResumeDataTest(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.resume_data_dir = self.config_dir.joinpath(
-            resume_lib.RESUME_DATA_DIR_NAME)
+            resume_lib.RESUME_DATA_DIR_NAME
+        )
 
         def write(torrent):
             self.resume_data_dir.mkdir(parents=True, exist_ok=True)
-            path = self.resume_data_dir.joinpath(
-                torrent.info_hash).with_suffix(".resume")
+            path = self.resume_data_dir.joinpath(torrent.info_hash).with_suffix(
+                ".resume"
+            )
             atp = torrent.atp()
             atp.ti = None
             atp_data = lt.bencode(lt.write_resume_data(atp))
@@ -65,12 +67,16 @@ class IterResumeDataTest(unittest.TestCase):
         self.assertEqual(atp_comparable(got), atp_comparable(expected))
 
     def assert_atp_list_equal(self, got, expected):
-        self.assertEqual([atp_comparable(atp) for atp in got],
-                         [atp_comparable(atp) for atp in expected])
+        self.assertEqual(
+            [atp_comparable(atp) for atp in got],
+            [atp_comparable(atp) for atp in expected],
+        )
 
     def assert_atp_sets_equal(self, got, expected):
-        self.assertEqual(set(atp_hashable(atp) for atp in got),
-                         set(atp_hashable(atp) for atp in expected))
+        self.assertEqual(
+            set(atp_hashable(atp) for atp in got),
+            set(atp_hashable(atp) for atp in expected),
+        )
 
     def tearDown(self):
         self.tempdir.cleanup()
@@ -78,7 +84,8 @@ class IterResumeDataTest(unittest.TestCase):
     def test_normal(self):
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.assert_atp_sets_equal(
-            set(atps), set((self.TORRENT1.atp(), self.TORRENT2.atp())))
+            set(atps), set((self.TORRENT1.atp(), self.TORRENT2.atp()))
+        )
 
     def test_ignore_bad_data(self):
         # valid resume data, wrong filename
@@ -105,11 +112,11 @@ class IterResumeDataTest(unittest.TestCase):
 
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.assert_atp_sets_equal(
-            set(atps), set((self.TORRENT1.atp(), self.TORRENT2.atp())))
+            set(atps), set((self.TORRENT1.atp(), self.TORRENT2.atp()))
+        )
 
 
 class TerminateTest(unittest.TestCase):
-
     def setUp(self):
         self.session_service = lib.create_isolated_session_service()
         self.session = self.session_service.session
@@ -117,13 +124,17 @@ class TerminateTest(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.resume_data_dir = self.config_dir.joinpath(
-            resume_lib.RESUME_DATA_DIR_NAME)
+            resume_lib.RESUME_DATA_DIR_NAME
+        )
         self.alert_driver = driver_lib.AlertDriver(
-            session_service=self.session_service)
-        self.resume = resume_lib.ResumeService(session=self.session,
-                                               config_dir=self.config_dir,
-                                               alert_driver=self.alert_driver,
-                                               pedantic=True)
+            session_service=self.session_service
+        )
+        self.resume = resume_lib.ResumeService(
+            session=self.session,
+            config_dir=self.config_dir,
+            alert_driver=self.alert_driver,
+            pedantic=True,
+        )
         self.resume.start()
         self.alert_driver.start()
 
@@ -153,9 +164,9 @@ class TerminateTest(unittest.TestCase):
         # pieces in the unfinished_pieces field. See
         # https://github.com/arvidn/libtorrent/issues/5121
         if ltpy.version_info < (1, 2, 11):
-            iterator = self.alert_driver.iter_alerts(lt.alert_category.storage,
-                                                     lt.cache_flushed_alert,
-                                                     handle=handle)
+            iterator = self.alert_driver.iter_alerts(
+                lt.alert_category.storage, lt.cache_flushed_alert, handle=handle
+            )
             with iterator:
                 handle.flush_cache()
                 for alert in iterator:
@@ -170,7 +181,7 @@ class TerminateTest(unittest.TestCase):
             if atp.have_pieces[index]:
                 return True
             ti = self.torrent.torrent_info()
-            num_blocks = ((ti.piece_size(index) - 1) // 16384 + 1)
+            num_blocks = (ti.piece_size(index) - 1) // 16384 + 1
             bitmask = atp.unfinished_pieces.get(index, [])
             if len(bitmask) < num_blocks:
                 return False

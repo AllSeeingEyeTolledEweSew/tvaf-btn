@@ -38,8 +38,9 @@ def add_fixture_row(conn: apsw.Connection, table: str, **kwargs: Any) -> None:
     keys = sorted(kwargs.keys())
     columns = ",".join(keys)
     params = ",".join(":" + k for k in keys)
-    conn.cursor().execute(f"insert into {table} ({columns}) values ({params})",
-                          kwargs)
+    conn.cursor().execute(
+        f"insert into {table} ({columns}) values ({params})", kwargs
+    )
 
 
 def add_series(conn: apsw.Connection, **series: Any) -> None:
@@ -61,11 +62,9 @@ def add_group(conn: apsw.Connection, **group: Any) -> None:
         conn: The database to modify.
         group: A mapping from column names to binding values.
     """
-    data = dict(category="Episode",
-                updated_at=0,
-                series_id=100,
-                id=110,
-                deleted=0)
+    data = dict(
+        category="Episode", updated_at=0, series_id=100, id=110, deleted=0
+    )
     data.update(group)
     add_fixture_row(conn, "torrent_entry_group", **data)
 
@@ -77,21 +76,23 @@ def add_entry(conn: apsw.Connection, **torrent_entry: Any) -> None:
         conn: The database to modify.
         torrent_entry: A mapping from column names to binding values.
     """
-    data = dict(codec="H.264",
-                container="MKV",
-                origin="Scene",
-                release_name="Test",
-                resolution="1080p",
-                size=1048576,
-                source="Bluray",
-                snatched=0,
-                leechers=0,
-                seeders=0,
-                time=1234567,
-                updated_at=0,
-                id=111,
-                group_id=110,
-                deleted=0)
+    data = dict(
+        codec="H.264",
+        container="MKV",
+        origin="Scene",
+        release_name="Test",
+        resolution="1080p",
+        size=1048576,
+        source="Bluray",
+        snatched=0,
+        leechers=0,
+        seeders=0,
+        time=1234567,
+        updated_at=0,
+        id=111,
+        group_id=110,
+        deleted=0,
+    )
     data.update(torrent_entry)
     data["info_hash"] = hashlib.sha1(str(data["id"]).encode()).hexdigest()
     add_fixture_row(conn, "torrent_entry", **data)
@@ -630,12 +631,9 @@ class TestGroupSubdirBase(unittest.TestCase):
         add_series(conn, name="S")
         add_group(conn, name="G")
         add_entry(conn)
-        add_file(conn,
-                 id=111,
-                 path=b"a1/1.mkv",
-                 file_index=0,
-                 start=0,
-                 stop=100)
+        add_file(
+            conn, id=111, path=b"a1/1.mkv", file_index=0, start=0, stop=100
+        )
 
         root = tvaf_btn.RootDir(conn)
         node = fs.lookup(root, "browse/S/G")

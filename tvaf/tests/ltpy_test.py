@@ -19,24 +19,25 @@ ERROR_ACCESS_DENIED = 5
 
 
 class TestExceptionSubtypeInstantiation(unittest.TestCase):
-
     def test_error_to_libtorent_error(self):
-
         def func(value):
             return ltpy.Error(lt.error_code(value, lt.libtorrent_category()))
 
         self.assertIsInstance(func(999), ltpy.LibtorrentError)
         self.assertIsInstance(
             func(ltpy.LibtorrentErrorValue.INVALID_TORRENT_HANDLE),
-            ltpy.InvalidTorrentHandleError)
+            ltpy.InvalidTorrentHandleError,
+        )
         self.assertIsInstance(
             func(ltpy.LibtorrentErrorValue.INVALID_SESSION_HANDLE),
-            ltpy.InvalidSessionHandleError)
-        self.assertIsInstance(func(ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT),
-                              ltpy.DuplicateTorrentError)
+            ltpy.InvalidSessionHandleError,
+        )
+        self.assertIsInstance(
+            func(ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT),
+            ltpy.DuplicateTorrentError,
+        )
 
     def test_error_to_oserror(self):
-
         def func(value):
             return ltpy.Error(lt.error_code(value, lt.generic_category()))
 
@@ -48,10 +49,12 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
         self.assertIsInstance(func(errno.ECHILD), ltpy.ChildProcessError)
         self.assertIsInstance(func(errno.EPIPE), ltpy.BrokenPipeError)
         self.assertIsInstance(func(errno.ESHUTDOWN), ltpy.BrokenPipeError)
-        self.assertIsInstance(func(errno.ECONNABORTED),
-                              ltpy.ConnectionAbortedError)
-        self.assertIsInstance(func(errno.ECONNREFUSED),
-                              ltpy.ConnectionRefusedError)
+        self.assertIsInstance(
+            func(errno.ECONNABORTED), ltpy.ConnectionAbortedError
+        )
+        self.assertIsInstance(
+            func(errno.ECONNREFUSED), ltpy.ConnectionRefusedError
+        )
         self.assertIsInstance(func(errno.ECONNRESET), ltpy.ConnectionResetError)
         self.assertIsInstance(func(errno.EEXIST), ltpy.FileExistsError)
         self.assertIsInstance(func(errno.ENOENT), ltpy.FileNotFoundError)
@@ -64,64 +67,64 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
         self.assertIsInstance(func(errno.ETIMEDOUT), ltpy.TimeoutError)
 
     def test_error_to_upnp_error(self):
-
         def func(value):
             return ltpy.Error(lt.error_code(value, lt.upnp_category()))
 
         self.assertIsInstance(func(1), ltpy.UPNPError)
 
     def test_error_to_http_error(self):
-
         def func(value):
             return ltpy.Error(lt.error_code(value, lt.http_category()))
 
         self.assertIsInstance(func(1), ltpy.HTTPError)
 
     def test_error_to_socks_error(self):
-
         def func(value):
             return ltpy.Error(lt.error_code(value, lt.socks_category()))
 
         self.assertIsInstance(func(1), ltpy.SOCKSError)
 
     def test_error_to_bdecode_error(self):
-
         def func(value):
             return ltpy.Error(lt.error_code(value, lt.bdecode_category()))
 
         self.assertIsInstance(func(1), ltpy.BDecodeError)
 
     def test_error_to_i2p_error(self):
-
         def func(value):
             return ltpy.Error(lt.error_code(value, lt.i2p_category()))
 
         self.assertIsInstance(func(1), ltpy.I2PError)
 
     def test_libtorrent_error(self):
-
         def func(value):
             return ltpy.LibtorrentError(
-                lt.error_code(value, lt.libtorrent_category()))
+                lt.error_code(value, lt.libtorrent_category())
+            )
 
         self.assertIsInstance(func(999), ltpy.LibtorrentError)
-        self.assertIsInstance(func(ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT),
-                              ltpy.DuplicateTorrentError)
+        self.assertIsInstance(
+            func(ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT),
+            ltpy.DuplicateTorrentError,
+        )
         self.assertIsInstance(
             func(ltpy.LibtorrentErrorValue.INVALID_TORRENT_HANDLE),
-            ltpy.InvalidTorrentHandleError)
+            ltpy.InvalidTorrentHandleError,
+        )
         self.assertIsInstance(
             func(ltpy.LibtorrentErrorValue.INVALID_SESSION_HANDLE),
-            ltpy.InvalidSessionHandleError)
+            ltpy.InvalidSessionHandleError,
+        )
 
         # Test construction with wrong category
         self.assertIsInstance(
             ltpy.LibtorrentError(
-                lt.error_code(errno.ENOENT, lt.generic_category())),
-            ltpy.LibtorrentError)
+                lt.error_code(errno.ENOENT, lt.generic_category())
+            ),
+            ltpy.LibtorrentError,
+        )
 
     def _test_oserror_from_errno(self, category):
-
         def func(value):
             return ltpy.OSError(lt.error_code(value, category))
 
@@ -136,10 +139,12 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
         self.assertIsInstance(func(errno.ECHILD), ltpy.ChildProcessError)
         self.assertIsInstance(func(errno.EPIPE), ltpy.BrokenPipeError)
         self.assertIsInstance(func(errno.ESHUTDOWN), ltpy.BrokenPipeError)
-        self.assertIsInstance(func(errno.ECONNABORTED),
-                              ltpy.ConnectionAbortedError)
-        self.assertIsInstance(func(errno.ECONNREFUSED),
-                              ltpy.ConnectionRefusedError)
+        self.assertIsInstance(
+            func(errno.ECONNABORTED), ltpy.ConnectionAbortedError
+        )
+        self.assertIsInstance(
+            func(errno.ECONNREFUSED), ltpy.ConnectionRefusedError
+        )
         self.assertIsInstance(func(errno.ECONNRESET), ltpy.ConnectionResetError)
         self.assertIsInstance(func(errno.EEXIST), ltpy.FileExistsError)
         self.assertIsInstance(func(errno.ENOENT), ltpy.FileNotFoundError)
@@ -157,7 +162,8 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
         # Test construction with wrong category
         self.assertIsInstance(
             ltpy.OSError(lt.error_code(-1, lt.libtorrent_category())),
-            ltpy.OSError)
+            ltpy.OSError,
+        )
 
     def test_oserror_system(self):
         if os.name == "nt":
@@ -166,7 +172,6 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
             self._test_oserror_nonwindows()
 
     def _test_oserror_windows(self):
-
         def func(value):
             return ltpy.OSError(lt.error_code(value, lt.system_category()))
 
@@ -182,23 +187,30 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
         self.assertIsInstance(func(errno.WSAEALREADY), ltpy.BlockingIOError)
         self.assertIsInstance(func(errno.WSAEWOULDBLOCK), ltpy.BlockingIOError)
         self.assertIsInstance(func(errno.WSAEINPROGRESS), ltpy.BlockingIOError)
-        self.assertIsInstance(func(ERROR_WAIT_NO_CHILDREN),
-                              ltpy.ChildProcessError)
-        self.assertIsInstance(func(ERROR_CHILD_NOT_COMPLETE),
-                              ltpy.ChildProcessError)
+        self.assertIsInstance(
+            func(ERROR_WAIT_NO_CHILDREN), ltpy.ChildProcessError
+        )
+        self.assertIsInstance(
+            func(ERROR_CHILD_NOT_COMPLETE), ltpy.ChildProcessError
+        )
         self.assertIsInstance(func(ERROR_BROKEN_PIPE), ltpy.BrokenPipeError)
-        self.assertIsInstance(func(errno.WSAECONNABORTED),
-                              ltpy.ConnectionAbortedError)
-        self.assertIsInstance(func(errno.WSAECONNREFUSED),
-                              ltpy.ConnectionRefusedError)
-        self.assertIsInstance(func(errno.WSAECONNRESET),
-                              ltpy.ConnectionResetError)
+        self.assertIsInstance(
+            func(errno.WSAECONNABORTED), ltpy.ConnectionAbortedError
+        )
+        self.assertIsInstance(
+            func(errno.WSAECONNREFUSED), ltpy.ConnectionRefusedError
+        )
+        self.assertIsInstance(
+            func(errno.WSAECONNRESET), ltpy.ConnectionResetError
+        )
         self.assertIsInstance(func(ERROR_FILE_EXISTS), ltpy.FileExistsError)
         self.assertIsInstance(func(ERROR_ALREADY_EXISTS), ltpy.FileExistsError)
-        self.assertIsInstance(func(ERROR_FILE_NOT_FOUND),
-                              ltpy.FileNotFoundError)
-        self.assertIsInstance(func(ERROR_PATH_NOT_FOUND),
-                              ltpy.FileNotFoundError)
+        self.assertIsInstance(
+            func(ERROR_FILE_NOT_FOUND), ltpy.FileNotFoundError
+        )
+        self.assertIsInstance(
+            func(ERROR_PATH_NOT_FOUND), ltpy.FileNotFoundError
+        )
         self.assertIsInstance(func(errno.WSAEINTR), ltpy.InterruptedError)
         self.assertIsInstance(func(ERROR_DIRECTORY), ltpy.NotADirectoryError)
         self.assertIsInstance(func(ERROR_ACCESS_DENIED), ltpy.PermissionError)
@@ -210,28 +222,31 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
 
 
 class TestExceptionFromErrorCode(unittest.TestCase):
-
     def test_libtorent_error(self):
-
         def func(value):
             return ltpy.exception_from_error_code(
-                lt.error_code(value, lt.libtorrent_category()))
+                lt.error_code(value, lt.libtorrent_category())
+            )
 
         self.assertIsInstance(func(999), ltpy.LibtorrentError)
         self.assertIsInstance(
             func(ltpy.LibtorrentErrorValue.INVALID_TORRENT_HANDLE),
-            ltpy.InvalidTorrentHandleError)
+            ltpy.InvalidTorrentHandleError,
+        )
         self.assertIsInstance(
             func(ltpy.LibtorrentErrorValue.INVALID_SESSION_HANDLE),
-            ltpy.InvalidSessionHandleError)
-        self.assertIsInstance(func(ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT),
-                              ltpy.DuplicateTorrentError)
+            ltpy.InvalidSessionHandleError,
+        )
+        self.assertIsInstance(
+            func(ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT),
+            ltpy.DuplicateTorrentError,
+        )
 
     def test_generic_category(self):
-
         def func(value):
             return ltpy.exception_from_error_code(
-                lt.error_code(value, lt.generic_category()))
+                lt.error_code(value, lt.generic_category())
+            )
 
         # Mapping from pep3151
         self.assertIsInstance(func(errno.EAGAIN), ltpy.BlockingIOError)
@@ -241,10 +256,12 @@ class TestExceptionFromErrorCode(unittest.TestCase):
         self.assertIsInstance(func(errno.ECHILD), ltpy.ChildProcessError)
         self.assertIsInstance(func(errno.EPIPE), ltpy.BrokenPipeError)
         self.assertIsInstance(func(errno.ESHUTDOWN), ltpy.BrokenPipeError)
-        self.assertIsInstance(func(errno.ECONNABORTED),
-                              ltpy.ConnectionAbortedError)
-        self.assertIsInstance(func(errno.ECONNREFUSED),
-                              ltpy.ConnectionRefusedError)
+        self.assertIsInstance(
+            func(errno.ECONNABORTED), ltpy.ConnectionAbortedError
+        )
+        self.assertIsInstance(
+            func(errno.ECONNREFUSED), ltpy.ConnectionRefusedError
+        )
         self.assertIsInstance(func(errno.ECONNRESET), ltpy.ConnectionResetError)
         self.assertIsInstance(func(errno.EEXIST), ltpy.FileExistsError)
         self.assertIsInstance(func(errno.ENOENT), ltpy.FileNotFoundError)
@@ -257,53 +274,54 @@ class TestExceptionFromErrorCode(unittest.TestCase):
         self.assertIsInstance(func(errno.ETIMEDOUT), ltpy.TimeoutError)
 
     def test_upnp_category(self):
-
         def func(value):
             return ltpy.exception_from_error_code(
-                lt.error_code(value, lt.upnp_category()))
+                lt.error_code(value, lt.upnp_category())
+            )
 
         self.assertIsInstance(func(1), ltpy.UPNPError)
 
     def test_http_category(self):
-
         def func(value):
             return ltpy.exception_from_error_code(
-                lt.error_code(value, lt.http_category()))
+                lt.error_code(value, lt.http_category())
+            )
 
         self.assertIsInstance(func(1), ltpy.HTTPError)
 
     def test_socks_category(self):
-
         def func(value):
             return ltpy.exception_from_error_code(
-                lt.error_code(value, lt.socks_category()))
+                lt.error_code(value, lt.socks_category())
+            )
 
         self.assertIsInstance(func(1), ltpy.SOCKSError)
 
     def test_bdecode_category(self):
-
         def func(value):
             return ltpy.exception_from_error_code(
-                lt.error_code(value, lt.bdecode_category()))
+                lt.error_code(value, lt.bdecode_category())
+            )
 
         self.assertIsInstance(func(1), ltpy.BDecodeError)
 
     def test_i2p_category(self):
-
         def func(value):
             return ltpy.exception_from_error_code(
-                lt.error_code(value, lt.i2p_category()))
+                lt.error_code(value, lt.i2p_category())
+            )
 
         self.assertIsInstance(func(1), ltpy.I2PError)
 
     def test_no_error(self):
         self.assertIsNone(
             ltpy.exception_from_error_code(
-                lt.error_code(0, lt.libtorrent_category())))
+                lt.error_code(0, lt.libtorrent_category())
+            )
+        )
 
 
 class TestTranslateExceptions(unittest.TestCase):
-
     def test_real_enoent(self):
         with self.assertRaises(FileNotFoundError):
             with ltpy.translate_exceptions():
@@ -317,5 +335,8 @@ class TestTranslateExceptions(unittest.TestCase):
     def test_duplicate_torrent(self):
         with self.assertRaises(ltpy.DuplicateTorrentError):
             with ltpy.translate_exceptions():
-                raise RuntimeError(lt.libtorrent_category().message(
-                    ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT))
+                raise RuntimeError(
+                    lt.libtorrent_category().message(
+                        ltpy.LibtorrentErrorValue.DUPLICATE_TORRENT
+                    )
+                )

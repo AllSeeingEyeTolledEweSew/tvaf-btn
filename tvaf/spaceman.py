@@ -3,7 +3,6 @@
 
 
 class Spaceman:
-
     def __init__(self):
         self.config = None
         self.trackers = None

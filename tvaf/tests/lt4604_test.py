@@ -14,19 +14,20 @@ from . import lib
 from . import request_test_utils
 from . import tdummy
 
-MANY_PIECES = tdummy.Torrent.single_file(piece_length=16384,
-                                         name=b"test.txt",
-                                         length=16384 * 100)
+MANY_PIECES = tdummy.Torrent.single_file(
+    piece_length=16384, name=b"test.txt", length=16384 * 100
+)
 
 
 class CaptureStates(task_lib.Task):
-
     def __init__(self, alert_driver: driver_lib.AlertDriver, stop_state=None):
         super().__init__(title="capture states", forever=False)
-        self._iterator = alert_driver.iter_alerts(lt.alert_category.status,
-                                                  lt.add_torrent_alert,
-                                                  lt.torrent_removed_alert,
-                                                  lt.state_changed_alert)
+        self._iterator = alert_driver.iter_alerts(
+            lt.alert_category.status,
+            lt.add_torrent_alert,
+            lt.torrent_removed_alert,
+            lt.state_changed_alert,
+        )
         self._stop_state = stop_state
         self.states: List[str] = []
 
@@ -57,7 +58,8 @@ class Test4604(unittest.TestCase):
         self.session_service = lib.create_isolated_session_service()
         self.session = self.session_service.session
         self.alert_driver = driver_lib.AlertDriver(
-            session_service=self.session_service)
+            session_service=self.session_service
+        )
         self.fixup = lt4604.Fixup(alert_driver=self.alert_driver, pedantic=True)
 
     def tearDown(self):
@@ -104,24 +106,36 @@ class Test4604(unittest.TestCase):
 
         if lt4604.HAVE_BUG:
             # Test we actually triggered the bug
-            self.assertEqual(states, [
-                "checking_resume_data", "downloading", "checking_resume_data",
-                "checking_files", "finished", "seeding"
-            ])
+            self.assertEqual(
+                states,
+                [
+                    "checking_resume_data",
+                    "downloading",
+                    "checking_resume_data",
+                    "checking_files",
+                    "finished",
+                    "seeding",
+                ],
+            )
         else:
-            self.assertEqual(states, [
-                "checking_resume_data",
-                "downloading",
-                "finished",
-                "seeding",
-            ])
+            self.assertEqual(
+                states,
+                [
+                    "checking_resume_data",
+                    "downloading",
+                    "finished",
+                    "seeding",
+                ],
+            )
 
     def test_4604_and_remove(self):
         self.trigger_4604()
 
-        iterator = self.alert_driver.iter_alerts(lt.alert_category.status,
-                                                 lt.torrent_removed_alert,
-                                                 lt.torrent_paused_alert)
+        iterator = self.alert_driver.iter_alerts(
+            lt.alert_category.status,
+            lt.torrent_removed_alert,
+            lt.torrent_paused_alert,
+        )
         self.start()
         for alert in iterator:
             if isinstance(alert, lt.torrent_removed_alert):
@@ -154,7 +168,10 @@ class Test4604(unittest.TestCase):
         states = capture.states
 
         # Test we never wrongly triggered a recheck
-        self.assertEqual(states, [
-            "checking_resume_data",
-            "downloading",
-        ])
+        self.assertEqual(
+            states,
+            [
+                "checking_resume_data",
+                "downloading",
+            ],
+        )

@@ -21,7 +21,7 @@ from tvaf import task as task_lib
 
 # This approach lets us avoid subscribing to piece_progress alerts.
 
-HAVE_BUG = (ltpy.version_info < (1, 2, 7))
+HAVE_BUG = ltpy.version_info < (1, 2, 7)
 _LOG = logging.getLogger(__name__)
 _HASH_TIMEOUT = 3
 _ISSUE_URL = "https://github.com/arvidn/libtorrent/issues/4604"
@@ -44,10 +44,10 @@ def get_pending_pieces(handle: lt.torrent_handle) -> Set[int]:
 
 
 class _CheckTask(task_lib.Task):
-
     def __init__(self, handle: lt.torrent_handle):
-        super().__init__(title=f"lt4604 check for {handle.info_hash()}",
-                         forever=False)
+        super().__init__(
+            title=f"lt4604 check for {handle.info_hash()}", forever=False
+        )
         self._handle = handle
 
     def _terminate(self):
@@ -67,8 +67,11 @@ class _CheckTask(task_lib.Task):
                 "still pending hash check for %ss. Assuming their hash jobs "
                 "have been lost; force-rechecking the torrent to recover the "
                 "lost jobs. You should upgrade to libtorrent>=1.2.7",
-                self._handle.name(), _ISSUE_TITLE, pending_pieces,
-                _HASH_TIMEOUT)
+                self._handle.name(),
+                _ISSUE_TITLE,
+                pending_pieces,
+                _HASH_TIMEOUT,
+            )
             # Does not block
             self._handle.force_recheck()
 
@@ -80,21 +83,24 @@ class _CheckTask(task_lib.Task):
 
 
 class _TorrentTask(task_lib.Task):
-
-    def __init__(self,
-                 *,
-                 alert_driver: driver_lib.AlertDriver,
-                 start: lt.alert,
-                 handle: lt.torrent_handle,
-                 pedantic=False):
+    def __init__(
+        self,
+        *,
+        alert_driver: driver_lib.AlertDriver,
+        start: lt.alert,
+        handle: lt.torrent_handle,
+        pedantic=False,
+    ):
         super().__init__(title=f"lt4604 fixup monitor for {handle.info_hash()}")
         self._pedantic = pedantic
-        self._iterator = alert_driver.iter_alerts(lt.alert_category.status,
-                                                  lt.state_changed_alert,
-                                                  lt.torrent_removed_alert,
-                                                  lt.torrent_paused_alert,
-                                                  handle=handle,
-                                                  start=start)
+        self._iterator = alert_driver.iter_alerts(
+            lt.alert_category.status,
+            lt.state_changed_alert,
+            lt.torrent_removed_alert,
+            lt.torrent_paused_alert,
+            handle=handle,
+            start=start,
+        )
 
     def _terminate(self):
         self._iterator.close()
@@ -106,8 +112,9 @@ class _TorrentTask(task_lib.Task):
         elif isinstance(alert, lt.torrent_removed_alert):
             self.terminate()
         elif isinstance(alert, lt.torrent_paused_alert):
-            self._add_child(_CheckTask(alert.handle),
-                            terminate_me_on_error=self._pedantic)
+            self._add_child(
+                _CheckTask(alert.handle), terminate_me_on_error=self._pedantic
+            )
 
     def _run(self):
         with self._iterator:
@@ -116,16 +123,18 @@ class _TorrentTask(task_lib.Task):
 
 
 class Fixup(task_lib.Task):
-
     def __init__(self, *, alert_driver: driver_lib.AlertDriver, pedantic=False):
-        super().__init__(title="lt4604 fixup session monitor",
-                         thread_name="lt4604.fixup")
+        super().__init__(
+            title="lt4604 fixup session monitor", thread_name="lt4604.fixup"
+        )
         self._pedantic = pedantic
         self._alert_driver = alert_driver
         if HAVE_BUG:
             self._iterator: Optional[
-                driver_lib.Iterator] = alert_driver.iter_alerts(
-                    lt.alert_category.status, lt.state_changed_alert)
+                driver_lib.Iterator
+            ] = alert_driver.iter_alerts(
+                lt.alert_category.status, lt.state_changed_alert
+            )
         else:
             self._iterator = None
 
@@ -137,16 +146,21 @@ class Fixup(task_lib.Task):
         if not HAVE_BUG:
             self._terminated.wait()
         else:
-            warnings.warn("libtorrent with bug #4604 detected. "
-                          "Please upgrade to libtorrent 1.2.7 or later.")
+            warnings.warn(
+                "libtorrent with bug #4604 detected. "
+                "Please upgrade to libtorrent 1.2.7 or later."
+            )
             assert self._iterator
             with self._iterator:
                 for alert in self._iterator:
                     assert isinstance(alert, lt.state_changed_alert)
                     if alert.state == lt.torrent_status.states.downloading:
-                        self._add_child(_TorrentTask(
-                            alert_driver=self._alert_driver,
-                            start=alert,
-                            handle=alert.handle,
-                            pedantic=self._pedantic),
-                                        terminate_me_on_error=self._pedantic)
+                        self._add_child(
+                            _TorrentTask(
+                                alert_driver=self._alert_driver,
+                                start=alert,
+                                handle=alert.handle,
+                                pedantic=self._pedantic,
+                            ),
+                            terminate_me_on_error=self._pedantic,
+                        )

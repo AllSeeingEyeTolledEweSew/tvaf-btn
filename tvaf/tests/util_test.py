@@ -25,14 +25,33 @@ class TestIterBitmap(unittest.TestCase):
     """Tests for tvaf.util.iter_bitmap()."""
 
     def test_full_range(self):
-        self.assertSequenceEqual(list(util.iter_bitmap(b"\x00\x08", 0, 16)), [
-            False, False, False, False, False, False, False, False, False,
-            False, False, False, True, False, False, False
-        ])
+        self.assertSequenceEqual(
+            list(util.iter_bitmap(b"\x00\x08", 0, 16)),
+            [
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                True,
+                False,
+                False,
+                False,
+            ],
+        )
 
     def test_sub_range(self):
-        self.assertSequenceEqual(list(util.iter_bitmap(b"\x00\x08", 12, 16)),
-                                 [True, False, False, False])
+        self.assertSequenceEqual(
+            list(util.iter_bitmap(b"\x00\x08", 12, 16)),
+            [True, False, False, False],
+        )
 
 
 class TestRangeToPieces(unittest.TestCase):
@@ -53,17 +72,20 @@ class TestEnumPieceIsSet(unittest.TestCase):
 
     def test_empty(self):
         self.assertSequenceEqual(
-            list(util.enum_piece_is_set(b"\x80", 1024, 1000, 1000)), [])
+            list(util.enum_piece_is_set(b"\x80", 1024, 1000, 1000)), []
+        )
 
     def test_non_edge_cases(self):
         self.assertSequenceEqual(
             list(util.enum_piece_is_set(b"\x80", 1024, 1000, 2000)),
-            [(0, True), (1, False)])
+            [(0, True), (1, False)],
+        )
 
     def test_edge_cases(self):
         self.assertSequenceEqual(
-            list(util.enum_piece_is_set(b"\x80", 1024, 0, 2048)), [(0, True),
-                                                                   (1, False)])
+            list(util.enum_piece_is_set(b"\x80", 1024, 0, 2048)),
+            [(0, True), (1, False)],
+        )
 
 
 class TestIterPieceIsSet(unittest.TestCase):
@@ -71,16 +93,19 @@ class TestIterPieceIsSet(unittest.TestCase):
 
     def test_empty(self):
         self.assertSequenceEqual(
-            list(util.iter_piece_is_set(b"\x80", 1024, 1000, 1000)), [])
+            list(util.iter_piece_is_set(b"\x80", 1024, 1000, 1000)), []
+        )
 
     def test_non_edge_cases(self):
         self.assertSequenceEqual(
             list(util.iter_piece_is_set(b"\x80", 1024, 1000, 2000)),
-            [True, False])
+            [True, False],
+        )
 
     def test_edge_cases(self):
         self.assertSequenceEqual(
-            list(util.iter_piece_is_set(b"\x80", 1024, 0, 2048)), [True, False])
+            list(util.iter_piece_is_set(b"\x80", 1024, 0, 2048)), [True, False]
+        )
 
 
 class TestEnumPiecewiseRanges(unittest.TestCase):
@@ -88,21 +113,23 @@ class TestEnumPiecewiseRanges(unittest.TestCase):
 
     def test_empty(self):
         self.assertSequenceEqual(
-            list(util.enum_piecewise_ranges(1024, 1000, 1000)), [])
+            list(util.enum_piecewise_ranges(1024, 1000, 1000)), []
+        )
 
     def test_non_edge_cases(self):
         self.assertSequenceEqual(
             list(util.enum_piecewise_ranges(1024, 1000, 2000)),
-            [(0, 1000, 1024), (1, 1024, 2000)])
+            [(0, 1000, 1024), (1, 1024, 2000)],
+        )
 
     def test_edge_cases(self):
         self.assertSequenceEqual(
-            list(util.enum_piecewise_ranges(1024, 0, 2048)), [(0, 0, 1024),
-                                                              (1, 1024, 2048)])
+            list(util.enum_piecewise_ranges(1024, 0, 2048)),
+            [(0, 0, 1024), (1, 1024, 2048)],
+        )
 
 
 class TestSelectablePipe(unittest.TestCase):
-
     def test_select_write_before(self):
         rfile, wfile = util.selectable_pipe()
         wfile.write(b"\0")

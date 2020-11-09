@@ -28,7 +28,6 @@ _LOG = logging.getLogger(__name__)
 
 
 def _partialclass(cls, *args, **kwds):
-
     class Wrapped(cls):
         __init__ = functools.partialmethod(cls.__init__, *args, **kwds)
 
@@ -55,11 +54,12 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
         return fspath
 
     def mkstemp(
-            self,
-            suffix="",
-            prefix="",
-            dir=None,  # pylint: disable=redefined-builtin
-            mode="wb") -> None:
+        self,
+        suffix="",
+        prefix="",
+        dir=None,  # pylint: disable=redefined-builtin
+        mode="wb",
+    ) -> None:
         raise fs.mkoserror(errno.EROFS)
 
     def mkdir(self, path: str) -> None:
@@ -169,18 +169,19 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
 
 
 class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
-
     def __init__(self, *, auth_service: auth.AuthService) -> None:
         # pylint: disable=super-init-not-called
         self.auth_service = auth_service
 
-    def add_user(self,
-                 username: str,
-                 password: str,
-                 homedir: str,
-                 perm: str = "elr",
-                 msg_login: str = "Login successful.",
-                 msg_quit: str = "Goodbye.") -> None:
+    def add_user(
+        self,
+        username: str,
+        password: str,
+        homedir: str,
+        perm: str = "elr",
+        msg_login: str = "Login successful.",
+        msg_quit: str = "Goodbye.",
+    ) -> None:
         raise NotImplementedError
 
     def add_anonymous(self, homedir: str, **kwargs) -> None:
@@ -189,11 +190,9 @@ class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
     def remove_user(self, username: str) -> None:
         raise NotImplementedError
 
-    def override_perm(self,
-                      username: str,
-                      directory: str,
-                      perm: str,
-                      recursive=False) -> None:
+    def override_perm(
+        self, username: str, directory: str, perm: str, recursive=False
+    ) -> None:
         raise NotImplementedError
 
     def has_user(self, username: str) -> bool:
@@ -214,8 +213,9 @@ class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
     def get_perms(self, username: str) -> str:
         return cast(str, self.read_perms)
 
-    def validate_authentication(self, username: str, password: str,
-                                handler) -> None:
+    def validate_authentication(
+        self, username: str, password: str, handler
+    ) -> None:
         try:
             self.auth_service.auth_password_plain(username, password)
         except auth.AuthenticationFailed as exc:
@@ -234,24 +234,30 @@ class _FTPHandler(pyftpdlib.handlers.FTPHandler):
     # BufferedTorrentIO expose fileno that raises io.UnsupportedOperation.
     use_sendfile = False
 
-    def __init__(self, *args, root: fs.Dir, auth_service: auth.AuthService,
-                 **kwargs) -> None:
+    def __init__(
+        self, *args, root: fs.Dir, auth_service: auth.AuthService, **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.authorizer = _Authorizer(auth_service=auth_service)
         self.abstracted_fs = _partialclass(_FS, root=root)
 
 
 class FTPD(task_lib.Task, config_lib.HasConfig):
-
-    def __init__(self, *, config: config_lib.Config, root: fs.Dir,
-                 auth_service: auth.AuthService) -> None:
+    def __init__(
+        self,
+        *,
+        config: config_lib.Config,
+        root: fs.Dir,
+        auth_service: auth.AuthService
+    ) -> None:
         super().__init__(title="FTPD", thread_name="ftpd")
         self._auth_service = auth_service
         self._root = root
 
         # TODO: fixup typing here
-        self._lock: threading.Condition = \
-                threading.Condition(threading.RLock())  # type: ignore
+        self._lock: threading.Condition = threading.Condition(
+            threading.RLock()
+        )  # type: ignore
         self._server: Optional[pyftpdlib.servers.FTPServer] = None
         self._address: Optional[Tuple] = None
 
@@ -275,8 +281,10 @@ class FTPD(task_lib.Task, config_lib.HasConfig):
 
         # Only parse address and port if enabled
         if config.require_bool("ftp_enabled"):
-            address = (config.require_str("ftp_bind_address"),
-                       config.require_int("ftp_port"))
+            address = (
+                config.require_str("ftp_bind_address"),
+                config.require_int("ftp_port"),
+            )
 
         with self._lock:
             if address != self._address and address is not None:
@@ -295,9 +303,9 @@ class FTPD(task_lib.Task, config_lib.HasConfig):
             if socket is None:
                 return
 
-            handler = _partialclass(_FTPHandler,
-                                    root=self._root,
-                                    auth_service=self._auth_service)
+            handler = _partialclass(
+                _FTPHandler, root=self._root, auth_service=self._auth_service
+            )
             self._server = pyftpdlib.servers.ThreadedFTPServer(socket, handler)
 
     def _terminate(self):

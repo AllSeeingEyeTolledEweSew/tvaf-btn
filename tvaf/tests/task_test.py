@@ -18,7 +18,6 @@ class ExternalTerminateException(Exception):
 
 
 class Bounded(task_lib.Task):
-
     def __init__(self):
         super().__init__(title="Bounded", forever=False)
 
@@ -30,7 +29,6 @@ class Bounded(task_lib.Task):
 
 
 class Forever(task_lib.Task):
-
     def __init__(self):
         super().__init__(title="Forever", forever=True)
 
@@ -43,7 +41,6 @@ class Forever(task_lib.Task):
 
 
 class PrematureTerminator(task_lib.Task):
-
     def __init__(self):
         # NB: Not marked as forever
         super().__init__(title="Premature terminator")
@@ -56,7 +53,6 @@ class PrematureTerminator(task_lib.Task):
 
 
 class Failer(task_lib.Task):
-
     def __init__(self):
         super().__init__(title="Failer")
 
@@ -68,7 +64,6 @@ class Failer(task_lib.Task):
 
 
 class Fundamentals(unittest.TestCase):
-
     def setUp(self):
         self.task = Bounded()
 
@@ -96,7 +91,6 @@ class Fundamentals(unittest.TestCase):
         callback.assert_called_once_with(self.task)
 
     def test_failer_callback(self):
-
         def failer(_):
             raise FailerCallbackException()
 
@@ -134,8 +128,9 @@ class Fundamentals(unittest.TestCase):
         self.task.add_done_callback(failer)
 
 
-def run_and_terminate_idempotent(task: task_lib.Task,
-                                 exception: Optional[Exception]):
+def run_and_terminate_idempotent(
+    task: task_lib.Task, exception: Optional[Exception]
+):
     task.terminate(exception)
     task.terminate(exception)
     task.join()
@@ -147,7 +142,6 @@ def run_and_terminate_idempotent(task: task_lib.Task,
 
 
 class NormalTerminationTests(Fundamentals):
-
     def test_terminate(self):
         self.task.start()
         run_and_terminate_idempotent(self.task, None)
@@ -162,7 +156,6 @@ class NormalTerminationTests(Fundamentals):
 
 
 class ForeverTest(NormalTerminationTests):
-
     def setUp(self):
         self.task = Forever()
 
@@ -171,7 +164,6 @@ class ForeverTest(NormalTerminationTests):
 
 
 class BoundedTest(NormalTerminationTests):
-
     def setUp(self):
         self.task = Bounded()
 
@@ -239,7 +231,6 @@ class FailerTerminatesChildTest(AbnormalTerminationTests):
 
 
 class ForeverStartChildren(Forever):
-
     def _run(self):
         for child in self._get_children():
             child.start()
@@ -258,14 +249,13 @@ class FailerTerminatesParentTest(AbnormalTerminationTests):
 
 
 class CatchChildErrorsTest(NormalTerminationTests):
-
     def setUp(self):
         self.task = ForeverStartChildren()
         self.child = Failer()
         # pylint: disable=protected-access
-        self.task._add_child(self.child,
-                             start=False,
-                             terminate_me_on_error=False)
+        self.task._add_child(
+            self.child, start=False, terminate_me_on_error=False
+        )
 
     def runs_forever(self):
         return True

@@ -12,7 +12,7 @@ import setuptools
 class FormatCommand(distutils.cmd.Command):
 
     description = "Run autoflake and yapf on python source files"
-    user_options:List[Tuple] = []
+    user_options: List[Tuple] = []
 
     def initialize_options(self) -> None:
         pass
@@ -21,31 +21,34 @@ class FormatCommand(distutils.cmd.Command):
         pass
 
     def run_isort(self) -> None:
-        subprocess.check_call(["isort", "-rc", "-y"])
-
-    def run_yapf(self) -> None:
-        subprocess.check_call(["yapf", "-i", "-r", "."])
-        # yapf does not fix certain hanging indents currently, see
-        # https://github.com/google/yapf/issues/769
-        # We work around this by calling selective autopep8 after yapf.
-        subprocess.check_call(["autopep8", "-i", "-r", "--select", "E125", "."])
+        subprocess.check_call(["isort", "."])
 
     def run_autoflake(self) -> None:
-        subprocess.check_call([
-            "autoflake", "-i", "-r", "--remove-all-unused-imports",
-            "--remove-duplicate-keys", "--remove-unused-variables", "."
-        ])
+        subprocess.check_call(
+            [
+                "autoflake",
+                "-i",
+                "-r",
+                "--remove-all-unused-imports",
+                "--remove-duplicate-keys",
+                "--remove-unused-variables",
+                ".",
+            ]
+        )
+
+    def run_black(self) -> None:
+        subprocess.check_call(["black", "."])
 
     def run(self) -> None:
         self.run_isort()
-        self.run_yapf()
         self.run_autoflake()
+        self.run_black()
 
 
 class LintCommand(distutils.cmd.Command):
 
     description = "Run autoflake and yapf on python source files"
-    user_options:List[Tuple] = []
+    user_options: List[Tuple] = []
 
     def initialize_options(self) -> None:
         pass

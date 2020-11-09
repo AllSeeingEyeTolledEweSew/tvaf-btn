@@ -39,7 +39,7 @@ class MemoryView(collections.abc.ByteString):
         return self.to_memoryview().tobytes()
 
     def to_memoryview(self) -> memoryview:
-        return memoryview(self.obj)[self.start:self.stop]
+        return memoryview(self.obj)[self.start : self.stop]
 
 
 # Singleton empty MemoryView, to save a malloc

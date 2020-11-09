@@ -35,9 +35,11 @@ class TestCleanup(request_test_utils.RequestServiceTestCase):
         self.handle = self.session.add_torrent(atp)
         self.handle.prioritize_pieces([0] * len(self.torrent.pieces))
         # pylint: disable=protected-access
-        self.cleanup = request_lib._Cleanup(handle=self.handle,
-                                            session=self.session,
-                                            alert_driver=self.alert_driver)
+        self.cleanup = request_lib._Cleanup(
+            handle=self.handle,
+            session=self.session,
+            alert_driver=self.alert_driver,
+        )
 
     def test_remove(self):
         self.cleanup.cleanup()
@@ -62,13 +64,13 @@ class TestCleanup(request_test_utils.RequestServiceTestCase):
 
 
 class TestAddRemove(request_test_utils.RequestServiceTestCase):
-
     def test_add_remove(self):
         req = self.add_req()
         self.wait_for_torrent()
         self.assertEqual(
             [str(h.info_hash()) for h in self.session.get_torrents()],
-            [self.torrent.info_hash])
+            [self.torrent.info_hash],
+        )
         self.service.discard_request(req)
         with self.assertRaises(request_lib.CanceledError):
             req.read(timeout=5)
@@ -92,7 +94,6 @@ class TestAddRemove(request_test_utils.RequestServiceTestCase):
 
 
 class TestRead(request_test_utils.RequestServiceTestCase):
-
     def test_all(self):
         req = self.add_req()
 
@@ -250,7 +251,6 @@ class TestRead(request_test_utils.RequestServiceTestCase):
 
 
 class TestRemoveTorrent(request_test_utils.RequestServiceTestCase):
-
     def test_with_active_requests(self):
         req = self.add_req()
         self.session.remove_torrent(self.wait_for_torrent())
@@ -259,11 +259,11 @@ class TestRemoveTorrent(request_test_utils.RequestServiceTestCase):
 
 
 class TestConfig(request_test_utils.RequestServiceTestCase):
-
     def test_config_defaults(self):
         save_path = str(self.config_dir.joinpath("downloads"))
-        self.assertEqual(self.config,
-                         config_lib.Config(torrent_default_save_path=save_path))
+        self.assertEqual(
+            self.config, config_lib.Config(torrent_default_save_path=save_path)
+        )
 
         atp = lt.add_torrent_params()
         self.service.configure_atp(atp)
@@ -283,9 +283,11 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
         self.assertEqual(atp.save_path, self.tempdir.name)
         self.assertEqual(
             atp.flags,
-            lt.torrent_flags.default_flags & ~lt.torrent_flags.apply_ip_filter)
-        self.assertEqual(atp.storage_mode,
-                         lt.storage_mode_t.storage_mode_allocate)
+            lt.torrent_flags.default_flags & ~lt.torrent_flags.apply_ip_filter,
+        )
+        self.assertEqual(
+            atp.storage_mode, lt.storage_mode_t.storage_mode_allocate
+        )
 
         # Set some default configs
         self.config["torrent_default_flags_apply_ip_filter"] = True
@@ -297,8 +299,9 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
 
         self.assertEqual(atp.save_path, self.tempdir.name)
         self.assertEqual(atp.flags, lt.torrent_flags.default_flags)
-        self.assertEqual(atp.storage_mode,
-                         lt.storage_mode_t.storage_mode_sparse)
+        self.assertEqual(
+            atp.storage_mode, lt.storage_mode_t.storage_mode_sparse
+        )
 
     def test_save_path_loop(self):
         bad_link = self.config_dir.joinpath("bad_link")
@@ -326,5 +329,6 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
 
         atp = lt.add_torrent_params()
         self.service.configure_atp(atp)
-        self.assertEqual(atp.storage_mode,
-                         lt.storage_mode_t.storage_mode_sparse)
+        self.assertEqual(
+            atp.storage_mode, lt.storage_mode_t.storage_mode_sparse
+        )

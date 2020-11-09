@@ -24,21 +24,24 @@ import tvaf.types
 
 
 def create_isolated_config() -> config_lib.Config:
-    return config_lib.Config(session_enable_dht=False,
-                             session_enable_lsd=False,
-                             session_enable_natpmp=False,
-                             session_enable_upnp=False,
-                             session_listen_interfaces="127.0.0.1:0",
-                             session_alert_mask=0,
-                             ftp_port=0,
-                             http_port=0)
+    return config_lib.Config(
+        session_enable_dht=False,
+        session_enable_lsd=False,
+        session_enable_natpmp=False,
+        session_enable_upnp=False,
+        session_listen_interfaces="127.0.0.1:0",
+        session_alert_mask=0,
+        ftp_port=0,
+        http_port=0,
+    )
 
 
-def create_isolated_session_service(*,
-                                    alert_mask: int = 0
-                                   ) -> session_lib.SessionService:
-    return session_lib.SessionService(alert_mask=alert_mask,
-                                      config=create_isolated_config())
+def create_isolated_session_service(
+    *, alert_mask: int = 0
+) -> session_lib.SessionService:
+    return session_lib.SessionService(
+        alert_mask=alert_mask, config=create_isolated_config()
+    )
 
 
 def loop_until_timeout(timeout: float, msg: str = "condition") -> Generator:
@@ -59,12 +62,14 @@ def add_fixture_row(conn: apsw.Connection, table: str, **kwargs: Any) -> None:
     keys = sorted(kwargs.keys())
     columns = ",".join(keys)
     params = ",".join(":" + k for k in keys)
-    conn.cursor().execute(f"insert into {table} ({columns}) values ({params})",
-                          kwargs)
+    conn.cursor().execute(
+        f"insert into {table} ({columns}) values ({params})", kwargs
+    )
 
 
-def add_fixture_torrent_meta(conn: apsw.Connection,
-                             meta: tvaf.types.TorrentMeta) -> None:
+def add_fixture_torrent_meta(
+    conn: apsw.Connection, meta: tvaf.types.TorrentMeta
+) -> None:
     """Adds a TorrentMeta to the database."""
     meta_dict = dataclasses.asdict(meta)
     add_fixture_row(conn, "torrent_meta", **meta_dict)
@@ -81,13 +86,15 @@ class TestCase(unittest.TestCase):
         # that are assumed to be individually accessible on the filesystem. So
         # for updating golden data, we use the "naive" approach of referencing
         # a file based off of the __file__ path.
-        return os.path.join(os.path.dirname(__file__), "data",
-                            f"{self.id()}.{suffix}")
+        return os.path.join(
+            os.path.dirname(__file__), "data", f"{self.id()}.{suffix}"
+        )
 
     def get_data(self, suffix: str) -> str:
         """Returns golden reference data for this test."""
-        return importlib.resources.read_text("tvaf.tests.data",
-                                             f"{self.id()}.{suffix}")
+        return importlib.resources.read_text(
+            "tvaf.tests.data", f"{self.id()}.{suffix}"
+        )
 
     def assert_golden(self, value: str, suffix: str = "golden.txt") -> None:
         """Asserts a value is equal to golden data, or update the golden data.
@@ -118,10 +125,9 @@ class TestCase(unittest.TestCase):
             second = self.get_data(suffix)
             self.assertEqual(value, second)
 
-    def assert_golden_json(self,
-                           value: Any,
-                           suffix: str = "golden.json",
-                           **kwargs: Any):
+    def assert_golden_json(
+        self, value: Any, suffix: str = "golden.json", **kwargs: Any
+    ):
         """Like assert_golden for the json text representation of a value.
 
         Args:
@@ -142,10 +148,12 @@ class TestCase(unittest.TestCase):
         value_text = json.dumps(value, **kwargs)
         self.assert_golden(value_text, suffix=suffix)
 
-    def assert_golden_db(self,
-                         conn: apsw.Connection,
-                         suffix: str = "golden.sql",
-                         include_schema: bool = False) -> None:
+    def assert_golden_db(
+        self,
+        conn: apsw.Connection,
+        suffix: str = "golden.sql",
+        include_schema: bool = False,
+    ) -> None:
         """Like assert_golden for the contents of the database.
 
         This internally uses apsw's ".dump" command. Comments and whitespace
@@ -170,20 +178,25 @@ class TestCase(unittest.TestCase):
         # usernames and hostnames.
         output = re.sub(r"-- (.*?)\n", "", output)
         if not include_schema:
-            output = "\n".join(line for line in output.split("\n")
-                               if line.startswith("INSERT "))
+            output = "\n".join(
+                line
+                for line in output.split("\n")
+                if line.startswith("INSERT ")
+            )
         self.assert_golden(output, suffix=suffix)
 
-    def assert_golden_acct(self,
-                           *audits: tvaf.types.Acct,
-                           suffix: str = "accts.golden.json") -> None:
+    def assert_golden_acct(
+        self, *audits: tvaf.types.Acct, suffix: str = "accts.golden.json"
+    ) -> None:
         """Compares a list of Acct records to golden data."""
-        self.assert_golden_json([dataclasses.asdict(a) for a in audits],
-                                suffix=suffix)
+        self.assert_golden_json(
+            [dataclasses.asdict(a) for a in audits], suffix=suffix
+        )
 
-    def assert_golden_torrent_meta(self,
-                                   *meta: tvaf.types.TorrentMeta,
-                                   suffix: str = "status.golden.json") -> None:
+    def assert_golden_torrent_meta(
+        self, *meta: tvaf.types.TorrentMeta, suffix: str = "status.golden.json"
+    ) -> None:
         """Compares a list of TorrentMetas to golden data."""
-        self.assert_golden_json([dataclasses.asdict(m) for m in meta],
-                                suffix=suffix)
+        self.assert_golden_json(
+            [dataclasses.asdict(m) for m in meta], suffix=suffix
+        )

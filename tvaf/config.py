@@ -59,7 +59,6 @@ _T = TypeVar("_T")
 
 
 class Config(dict, MutableMapping[str, Any]):
-
     @classmethod
     def from_config_dir(cls: Type[_C], config_dir: pathlib.Path) -> _C:
         with config_dir.joinpath(FILENAME).open() as fp:
@@ -76,13 +75,13 @@ class Config(dict, MutableMapping[str, Any]):
     def _get(self, key: str, type_: Type[_T]) -> Optional[_T]:
         value = self.get(key)
         if key in self and not isinstance(value, type_):
-            raise InvalidConfigError(f"\"{key}\": {value!r} is not a {type_}")
+            raise InvalidConfigError(f'"{key}": {value!r} is not a {type_}')
         return value
 
     def _require(self, key: str, type_: Type[_T]) -> _T:
         value = self._get(key, type_)
         if value is None:
-            raise InvalidConfigError(f"\"{key}\": missing")
+            raise InvalidConfigError(f'"{key}": missing')
         return value
 
     def get_int(self, key: str) -> Optional[int]:
@@ -108,7 +107,6 @@ _C = TypeVar("_C", bound=Config)
 
 
 class HasConfig(abc.ABC):
-
     @abc.abstractmethod
     def stage_config(self, config: Config) -> ContextManager[None]:
         return contextlib.nullcontext()

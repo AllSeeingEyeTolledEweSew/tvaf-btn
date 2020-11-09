@@ -27,23 +27,25 @@ class TestLibraryService(unittest.TestCase):
     # pylint: disable=too-many-public-methods
 
     def setUp(self):
-
         def opener(info_hash: str, start: int, stop: int, _: Any) -> io.BytesIO:
             return io.BytesIO(get_placeholder_data(info_hash, start, stop))
 
         self.torrents = {torrent.info_hash: torrent for torrent in ltu.TORRENTS}
         self.libraries = library.Libraries()
         ltu.add_test_libraries(self.libraries)
-        self.libs = library.LibraryService(opener=opener,
-                                           libraries=self.libraries)
+        self.libs = library.LibraryService(
+            opener=opener, libraries=self.libraries
+        )
 
-    def assert_torrent_file(self,
-                            tfile: library.TorrentFile,
-                            *,
-                            dummy: tdummy.Torrent,
-                            start: int = None,
-                            stop: int = None,
-                            dummy_file: Union[tdummy.File, int] = None):
+    def assert_torrent_file(
+        self,
+        tfile: library.TorrentFile,
+        *,
+        dummy: tdummy.Torrent,
+        start: int = None,
+        stop: int = None,
+        dummy_file: Union[tdummy.File, int] = None,
+    ):
         info_hash = dummy.info_hash
         if dummy_file is not None:
             if isinstance(dummy_file, int):
@@ -62,7 +64,8 @@ class TestLibraryService(unittest.TestCase):
         self.assertEqual(tfile.stop, stop)
         self.assertEqual(
             tfile.open(mode="rb").read(),
-            get_placeholder_data(info_hash, start, stop))
+            get_placeholder_data(info_hash, start, stop),
+        )
 
         atp = lt.add_torrent_params()
         atp.info_hash = lt.sha1_hash(bytes.fromhex(info_hash))
@@ -79,8 +82,9 @@ class TestLibraryService(unittest.TestCase):
     def assert_is_symlink(self, node: fs.Node):
         self.assertEqual(node.stat().filetype, stat_lib.S_IFLNK)
 
-    def assert_dirents_like(self, dirents: Iterable[fs.Dirent],
-                            expected: Iterable[Tuple[str, str]]):
+    def assert_dirents_like(
+        self, dirents: Iterable[fs.Dirent], expected: Iterable[Tuple[str, str]]
+    ):
         got = [(stat_lib.filemode(d.stat.filetype), d.name) for d in dirents]
         expected = list(expected)
         # Test file types only
@@ -103,7 +107,8 @@ class TestLibraryService(unittest.TestCase):
         test_dir = fs.StaticDir()
         test_dir.mkchild(
             "single",
-            fs.Symlink(target=self.libs.lookup_torrent(ltu.SINGLE.info_hash)))
+            fs.Symlink(target=self.libs.lookup_torrent(ltu.SINGLE.info_hash)),
+        )
         self.libs.browse_nodes["test"] = test_dir
 
         browse = self.libs.root.traverse("browse")
@@ -114,10 +119,13 @@ class TestLibraryService(unittest.TestCase):
 
         link = cast(
             fs.Symlink,
-            self.libs.root.traverse("browse/test/single",
-                                    follow_symlinks=False))
-        self.assertEqual(str(link.readlink()),
-                         f"../../v1/{ltu.SINGLE.info_hash}")
+            self.libs.root.traverse(
+                "browse/test/single", follow_symlinks=False
+            ),
+        )
+        self.assertEqual(
+            str(link.readlink()), f"../../v1/{ltu.SINGLE.info_hash}"
+        )
 
     def test_v1_lookup(self):
         for info_hash in self.torrents:
@@ -135,8 +143,9 @@ class TestLibraryService(unittest.TestCase):
 
     def test_torrent_dir_readdir(self):
         for info_hash in self.torrents:
-            torrent_dir = cast(fs.Dir,
-                               self.libs.root.traverse(f"v1/{info_hash}"))
+            torrent_dir = cast(
+                fs.Dir, self.libs.root.traverse(f"v1/{info_hash}")
+            )
             self.assert_dirents_like(torrent_dir.readdir(), [("d", "test")])
 
     def test_torrent_dir_lookup(self):
@@ -147,7 +156,8 @@ class TestLibraryService(unittest.TestCase):
         for info_hash in self.torrents:
             with self.assertRaises(FileNotFoundError):
                 self.assert_is_dir(
-                    self.libs.root.traverse(f"v1/{info_hash}/does-not-exist"))
+                    self.libs.root.traverse(f"v1/{info_hash}/does-not-exist")
+                )
 
     def test_torrent_dir_with_no_network(self):
         self.libraries.networks.clear()
@@ -156,22 +166,26 @@ class TestLibraryService(unittest.TestCase):
 
     def test_network_readdir(self):
         for info_hash in self.torrents:
-            network = cast(fs.Dir,
-                           self.libs.root.traverse(f"v1/{info_hash}/test"))
-            self.assert_dirents_like(network.readdir(), [("d", "f"),
-                                                         ("d", "i")])
+            network = cast(
+                fs.Dir, self.libs.root.traverse(f"v1/{info_hash}/test")
+            )
+            self.assert_dirents_like(
+                network.readdir(), [("d", "f"), ("d", "i")]
+            )
 
     def test_network_lookup(self):
         for info_hash in self.torrents:
             self.assert_is_dir(
-                self.libs.root.traverse(f"v1/{info_hash}/test/f"))
+                self.libs.root.traverse(f"v1/{info_hash}/test/f")
+            )
             self.assert_is_dir(
-                self.libs.root.traverse(f"v1/{info_hash}/test/i"))
+                self.libs.root.traverse(f"v1/{info_hash}/test/i")
+            )
 
     def test_by_path_single(self):
         by_path = cast(
-            fs.Dir,
-            self.libs.root.traverse(f"v1/{ltu.SINGLE.info_hash}/test/f"))
+            fs.Dir, self.libs.root.traverse(f"v1/{ltu.SINGLE.info_hash}/test/f")
+        )
 
         self.assert_dirents_like(by_path.readdir(), [("l", "test.txt")])
 
@@ -181,8 +195,8 @@ class TestLibraryService(unittest.TestCase):
 
     def test_by_index_single(self):
         by_index = cast(
-            fs.Dir,
-            self.libs.root.traverse(f"v1/{ltu.SINGLE.info_hash}/test/i"))
+            fs.Dir, self.libs.root.traverse(f"v1/{ltu.SINGLE.info_hash}/test/i")
+        )
 
         self.assert_dirents_like(by_index.readdir(), [("-", "0")])
 
@@ -191,15 +205,17 @@ class TestLibraryService(unittest.TestCase):
 
     def test_by_path_multi(self):
         by_path = cast(
-            fs.Dir, self.libs.root.traverse(f"v1/{ltu.MULTI.info_hash}/test/f"))
+            fs.Dir, self.libs.root.traverse(f"v1/{ltu.MULTI.info_hash}/test/f")
+        )
 
         self.assert_dirents_like(by_path.readdir(), [("d", "multi")])
 
         subdir = cast(fs.Dir, by_path.lookup("multi"))
         self.assert_is_dir(subdir)
 
-        self.assert_dirents_like(subdir.readdir(), [("l", "file.tar.gz"),
-                                                    ("l", "info.nfo")])
+        self.assert_dirents_like(
+            subdir.readdir(), [("l", "file.tar.gz"), ("l", "info.nfo")]
+        )
 
         link = cast(fs.Symlink, subdir.lookup("file.tar.gz"))
         self.assert_is_symlink(link)
@@ -211,7 +227,8 @@ class TestLibraryService(unittest.TestCase):
 
     def test_by_index_multi(self):
         by_index = cast(
-            fs.Dir, self.libs.root.traverse(f"v1/{ltu.MULTI.info_hash}/test/i"))
+            fs.Dir, self.libs.root.traverse(f"v1/{ltu.MULTI.info_hash}/test/i")
+        )
 
         self.assert_dirents_like(by_index.readdir(), [("-", "0"), ("-", "1")])
 
@@ -226,15 +243,16 @@ class TestLibraryService(unittest.TestCase):
         # that the by-index path still holds file references.
         by_index = cast(
             fs.Dir,
-            self.libs.root.traverse(f"v1/{ltu.CONFLICT_FILE.info_hash}/test/i"))
+            self.libs.root.traverse(f"v1/{ltu.CONFLICT_FILE.info_hash}/test/i"),
+        )
 
         self.assert_dirents_like(by_index.readdir(), [("-", "0"), ("-", "1")])
 
         for i in range(len(ltu.CONFLICT_FILE.files)):
             tfile = cast(library.TorrentFile, by_index.lookup(str(i)))
-            self.assert_torrent_file(tfile,
-                                     dummy=ltu.CONFLICT_FILE,
-                                     dummy_file=i)
+            self.assert_torrent_file(
+                tfile, dummy=ltu.CONFLICT_FILE, dummy_file=i
+            )
 
     def test_conflict_file_dir(self):
         # Don't test by-path directory, as its contents are undefined. Do test
@@ -242,15 +260,17 @@ class TestLibraryService(unittest.TestCase):
         by_index = cast(
             fs.Dir,
             self.libs.root.traverse(
-                f"v1/{ltu.CONFLICT_FILE_DIR.info_hash}/test/i"))
+                f"v1/{ltu.CONFLICT_FILE_DIR.info_hash}/test/i"
+            ),
+        )
 
         self.assert_dirents_like(by_index.readdir(), [("-", "0"), ("-", "1")])
 
         for i in range(len(ltu.CONFLICT_FILE_DIR.files)):
             tfile = cast(library.TorrentFile, by_index.lookup(str(i)))
-            self.assert_torrent_file(tfile,
-                                     dummy=ltu.CONFLICT_FILE_DIR,
-                                     dummy_file=i)
+            self.assert_torrent_file(
+                tfile, dummy=ltu.CONFLICT_FILE_DIR, dummy_file=i
+            )
 
     def test_conflict_dir_file(self):
         # Don't test by-path directory, as its contents are undefined. Do test
@@ -258,31 +278,36 @@ class TestLibraryService(unittest.TestCase):
         by_index = cast(
             fs.Dir,
             self.libs.root.traverse(
-                f"v1/{ltu.CONFLICT_DIR_FILE.info_hash}/test/i"))
+                f"v1/{ltu.CONFLICT_DIR_FILE.info_hash}/test/i"
+            ),
+        )
 
         self.assert_dirents_like(by_index.readdir(), [("-", "0"), ("-", "1")])
 
         for i in range(len(ltu.CONFLICT_DIR_FILE.files)):
             tfile = cast(library.TorrentFile, by_index.lookup(str(i)))
-            self.assert_torrent_file(tfile,
-                                     dummy=ltu.CONFLICT_DIR_FILE,
-                                     dummy_file=i)
+            self.assert_torrent_file(
+                tfile, dummy=ltu.CONFLICT_DIR_FILE, dummy_file=i
+            )
 
     def test_bad_paths(self):
         # All paths in BAD_PATHS are bad, so the by-path directory should be
         # empty.
         by_path = cast(
             fs.Dir,
-            self.libs.root.traverse(f"v1/{ltu.BAD_PATHS.info_hash}/test/f"))
+            self.libs.root.traverse(f"v1/{ltu.BAD_PATHS.info_hash}/test/f"),
+        )
         self.assert_dirents_like(by_path.readdir(), [])
 
         by_index = cast(
             fs.Dir,
-            self.libs.root.traverse(f"v1/{ltu.BAD_PATHS.info_hash}/test/i"))
+            self.libs.root.traverse(f"v1/{ltu.BAD_PATHS.info_hash}/test/i"),
+        )
 
         # Ensure we can still access files by index.
-        self.assert_dirents_like(by_index.readdir(), [("-", "0"), ("-", "1"),
-                                                      ("-", "2")])
+        self.assert_dirents_like(
+            by_index.readdir(), [("-", "0"), ("-", "1"), ("-", "2")]
+        )
 
         for i in range(len(ltu.BAD_PATHS.files)):
             tfile = cast(library.TorrentFile, by_index.lookup(str(i)))
@@ -291,13 +316,15 @@ class TestLibraryService(unittest.TestCase):
     def test_padded(self):
         by_path = cast(
             fs.Dir,
-            self.libs.root.traverse(f"v1/{ltu.PADDED.info_hash}/test/f/padded"))
-        self.assert_dirents_like(by_path.readdir(), [("l", "file.tar.gz"),
-                                                     ("l", "info.nfo")])
+            self.libs.root.traverse(f"v1/{ltu.PADDED.info_hash}/test/f/padded"),
+        )
+        self.assert_dirents_like(
+            by_path.readdir(), [("l", "file.tar.gz"), ("l", "info.nfo")]
+        )
 
         by_index = cast(
-            fs.Dir,
-            self.libs.root.traverse(f"v1/{ltu.PADDED.info_hash}/test/i"))
+            fs.Dir, self.libs.root.traverse(f"v1/{ltu.PADDED.info_hash}/test/i")
+        )
 
         # Ensure we can still access files by index.
         self.assert_dirents_like(by_index.readdir(), [("-", "0"), ("-", "2")])

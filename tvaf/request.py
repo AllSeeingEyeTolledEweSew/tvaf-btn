@@ -67,9 +67,15 @@ class TorrentRemovedError(CanceledError):
 
 
 class Request:
-
-    def __init__(self, *, info_hash: types.InfoHash, start: int, stop: int,
-                 mode: Mode, configure_atp: types.ConfigureATP):
+    def __init__(
+        self,
+        *,
+        info_hash: types.InfoHash,
+        start: int,
+        stop: int,
+        mode: Mode,
+        configure_atp: types.ConfigureATP,
+    ):
         self.info_hash = info_hash
         self.start = start
         self.stop = stop
@@ -91,10 +97,10 @@ class Request:
             raise ValueError("not a read request")
         with self._condition:
             if offset < self.start:
-                chunk = chunk[self.start - offset:]
+                chunk = chunk[self.start - offset :]
                 offset = self.start
             if offset + len(chunk) > self.stop:
-                chunk = chunk[:self.stop - offset]
+                chunk = chunk[: self.stop - offset]
             if not chunk:
                 return
             self._chunks[offset] = chunk
@@ -125,8 +131,12 @@ class Request:
 
 def _get_request_pieces(request: Request, ti: lt.torrent_info) -> Iterable[int]:
     return iter(
-        range(*util.range_to_pieces(ti.piece_length(), request.start,
-                                    request.stop)))
+        range(
+            *util.range_to_pieces(
+                ti.piece_length(), request.start, request.stop
+            )
+        )
+    )
 
 
 class _State:
@@ -139,13 +149,15 @@ class _State:
         # OrderedDict is to preserve FIFO order for satisfying requests. We use
         # a mapping like {id(obj): obj} to emulate an ordered set
         # NB: As of 3.8, OrderedDict is not subscriptable
-        self._requests = collections.OrderedDict() \
-                # type: collections.OrderedDict[int, Request]
+        self._requests = (
+            collections.OrderedDict()
+        )  # type: collections.OrderedDict[int, Request]
 
         self._piece_to_readers: Dict[int, Set[Request]] = {}
         # NB: As of 3.8, OrderedDict is not subscriptable
-        self._piece_queue = collections.OrderedDict() \
-                # type: collections.OrderedDict[int, int]
+        self._piece_queue = (
+            collections.OrderedDict()
+        )  # type: collections.OrderedDict[int, int]
 
         self._exception: Optional[Exception] = None
 
@@ -262,8 +274,9 @@ class _State:
             return
 
         if self._piece_queue:
-            self._handle.set_flags(lt.torrent_flags.auto_managed,
-                                   lt.torrent_flags.auto_managed)
+            self._handle.set_flags(
+                lt.torrent_flags.auto_managed, lt.torrent_flags.auto_managed
+            )
 
         priorities = [0] * self._ti.num_pieces()
 
@@ -294,8 +307,9 @@ class _State:
         except ltpy.InvalidTorrentHandleError:
             pass
 
-    def on_read_piece(self, piece: int, data: bytes,
-                      exception: Optional[Exception]):
+    def on_read_piece(
+        self, piece: int, data: bytes, exception: Optional[Exception]
+    ):
         readers = self._piece_to_readers.get(piece, ())
         if not readers:
             return
@@ -338,9 +352,13 @@ class _State:
 
 
 class _Cleanup:
-
-    def __init__(self, *, handle: lt.torrent_handle, session: lt.session,
-                 alert_driver: driver_lib.AlertDriver):
+    def __init__(
+        self,
+        *,
+        handle: lt.torrent_handle,
+        session: lt.session,
+        alert_driver: driver_lib.AlertDriver,
+    ):
         self._handle = handle
         self._session = session
         self._alert_driver = alert_driver
@@ -359,9 +377,11 @@ class _Cleanup:
         # We have no whole pieces, and none are downloading. Do a graceful
         # pause to drain outstanding block requests
         if status.flags & lt.torrent_flags.paused == 0:
-            iterator = self._alert_driver.iter_alerts(lt.alert_category.status,
-                                                      lt.torrent_paused_alert,
-                                                      lt.torrent_removed_alert)
+            iterator = self._alert_driver.iter_alerts(
+                lt.alert_category.status,
+                lt.torrent_paused_alert,
+                lt.torrent_removed_alert,
+            )
             with iterator:
                 # Does not block
                 self._handle.pause(flags=lt.torrent_handle.graceful_pause)
@@ -379,8 +399,9 @@ class _Cleanup:
 
         # Torrent has no data, no pieces prioritized, and all peers are drained.
         # Clear to delete
-        self._session.remove_torrent(self._handle,
-                                     option=lt.options_t.delete_files)
+        self._session.remove_torrent(
+            self._handle, option=lt.options_t.delete_files
+        )
 
     def cleanup(self):
         with ltpy.translate_exceptions():
@@ -388,14 +409,15 @@ class _Cleanup:
 
 
 class _TorrentTask(task_lib.Task):
-
-    def __init__(self,
-                 *,
-                 info_hash: types.InfoHash,
-                 alert_driver: driver_lib.AlertDriver,
-                 resume_service: resume_lib.ResumeService,
-                 session: lt.session,
-                 prev_task: task_lib.Task = None):
+    def __init__(
+        self,
+        *,
+        info_hash: types.InfoHash,
+        alert_driver: driver_lib.AlertDriver,
+        resume_service: resume_lib.ResumeService,
+        session: lt.session,
+        prev_task: task_lib.Task = None,
+    ):
         super().__init__(title=f"request handler for {info_hash}")
         self._info_hash = info_hash
         self._alert_driver = alert_driver
@@ -404,8 +426,9 @@ class _TorrentTask(task_lib.Task):
         self._prev_task = prev_task
 
         # TODO: fixup typing here
-        self._lock: threading.Condition = \
-                threading.Condition(threading.RLock())  # type: ignore
+        self._lock: threading.Condition = threading.Condition(
+            threading.RLock()
+        )  # type: ignore
         self._state = _State()
         self._iterator: Optional[driver_lib.Iterator] = None
 
@@ -461,8 +484,9 @@ class _TorrentTask(task_lib.Task):
             if exc is not None:
                 raise exc
         elif isinstance(alert, lt.metadata_received_alert):
-            self._resume_service.save(alert.handle,
-                                      flags=lt.torrent_handle.save_info_dict)
+            self._resume_service.save(
+                alert.handle, flags=lt.torrent_handle.save_info_dict
+            )
 
     def _handle_alerts_until_no_requests(self, handle: lt.torrent_handle):
         # pylint: disable=invalid-name
@@ -477,7 +501,8 @@ class _TorrentTask(task_lib.Task):
                 lt.save_resume_data_alert,
                 lt.torrent_error_alert,
                 lt.metadata_received_alert,
-                handle=handle)
+                handle=handle,
+            )
 
         with self._iterator:
             with self._lock:
@@ -485,7 +510,8 @@ class _TorrentTask(task_lib.Task):
                 self._state.set_handle(handle)
                 if self._state.get_ti() is None:
                     self._resume_service.save(
-                        handle, flags=lt.torrent_handle.save_info_dict)
+                        handle, flags=lt.torrent_handle.save_info_dict
+                    )
 
             for alert in self._iterator:
                 with self._lock:
@@ -513,8 +539,9 @@ class _TorrentTask(task_lib.Task):
             with self._lock:
 
                 def wakeup():
-                    return self._terminated.is_set(
-                    ) or self._state.has_requests()
+                    return (
+                        self._terminated.is_set() or self._state.has_requests()
+                    )
 
                 if not self._lock.wait_for(wakeup, timeout=60):
                     self.terminate()
@@ -522,9 +549,11 @@ class _TorrentTask(task_lib.Task):
         _LOG.debug("cleaning up")
         # We won't run cleanup if we get an exception. This is probably for the
         # best
-        cleanup = _Cleanup(handle=handle,
-                           session=self._session,
-                           alert_driver=self._alert_driver)
+        cleanup = _Cleanup(
+            handle=handle,
+            session=self._session,
+            alert_driver=self._alert_driver,
+        )
         cleanup.cleanup()
 
     def _run(self):
@@ -554,11 +583,12 @@ class _TorrentTask(task_lib.Task):
             except Exception as exc:
                 raise FetchError() from exc
 
-            atp.flags &= ~(lt.torrent_flags.paused |
-                           lt.torrent_flags.duplicate_is_error)
+            atp.flags &= ~(
+                lt.torrent_flags.paused | lt.torrent_flags.duplicate_is_error
+            )
             # TODO: how do we support this with magnet links?
             assert atp.ti is not None
-            #atp.file_priorities = [0] * atp.ti.num_files()
+            # atp.file_priorities = [0] * atp.ti.num_files()
             atp.piece_priorities = [0] * atp.ti.num_pieces()
 
             # If we fail, should we retry with a different request?
@@ -573,15 +603,16 @@ class _TorrentTask(task_lib.Task):
 
 
 class RequestService(task_lib.Task, config_lib.HasConfig):
-
-    def __init__(self,
-                 *,
-                 config: config_lib.Config,
-                 alert_driver: driver_lib.AlertDriver,
-                 resume_service: resume_lib.ResumeService,
-                 session: lt.session,
-                 config_dir: pathlib.Path,
-                 pedantic=False):
+    def __init__(
+        self,
+        *,
+        config: config_lib.Config,
+        alert_driver: driver_lib.AlertDriver,
+        resume_service: resume_lib.ResumeService,
+        session: lt.session,
+        config_dir: pathlib.Path,
+        pedantic=False,
+    ):
         super().__init__(title="RequestService", thread_name="request")
         self._alert_driver = alert_driver
         self._resume_service = resume_service
@@ -591,41 +622,53 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
 
         self._lock = threading.RLock()
         # As of 3.8, WeakValueDictionary is unsubscriptable
-        self._torrent_tasks = WeakValueDictionary() \
-                # type: WeakValueDictionary[types.InfoHash, _TorrentTask]
+        self._torrent_tasks = (
+            WeakValueDictionary()
+        )  # type: WeakValueDictionary[types.InfoHash, _TorrentTask]
 
         self._atp_settings: Mapping[str, Any] = {}
 
         self.set_config(config)
 
-    def add_request(self, *, info_hash: types.InfoHash, start: int, stop: int,
-                    mode: Mode, configure_atp: types.ConfigureATP) -> Request:
-
+    def add_request(
+        self,
+        *,
+        info_hash: types.InfoHash,
+        start: int,
+        stop: int,
+        mode: Mode,
+        configure_atp: types.ConfigureATP,
+    ) -> Request:
         def _configure_atp_with_settings(atp: lt.add_torrent_params) -> None:
             configure_atp(atp)
             self.configure_atp(atp)
 
-        request = Request(info_hash=info_hash,
-                          start=start,
-                          stop=stop,
-                          mode=mode,
-                          configure_atp=_configure_atp_with_settings)
+        request = Request(
+            info_hash=info_hash,
+            start=start,
+            stop=stop,
+            mode=mode,
+            configure_atp=_configure_atp_with_settings,
+        )
 
         with self._lock:
             if self._terminated.is_set():
                 request.set_exception(
-                    CanceledError("RequestService terminated"))
+                    CanceledError("RequestService terminated")
+                )
                 return request
 
             task = self._torrent_tasks.get(info_hash)
             while True:
                 if task is not None and task.add(request):
                     break
-                task = _TorrentTask(info_hash=info_hash,
-                                    alert_driver=self._alert_driver,
-                                    resume_service=self._resume_service,
-                                    session=self._session,
-                                    prev_task=task)
+                task = _TorrentTask(
+                    info_hash=info_hash,
+                    alert_driver=self._alert_driver,
+                    resume_service=self._resume_service,
+                    session=self._session,
+                    prev_task=task,
+                )
                 self._torrent_tasks[info_hash] = task
                 self._add_child(task, terminate_me_on_error=self._pedantic)
 
@@ -649,12 +692,14 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
     def stage_config(self, config: config_lib.Config) -> Iterator[None]:
         config.setdefault(
             "torrent_default_save_path",
-            str(self._config_dir.joinpath(DEFAULT_DOWNLOAD_DIR_NAME)))
+            str(self._config_dir.joinpath(DEFAULT_DOWNLOAD_DIR_NAME)),
+        )
 
         atp_settings: MutableMapping[str, Any] = {}
 
         save_path = pathlib.Path(
-            config.require_str("torrent_default_save_path"))
+            config.require_str("torrent_default_save_path")
+        )
         try:
             # Raises RuntimeError on symlink loops
             save_path = save_path.resolve()
@@ -684,7 +729,8 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
             mode = lt.storage_mode_t.names.get(full_name)
             if mode is None:
                 raise config_lib.InvalidConfigError(
-                    f"invalid storage mode {maybe_name}")
+                    f"invalid storage mode {maybe_name}"
+                )
             atp_settings["storage_mode"] = mode
 
         with self._lock:

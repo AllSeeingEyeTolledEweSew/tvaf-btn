@@ -15,13 +15,13 @@ class TestConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = pathlib.Path(tmpdir)
             path = config_dir.joinpath(config_lib.FILENAME)
-            path.write_text("{\"text_field\": \"value\", "
-                            "\"numeric_field\": 123}")
+            path.write_text('{"text_field": "value", ' '"numeric_field": 123}')
 
             config = config_lib.Config.from_config_dir(config_dir)
 
         self.assertEqual(
-            config, config_lib.Config(text_field="value", numeric_field=123))
+            config, config_lib.Config(text_field="value", numeric_field=123)
+        )
 
     def test_from_config_dir_invalid_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -42,10 +42,12 @@ class TestConfig(unittest.TestCase):
             config_text = path.read_text()
 
         self.assertEqual(
-            config_text, "{\n"
-            "    \"numeric_field\": 123,\n"
-            "    \"text_field\": \"value\"\n"
-            "}")
+            config_text,
+            "{\n"
+            '    "numeric_field": 123,\n'
+            '    "text_field": "value"\n'
+            "}",
+        )
 
     def test_get_int(self):
         config = config_lib.Config(key=123)
@@ -130,7 +132,6 @@ class TestConfig(unittest.TestCase):
 
 
 class Receiver:
-
     def __init__(self):
         self.config = config_lib.Config()
 
@@ -150,7 +151,6 @@ def _raise_dummy() -> None:
 
 
 class FailReceiver:
-
     def __init__(self):
         self.config = config_lib.Config()
 
@@ -162,7 +162,6 @@ class FailReceiver:
 
 
 class TestSetConfig(unittest.TestCase):
-
     def test_fail(self):
         config = config_lib.Config(new=True)
 
@@ -171,8 +170,9 @@ class TestSetConfig(unittest.TestCase):
 
         # fail_receiver should cause an exception to be raised
         with self.assertRaises(DummyException):
-            config_lib.set_config(config, good_receiver.stage_config,
-                                  fail_receiver.stage_config)
+            config_lib.set_config(
+                config, good_receiver.stage_config, fail_receiver.stage_config
+            )
 
         # fail_receiver should prevent good_receiver from updating
         self.assertEqual(good_receiver.config, config_lib.Config())
@@ -180,8 +180,9 @@ class TestSetConfig(unittest.TestCase):
         # Order should be independent
 
         with self.assertRaises(DummyException):
-            config_lib.set_config(config, fail_receiver.stage_config,
-                                  good_receiver.stage_config)
+            config_lib.set_config(
+                config, fail_receiver.stage_config, good_receiver.stage_config
+            )
 
         self.assertEqual(good_receiver.config, config_lib.Config())
 
@@ -191,8 +192,9 @@ class TestSetConfig(unittest.TestCase):
         receiver1 = Receiver()
         receiver2 = Receiver()
 
-        config_lib.set_config(config, receiver1.stage_config,
-                              receiver2.stage_config)
+        config_lib.set_config(
+            config, receiver1.stage_config, receiver2.stage_config
+        )
 
         self.assertEqual(receiver1.config, config)
         self.assertEqual(receiver2.config, config)

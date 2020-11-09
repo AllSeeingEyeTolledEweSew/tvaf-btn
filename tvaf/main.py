@@ -15,7 +15,6 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
 
 class Loader:
-
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
 
@@ -24,7 +23,6 @@ class Loader:
 
 
 class Runner:
-
     def __init__(self, app: app_lib.App) -> None:
         self.app = app
         self.done = False

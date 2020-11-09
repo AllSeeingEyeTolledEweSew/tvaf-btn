@@ -5,28 +5,35 @@
 
 def create_schema(conn: apsw.Connection) -> None:
     """Creates all tables and indexes in the database."""
-    conn.cursor().execute("create table if not exists torrent_meta ("
-                          "infohash text primary key collate nocase, "
-                          "generation int not null default 0, "
-                          "managed bool not null default 0, "
-                          "atime int not null default 0)")
+    conn.cursor().execute(
+        "create table if not exists torrent_meta ("
+        "infohash text primary key collate nocase, "
+        "generation int not null default 0, "
+        "managed bool not null default 0, "
+        "atime int not null default 0)"
+    )
 
-    conn.cursor().execute("create table if not exists acct ("
-                          "origin text not null, "
-                          "tracker text not null collate nocase, "
-                          "infohash text not null collate nocase, "
-                          "generation int not null, "
-                          "num_bytes int not null default 0, "
-                          "atime int not null default 0)")
-    conn.cursor().execute("create unique index if not exists "
-                          "acct_on_tracker_infohash_origin_generation "
-                          "on acct (tracker, infohash, origin, generation)")
+    conn.cursor().execute(
+        "create table if not exists acct ("
+        "origin text not null, "
+        "tracker text not null collate nocase, "
+        "infohash text not null collate nocase, "
+        "generation int not null, "
+        "num_bytes int not null default 0, "
+        "atime int not null default 0)"
+    )
+    conn.cursor().execute(
+        "create unique index if not exists "
+        "acct_on_tracker_infohash_origin_generation "
+        "on acct (tracker, infohash, origin, generation)"
+    )
 
 
 def get_meta(conn: apsw.Connection, infohash: str) -> Optional[TorrentMeta]:
     """Returns TorrentMeta for a given infohash, or None if not found."""
-    cur = conn.cursor().execute("select * from torrent_meta where infohash = ?",
-                                (infohash,))
+    cur = conn.cursor().execute(
+        "select * from torrent_meta where infohash = ?", (infohash,)
+    )
     row = cur.fetchone()
     if not row:
         return None
@@ -37,10 +44,12 @@ def get_meta(conn: apsw.Connection, infohash: str) -> Optional[TorrentMeta]:
     return meta
 
 
-def get_acct(conn: apsw.Connection,
-             *,
-             group_by: Iterable[str] = (),
-             **where: Union[str, int]) -> Iterable[Acct]:
+def get_acct(
+    conn: apsw.Connection,
+    *,
+    group_by: Iterable[str] = (),
+    **where: Union[str, int],
+) -> Iterable[Acct]:
     """Get aggregate Acct records.
 
     This function directly constructs a sql query using the arguments. For
@@ -60,7 +69,8 @@ def get_acct(conn: apsw.Connection,
         A list of audit records.
     """
     group_by = [
-        c for c in group_by
+        c
+        for c in group_by
         if c in ("origin", "tracker", "infohash", "generation")
     ]
     select = ["coalesce(sum(num_bytes), 0) as num_bytes", "max(atime) as atime"]

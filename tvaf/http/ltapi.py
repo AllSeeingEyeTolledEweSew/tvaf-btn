@@ -15,9 +15,11 @@ import tvaf.http.serialization as ser_lib
 
 from . import util as http_util
 
-_ALL_TORRENT_FIELDS = (ser_lib.TorrentStatusSerializer.FIELDS |
-                       ser_lib.TorrentHandleSerializer.FIELDS |
-                       ser_lib.TorrentInfoSerializer.FIELDS)
+_ALL_TORRENT_FIELDS = (
+    ser_lib.TorrentStatusSerializer.FIELDS
+    | ser_lib.TorrentHandleSerializer.FIELDS
+    | ser_lib.TorrentInfoSerializer.FIELDS
+)
 
 
 def get_torrent_fields() -> Optional[AbstractSet[str]]:
@@ -33,7 +35,6 @@ def get_torrent_fields() -> Optional[AbstractSet[str]]:
 
 
 class TorrentSerializer:
-
     def __init__(self, fields: AbstractSet[str] = None):
         self.handle_serializer: Optional[ser_lib.TorrentHandleSerializer] = None
         self.status_serializer: Optional[ser_lib.TorrentStatusSerializer] = None
@@ -47,17 +48,20 @@ class TorrentSerializer:
             handle_fields = fields & ser_lib.TorrentHandleSerializer.FIELDS
             if handle_fields:
                 self.handle_serializer = ser_lib.TorrentHandleSerializer(
-                    handle_fields)
+                    handle_fields
+                )
 
             status_fields = fields & ser_lib.TorrentStatusSerializer.FIELDS
             if status_fields:
                 self.status_serializer = ser_lib.TorrentStatusSerializer(
-                    status_fields)
+                    status_fields
+                )
 
             info_fields = fields & ser_lib.TorrentInfoSerializer.FIELDS
             if info_fields:
                 self.info_serializer = ser_lib.TorrentInfoSerializer(
-                    info_fields)
+                    info_fields
+                )
 
     def serialize(self, handle: lt.torrent_handle) -> Mapping[str, Any]:
         result: Dict[str, Any] = {}
@@ -77,7 +81,6 @@ class TorrentSerializer:
 
 
 class V1Blueprint(http_util.Blueprint):
-
     def __init__(self, session: lt.session):
         super().__init__("v1", __name__)
         self.session = session

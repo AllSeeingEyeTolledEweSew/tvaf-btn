@@ -13,7 +13,6 @@ from . import tdummy
 
 
 class TestV1Base(unittest.TestCase):
-
     def setUp(self) -> None:
         self.session = lib.create_isolated_session_service().session
         self.app = flask.Flask(__name__)
@@ -30,7 +29,6 @@ class TestV1Base(unittest.TestCase):
 
 
 class TestSingleTorrent(TestV1Base, lib.TestCase):
-
     def test_malformed_url(self) -> None:
         response = self.client.get("/torrents/wxyz")
         self.assertEqual(response.status_code, 404)
@@ -61,7 +59,8 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
         hashes = data.pop("hash_for_piece")
         self.assertEqual(
             hashes,
-            [hashlib.sha1(piece).hexdigest() for piece in torrent.pieces])
+            [hashlib.sha1(piece).hexdigest() for piece in torrent.pieces],
+        )
 
         info_hash = data.pop("info_hash")
         self.assertEqual(info_hash, dict(v1=torrent.info_hash))
@@ -106,17 +105,18 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
         atp = torrent.atp()
         atp.save_path = self.tempdir.name
         self.session.add_torrent(atp)
-        response = self.client.get("/torrents/%s?fields=pieces,info_hash" %
-                                   torrent.info_hash)
+        response = self.client.get(
+            "/torrents/%s?fields=pieces,info_hash" % torrent.info_hash
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json
 
         self.assertEqual(
-            data, dict(info_hash=dict(v1=torrent.info_hash), pieces="AAA="))
+            data, dict(info_hash=dict(v1=torrent.info_hash), pieces="AAA=")
+        )
 
 
 class TestTorrents(TestV1Base, lib.TestCase):
-
     def test_empty(self) -> None:
         response = self.client.get("/torrents")
         self.assertEqual(response.status_code, 200)
@@ -158,4 +158,5 @@ class TestTorrents(TestV1Base, lib.TestCase):
         data = response.json
 
         self.assertEqual(
-            data, [dict(info_hash=dict(v1=torrent.info_hash), pieces="AAA=")])
+            data, [dict(info_hash=dict(v1=torrent.info_hash), pieces="AAA=")]
+        )

@@ -22,8 +22,9 @@ def iter_bitmap(bitmap: bytes, start: int, stop: int) -> Iterator[bool]:
         yield bitmap_is_set(bitmap, i)
 
 
-def range_to_pieces(piece_length: int, start: int,
-                    stop: int) -> Tuple[int, int]:
+def range_to_pieces(
+    piece_length: int, start: int, stop: int
+) -> Tuple[int, int]:
     """Converts a range of bytes to a range of pieces.
 
     Pieces are assumed to be zero-aligned.
@@ -44,8 +45,9 @@ def range_to_pieces(piece_length: int, start: int,
     return (start // piece_length, (stop - 1) // piece_length + 1)
 
 
-def enum_piece_is_set(bitmap: bytes, piece_length: int, start: int,
-                      stop: int) -> Iterator[Tuple[int, bool]]:
+def enum_piece_is_set(
+    bitmap: bytes, piece_length: int, start: int, stop: int
+) -> Iterator[Tuple[int, bool]]:
     """Yields a (piece, is_set) tuple for each piece of a byte range.
 
     The given byte range (start, stop) is converted to a piece range. For every
@@ -64,8 +66,9 @@ def enum_piece_is_set(bitmap: bytes, piece_length: int, start: int,
         yield (piece, bitmap_is_set(bitmap, piece))
 
 
-def iter_piece_is_set(bitmap: bytes, piece_length: int, start: int,
-                      stop: int) -> Iterator[bool]:
+def iter_piece_is_set(
+    bitmap: bytes, piece_length: int, start: int, stop: int
+) -> Iterator[bool]:
     """Yields whether each piece overlapping a byte range is set.
 
     The given byte range (start, stop) is converted to a piece range. For every
@@ -86,8 +89,9 @@ def iter_piece_is_set(bitmap: bytes, piece_length: int, start: int,
         yield is_set
 
 
-def enum_piecewise_ranges(piece_length: int, start: int,
-                          stop: int) -> Iterator[Tuple[int, int, int]]:
+def enum_piecewise_ranges(
+    piece_length: int, start: int, stop: int
+) -> Iterator[Tuple[int, int, int]]:
     """Splits a byte range into smaller piece-aligned ranges.
 
     The given byte range (start, stop) is split into smaller sub-ranges, such

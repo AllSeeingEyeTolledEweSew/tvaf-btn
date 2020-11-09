@@ -28,11 +28,11 @@ Callback = Callable[["Task"], Any]
 
 
 class Task(abc.ABC):
-
     def __init__(self, *, title: str, thread_name: str = None, forever=True):
         self._title = title
-        self._thread = threading.Thread(name=thread_name,
-                                        target=self._run_wrapper)
+        self._thread = threading.Thread(
+            name=thread_name, target=self._run_wrapper
+        )
         self._lock = threading.RLock()
         self.__exception: Optional[Exception] = None
         self._terminated = threading.Event()
@@ -148,9 +148,9 @@ class Task(abc.ABC):
                 raise exception
 
 
-def terminate_task_on_future_fail(task: Task,
-                                  future: concurrent.futures.Future):
-
+def terminate_task_on_future_fail(
+    task: Task, future: concurrent.futures.Future
+):
     def check(_):
         exception = future.exception()
         if exception is not None:
@@ -160,7 +160,6 @@ def terminate_task_on_future_fail(task: Task,
 
 
 def log_future_exceptions(future: concurrent.futures.Future, msg: str, *args):
-
     def check(_):
         try:
             future.result()

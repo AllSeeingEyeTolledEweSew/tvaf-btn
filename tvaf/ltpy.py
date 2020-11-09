@@ -28,7 +28,6 @@ class LibtorrentErrorValue(enum.IntEnum):
 
 
 class Error(RuntimeError):
-
     def __new__(cls, ec: lt.error_code):
         use_cls = _CATEGORY_NAME_TO_SUBCLASS.get(ec.category().name(), cls)
         if use_cls is OSError:
@@ -70,8 +69,9 @@ class OSError(Error, builtins.OSError):
             # it as a "winerror", and will derive an "approximate translation"
             # value for errno, ignoring the 1st arg
             errno_ = builtins.OSError(0, "", None, ec.value()).errno
-        elif cat == GENERIC_CATEGORY or (os.name != "nt" and
-                                         cat == SYSTEM_CATEGORY):
+        elif cat == GENERIC_CATEGORY or (
+            os.name != "nt" and cat == SYSTEM_CATEGORY
+        ):
             errno_ = ec.value()
         else:
             # Always instantiate this class directly
@@ -185,7 +185,6 @@ class CanceledError(OSError):
 
 
 class LibtorrentError(Error):
-
     def __new__(cls, ec: lt.error_code):
         use_cls = cls
         if ec.category() == LIBTORRENT_CATEGORY:
@@ -239,13 +238,11 @@ _CATEGORY_NAME_TO_SUBCLASS = {
     BDECODE_CATEGORY.name(): BDecodeError,
 }
 
+_LTEV = LibtorrentErrorValue
 _LIBTORRENT_CODE_TO_SUBCLASS = {
-    LibtorrentErrorValue.DUPLICATE_TORRENT.value:
-        DuplicateTorrentError,
-    LibtorrentErrorValue.INVALID_TORRENT_HANDLE.value:
-        InvalidTorrentHandleError,
-    LibtorrentErrorValue.INVALID_SESSION_HANDLE.value:
-        InvalidSessionHandleError,
+    _LTEV.DUPLICATE_TORRENT.value: DuplicateTorrentError,
+    _LTEV.INVALID_TORRENT_HANDLE.value: InvalidTorrentHandleError,
+    _LTEV.INVALID_SESSION_HANDLE.value: InvalidSessionHandleError,
 }
 
 _ERRNO_TO_OSERROR = {
@@ -296,9 +293,16 @@ _error_code_msg_lookup: Dict[str, Dict[lt.error_category, int]] = {}
 def _init_error_code_msg_lookup():
     # There's no way to enumerate all error categories. Check all the ones we
     # know about.
-    for category in (GENERIC_CATEGORY, SYSTEM_CATEGORY, LIBTORRENT_CATEGORY,
-                     BDECODE_CATEGORY, HTTP_CATEGORY, I2P_CATEGORY,
-                     SOCKS_CATEGORY, UPNP_CATEGORY):
+    for category in (
+        GENERIC_CATEGORY,
+        SYSTEM_CATEGORY,
+        LIBTORRENT_CATEGORY,
+        BDECODE_CATEGORY,
+        HTTP_CATEGORY,
+        I2P_CATEGORY,
+        SOCKS_CATEGORY,
+        UPNP_CATEGORY,
+    ):
         # There's no way to enumerate all error codes covered by an
         # error_category. So our strategy is to get the message string for
         # error code #1, and keep incrementing the error code until the
@@ -308,8 +312,9 @@ def _init_error_code_msg_lookup():
         value = 1
         while True:
             msg = lt.error_code(value, category).message()
-            _error_code_msg_lookup.setdefault(msg,
-                                              {}).setdefault(category, value)
+            _error_code_msg_lookup.setdefault(msg, {}).setdefault(
+                category, value
+            )
             # At least http_category and upnp_category yield messages for
             # unknown error codes like "unknown code 123". We do map these
             # messages, but for stop condition testing we strip the decimal

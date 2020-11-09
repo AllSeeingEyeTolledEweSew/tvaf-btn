@@ -7,10 +7,10 @@ import math
 import pathlib
 import re
 import threading
-import warnings
 from typing import Callable
 from typing import Iterator
 from typing import Optional
+import warnings
 
 import libtorrent as lt
 

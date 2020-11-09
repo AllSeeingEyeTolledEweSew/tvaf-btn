@@ -4,8 +4,8 @@ from __future__ import annotations
 import io
 import pathlib
 import stat as stat_lib
-import unittest
 from typing import Dict
+import unittest
 
 from tvaf import fs
 

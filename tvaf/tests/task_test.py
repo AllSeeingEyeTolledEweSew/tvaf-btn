@@ -1,6 +1,6 @@
+from typing import Optional
 import unittest
 import unittest.mock
-from typing import Optional
 
 from tvaf import task as task_lib
 

@@ -6,12 +6,12 @@ import selectors
 import socket as socket_lib
 import socketserver
 import threading
-import wsgiref.simple_server
 from typing import Callable
+from typing import cast
 from typing import Iterator
 from typing import Optional
 from typing import Tuple
-from typing import cast
+import wsgiref.simple_server
 
 import flask
 import libtorrent as lt

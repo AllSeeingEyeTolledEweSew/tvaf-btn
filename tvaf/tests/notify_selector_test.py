@@ -1,8 +1,8 @@
 import selectors
 import threading
 import time
-import unittest
 from typing import Type
+import unittest
 
 from tvaf import notify_selector
 from tvaf import util

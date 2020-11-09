@@ -4,12 +4,12 @@ import abc
 import concurrent.futures
 import logging
 import threading
-import weakref
 from typing import Any
 from typing import Callable
 from typing import Collection
 from typing import List
 from typing import Optional
+import weakref
 
 _LOG = logging.getLogger(__name__)
 

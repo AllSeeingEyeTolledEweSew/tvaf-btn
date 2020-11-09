@@ -1,7 +1,7 @@
 import logging
-import warnings
 from typing import Optional
 from typing import Set
+import warnings
 
 import libtorrent as lt
 

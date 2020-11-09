@@ -3,10 +3,10 @@ import contextlib
 import gc
 import tempfile
 import threading
-import unittest
 from typing import List
 from typing import Optional
 from typing import Type
+import unittest
 
 import libtorrent as lt
 

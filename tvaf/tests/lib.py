@@ -11,16 +11,16 @@ import json
 import os
 import re
 import time
-import unittest
-import unittest.mock
 from typing import Any
 from typing import Generator
+import unittest
+import unittest.mock
 
 import apsw
 
-import tvaf.types
 from tvaf import config as config_lib
 from tvaf import session as session_lib
+import tvaf.types
 
 
 def create_isolated_config() -> config_lib.Config:

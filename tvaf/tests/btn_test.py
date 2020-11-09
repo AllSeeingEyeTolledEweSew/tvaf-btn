@@ -2,12 +2,12 @@
 
 import hashlib
 import stat as stat_lib
-import unittest
 from typing import Any
+import unittest
 
 import apsw
-import btn
 
+import btn
 import tvaf.btn as tvaf_btn
 import tvaf.fs as fs
 

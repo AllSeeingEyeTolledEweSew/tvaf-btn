@@ -10,8 +10,8 @@ from typing import Any
 from typing import Iterator
 
 import apsw
-import btn as btn_lib
 
+import btn as btn_lib
 from tvaf import fs
 from tvaf.config import Config
 from tvaf.exceptions import Error

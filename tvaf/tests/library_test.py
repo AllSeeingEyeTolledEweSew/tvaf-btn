@@ -1,11 +1,11 @@
 import io
 import stat as stat_lib
-import unittest
 from typing import Any
+from typing import cast
 from typing import Iterable
 from typing import Tuple
 from typing import Union
-from typing import cast
+import unittest
 
 import libtorrent as lt
 

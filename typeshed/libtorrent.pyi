@@ -6,10 +6,10 @@ from typing import Iterable
 from typing import Iterator
 from typing import List
 from typing import Optional
+from typing import overload
 from typing import Tuple
 from typing import TypedDict
 from typing import Union
-from typing import overload
 
 _ConvertsToString = Union[str, bytes]
 

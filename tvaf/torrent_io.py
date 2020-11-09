@@ -1,12 +1,12 @@
-import errno
 import array
+import errno
 import io
 import mmap
 import threading
+from typing import Any
 from typing import List
 from typing import Sequence
 from typing import Union
-from typing import Any
 
 from tvaf import ltpy
 from tvaf import request as request_lib

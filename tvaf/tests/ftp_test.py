@@ -1,7 +1,7 @@
 import ftplib
 import io
-import unittest
 from typing import Any
+import unittest
 
 from tvaf import auth
 from tvaf import ftp

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import unittest.mock
 from typing import List
 from typing import Optional
 from typing import SupportsFloat
+import unittest.mock
 
 
 class WaitForever(Exception):

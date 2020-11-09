@@ -1,8 +1,8 @@
 import contextlib
 import pathlib
 import tempfile
-import unittest
 from typing import Iterator
+import unittest
 
 from tvaf import config as config_lib
 

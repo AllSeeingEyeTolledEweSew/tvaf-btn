@@ -6,8 +6,8 @@ import logging
 import selectors
 import threading
 import time
-import weakref
 from typing import Any
+from typing import cast
 from typing import Collection
 from typing import Deque
 from typing import Dict
@@ -17,7 +17,7 @@ from typing import List
 from typing import Optional
 from typing import Set
 from typing import Type
-from typing import cast
+import weakref
 
 import libtorrent as lt
 

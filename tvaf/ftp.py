@@ -7,11 +7,11 @@ import os
 import socket as socket_lib
 import threading
 import time
+from typing import cast
 from typing import Iterator
 from typing import List
 from typing import Optional
 from typing import Tuple
-from typing import cast
 
 import pyftpdlib
 import pyftpdlib.authorizers
@@ -19,10 +19,10 @@ import pyftpdlib.filesystems
 import pyftpdlib.handlers
 import pyftpdlib.servers
 
-import tvaf.config as config_lib
 from tvaf import auth
 from tvaf import fs
 from tvaf import task as task_lib
+import tvaf.config as config_lib
 
 _LOG = logging.getLogger(__name__)
 

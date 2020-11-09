@@ -1,8 +1,8 @@
 import pathlib
 import tempfile
 import time
-import unittest
 from typing import List
+import unittest
 
 import libtorrent as lt
 

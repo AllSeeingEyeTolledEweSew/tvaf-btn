@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import contextlib
 import threading
+from typing import cast
 from typing import ContextManager
 from typing import Optional
-from typing import cast
 
 
 class Error(Exception):

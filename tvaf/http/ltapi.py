@@ -9,9 +9,9 @@ import flask
 import libtorrent as lt
 import werkzeug.exceptions
 
-import tvaf.http.serialization as ser_lib
 from tvaf import ltpy
 from tvaf import types
+import tvaf.http.serialization as ser_lib
 
 from . import util as http_util
 

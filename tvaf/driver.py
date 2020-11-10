@@ -45,7 +45,11 @@ def log_alert(
         prefix_args += [alert.message()]
     if error and error.value():
         prefix += " [%s (%s %d)]"
-        prefix_args += [error.message(), error.category().name(), error.value()]
+        prefix_args += [
+            error.message(),
+            error.category().name(),
+            error.value(),
+        ]
         if method is None:
             method = _LOG.error
     if method is None:
@@ -190,7 +194,8 @@ class _Index:
         # None, it indicates the type/handle is not filtered, and those
         # iterators should receive all alerts
         self.type_to_handle_to_entries: Dict[
-            Optional[_Type], Dict[Optional[lt.torrent_handle], Set[_IndexEntry]]
+            Optional[_Type],
+            Dict[Optional[lt.torrent_handle], Set[_IndexEntry]],
         ] = collections.defaultdict(lambda: collections.defaultdict(set))
 
     def add(

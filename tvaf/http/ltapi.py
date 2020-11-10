@@ -36,8 +36,12 @@ def get_torrent_fields() -> Optional[AbstractSet[str]]:
 
 class TorrentSerializer:
     def __init__(self, fields: AbstractSet[str] = None):
-        self.handle_serializer: Optional[ser_lib.TorrentHandleSerializer] = None
-        self.status_serializer: Optional[ser_lib.TorrentStatusSerializer] = None
+        self.handle_serializer: Optional[
+            ser_lib.TorrentHandleSerializer
+        ] = None
+        self.status_serializer: Optional[
+            ser_lib.TorrentStatusSerializer
+        ] = None
         self.info_serializer: Optional[ser_lib.TorrentInfoSerializer] = None
 
         if fields is None:

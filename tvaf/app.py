@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import io
 import logging
 import pathlib
@@ -24,9 +22,6 @@ _LOG = logging.getLogger(__name__)
 
 
 class App(task_lib.Task):
-
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self, config_dir: pathlib.Path):
         super().__init__(title="TVAF")
         self._config_dir = config_dir
@@ -70,7 +65,9 @@ class App(task_lib.Task):
             root=self._library_service.root,
             config=self._config,
         )
-        self._httpd = http_lib.HTTPD(config=self._config, session=self._session)
+        self._httpd = http_lib.HTTPD(
+            config=self._config, session=self._session
+        )
 
         self._lt4604_fixup = lt4604.Fixup(alert_driver=self._alert_driver)
 

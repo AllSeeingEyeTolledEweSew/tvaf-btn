@@ -2,7 +2,10 @@
 # accompanying UNLICENSE file.
 """Support code for other tests."""
 
-from __future__ import annotations
+# mypy currently chokes on importlib.resources; typeshed shadows the backported
+# module no matter what I do
+# mypy: ignore-errors
+
 
 import dataclasses
 import importlib.resources
@@ -92,6 +95,7 @@ class TestCase(unittest.TestCase):
 
     def get_data(self, suffix: str) -> str:
         """Returns golden reference data for this test."""
+        # typeshed overrides the backported module
         return importlib.resources.read_text(
             "tvaf.tests.data", f"{self.id()}.{suffix}"
         )

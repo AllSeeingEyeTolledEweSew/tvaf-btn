@@ -35,9 +35,6 @@ def _partialclass(cls, *args, **kwds):
 
 
 class _FS(pyftpdlib.filesystems.AbstractedFS):
-
-    # pylint: disable=too-many-public-methods
-
     def __init__(self, *args, root: fs.Dir, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.cur_dir = root
@@ -57,7 +54,7 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
         self,
         suffix="",
         prefix="",
-        dir=None,  # pylint: disable=redefined-builtin
+        dir=None,
         mode="wb",
     ) -> None:
         raise fs.mkoserror(errno.EROFS)
@@ -170,7 +167,6 @@ class _FS(pyftpdlib.filesystems.AbstractedFS):
 
 class _Authorizer(pyftpdlib.authorizers.DummyAuthorizer):
     def __init__(self, *, auth_service: auth.AuthService) -> None:
-        # pylint: disable=super-init-not-called
         self.auth_service = auth_service
 
     def add_user(
@@ -242,6 +238,17 @@ class _FTPHandler(pyftpdlib.handlers.FTPHandler):
         self.abstracted_fs = _partialclass(_FS, root=root)
 
 
+def _create_server(address: Tuple) -> socket_lib.socket:
+    sock = socket_lib.socket(socket_lib.AF_INET, socket_lib.SOCK_STREAM)
+    try:
+        sock.bind(address)
+        sock.listen()
+        return sock
+    except Exception:
+        sock.close()
+        raise
+
+
 class FTPD(task_lib.Task, config_lib.HasConfig):
     def __init__(
         self,
@@ -288,7 +295,7 @@ class FTPD(task_lib.Task, config_lib.HasConfig):
 
         with self._lock:
             if address != self._address and address is not None:
-                socket = socket_lib.create_server(address)
+                socket = _create_server(address)
 
             yield
 

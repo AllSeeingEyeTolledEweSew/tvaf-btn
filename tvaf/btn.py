@@ -1,6 +1,6 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
-# pylint: skip-file
+# flake8: noqa
 """BTN support for TVAF."""
 
 import errno
@@ -25,7 +25,9 @@ def fetch(config: Config, infohash: str) -> bytes:
     api = get_api(config)
     r = (
         api.db.cursor()
-        .execute("select id from torrent_entry where infohash = ?", (infohash,))
+        .execute(
+            "select id from torrent_entry where infohash = ?", (infohash,)
+        )
         .fetchone()
     )
     if not r:

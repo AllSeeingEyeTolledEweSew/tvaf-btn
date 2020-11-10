@@ -23,14 +23,15 @@ def get_placeholder_data(info_hash: str, start: int, stop: int) -> bytes:
 
 
 class TestLibraryService(unittest.TestCase):
-
-    # pylint: disable=too-many-public-methods
-
     def setUp(self):
-        def opener(info_hash: str, start: int, stop: int, _: Any) -> io.BytesIO:
+        def opener(
+            info_hash: str, start: int, stop: int, _: Any
+        ) -> io.BytesIO:
             return io.BytesIO(get_placeholder_data(info_hash, start, stop))
 
-        self.torrents = {torrent.info_hash: torrent for torrent in ltu.TORRENTS}
+        self.torrents = {
+            torrent.info_hash: torrent for torrent in ltu.TORRENTS
+        }
         self.libraries = library.Libraries()
         ltu.add_test_libraries(self.libraries)
         self.libs = library.LibraryService(
@@ -184,7 +185,8 @@ class TestLibraryService(unittest.TestCase):
 
     def test_by_path_single(self):
         by_path = cast(
-            fs.Dir, self.libs.root.traverse(f"v1/{ltu.SINGLE.info_hash}/test/f")
+            fs.Dir,
+            self.libs.root.traverse(f"v1/{ltu.SINGLE.info_hash}/test/f"),
         )
 
         self.assert_dirents_like(by_path.readdir(), [("l", "test.txt")])
@@ -195,7 +197,8 @@ class TestLibraryService(unittest.TestCase):
 
     def test_by_index_single(self):
         by_index = cast(
-            fs.Dir, self.libs.root.traverse(f"v1/{ltu.SINGLE.info_hash}/test/i")
+            fs.Dir,
+            self.libs.root.traverse(f"v1/{ltu.SINGLE.info_hash}/test/i"),
         )
 
         self.assert_dirents_like(by_index.readdir(), [("-", "0")])
@@ -243,7 +246,9 @@ class TestLibraryService(unittest.TestCase):
         # that the by-index path still holds file references.
         by_index = cast(
             fs.Dir,
-            self.libs.root.traverse(f"v1/{ltu.CONFLICT_FILE.info_hash}/test/i"),
+            self.libs.root.traverse(
+                f"v1/{ltu.CONFLICT_FILE.info_hash}/test/i"
+            ),
         )
 
         self.assert_dirents_like(by_index.readdir(), [("-", "0"), ("-", "1")])
@@ -316,14 +321,17 @@ class TestLibraryService(unittest.TestCase):
     def test_padded(self):
         by_path = cast(
             fs.Dir,
-            self.libs.root.traverse(f"v1/{ltu.PADDED.info_hash}/test/f/padded"),
+            self.libs.root.traverse(
+                f"v1/{ltu.PADDED.info_hash}/test/f/padded"
+            ),
         )
         self.assert_dirents_like(
             by_path.readdir(), [("l", "file.tar.gz"), ("l", "info.nfo")]
         )
 
         by_index = cast(
-            fs.Dir, self.libs.root.traverse(f"v1/{ltu.PADDED.info_hash}/test/i")
+            fs.Dir,
+            self.libs.root.traverse(f"v1/{ltu.PADDED.info_hash}/test/i"),
         )
 
         # Ensure we can still access files by index.

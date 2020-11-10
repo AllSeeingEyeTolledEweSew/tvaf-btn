@@ -91,7 +91,9 @@ class _TorrentTask(task_lib.Task):
         handle: lt.torrent_handle,
         pedantic=False,
     ):
-        super().__init__(title=f"lt4604 fixup monitor for {handle.info_hash()}")
+        super().__init__(
+            title=f"lt4604 fixup monitor for {handle.info_hash()}"
+        )
         self._pedantic = pedantic
         self._iterator = alert_driver.iter_alerts(
             lt.alert_category.status,
@@ -123,7 +125,9 @@ class _TorrentTask(task_lib.Task):
 
 
 class Fixup(task_lib.Task):
-    def __init__(self, *, alert_driver: driver_lib.AlertDriver, pedantic=False):
+    def __init__(
+        self, *, alert_driver: driver_lib.AlertDriver, pedantic=False
+    ):
         super().__init__(
             title="lt4604 fixup session monitor", thread_name="lt4604.fixup"
         )

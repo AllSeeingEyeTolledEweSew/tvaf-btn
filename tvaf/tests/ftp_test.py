@@ -158,13 +158,15 @@ class TestReadOnly(BaseFTPTest):
     def test_STOR_overwrite(self):
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.storbinary(
-                f"STOR /v1/{ltu.SINGLE.info_hash}/test/i/0", io.BytesIO(b"data")
+                f"STOR /v1/{ltu.SINGLE.info_hash}/test/i/0",
+                io.BytesIO(b"data"),
             )
 
     def test_APPE(self):
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.storbinary(
-                f"APPE /v1/{ltu.SINGLE.info_hash}/test/i/0", io.BytesIO(b"data")
+                f"APPE /v1/{ltu.SINGLE.info_hash}/test/i/0",
+                io.BytesIO(b"data"),
             )
 
     def test_DELE(self):

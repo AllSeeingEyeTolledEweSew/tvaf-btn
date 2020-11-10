@@ -70,7 +70,13 @@ class File:
 class Torrent:
     @classmethod
     def single_file(
-        cls, *, piece_length=16384, length=None, name=None, attr=None, data=None
+        cls,
+        *,
+        piece_length=16384,
+        length=None,
+        name=None,
+        attr=None,
+        data=None
     ):
         return cls(
             piece_length=piece_length,
@@ -151,7 +157,9 @@ class Torrent:
     @property
     def info_hash_bytes(self):
         if self._info_hash_bytes is None:
-            self._info_hash_bytes = hashlib.sha1(lt.bencode(self.info)).digest()
+            self._info_hash_bytes = hashlib.sha1(
+                lt.bencode(self.info)
+            ).digest()
         return self._info_hash_bytes
 
     @property

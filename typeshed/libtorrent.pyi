@@ -8,8 +8,9 @@ from typing import List
 from typing import Optional
 from typing import overload
 from typing import Tuple
-from typing import TypedDict
+import sys
 from typing import Union
+import typing
 
 _ConvertsToString = Union[str, bytes]
 
@@ -175,10 +176,13 @@ class sha1_hash:
 
 peer_id = sha1_hash
 
-class _WebSeed(TypedDict):
-    type: int
-    url: str
-    auth: str
+if sys.version_info >= (3, 8):
+    class _WebSeed(typing.TypedDict):
+        type: int
+        url: str
+        auth: str
+else:
+    _WebSeed = Dict[str, Any]
 
 _Entry = Union[bytes, Dict[bytes, Any], List, int]
 
@@ -316,44 +320,60 @@ class peer_info:
     bw_network: int
     bw_disk: int
 
-class _BlockInfo(TypedDict):
-    state: int
-    num_peers: int
-    bytes_progress: int
-    block_size: int
-    peer: Tuple[str, int]
+if sys.version_info >= (3, 8):
+    class _BlockInfo(typing.TypedDict):
+        state: int
+        num_peers: int
+        bytes_progress: int
+        block_size: int
+        peer: Tuple[str, int]
+else:
+    _BlockInfo = Dict[str, Any]
 
-class _PartialPieceInfo(TypedDict):
-    piece_index: int
-    blocks_in_piece: int
-    blocks: List[_BlockInfo]
+if sys.version_info >= (3, 8):
+    class _PartialPieceInfo(typing.TypedDict):
+        piece_index: int
+        blocks_in_piece: int
+        blocks: List[_BlockInfo]
+else:
+    _PartialPieceInfo = Dict[str, Any]
 
-class _ErrorCode(TypedDict):
-    value: int
-    category: str
 
-class _TrackerEndpoint(TypedDict):
-    message: str
-    local_address: Tuple[str, int]
-    last_error: _ErrorCode
-    next_announce: int
-    min_announce: int
-    scrape_incomplete: int
-    scrape_complete: int
-    scrape_downloaded: int
-    fails: int
-    updating: bool
-    start_sent: bool
-    complete_sent: bool
+if sys.version_info >= (3, 8):
+    class _ErrorCode(typing.TypedDict):
+        value: int
+        category: str
+else:
+    _ErrorCode = Dict[str, Any]
 
-class _Tracker(TypedDict):
-    url: str
-    trackerid: str
-    tier: int
-    fail_limit: int
-    source: int
-    verified: bool
-    endpoints: List[_TrackerEndpoint]
+if sys.version_info >= (3, 8):
+    class _TrackerEndpoint(typing.TypedDict):
+        message: str
+        local_address: Tuple[str, int]
+        last_error: _ErrorCode
+        next_announce: int
+        min_announce: int
+        scrape_incomplete: int
+        scrape_complete: int
+        scrape_downloaded: int
+        fails: int
+        updating: bool
+        start_sent: bool
+        complete_sent: bool
+else:
+    _TrackerEndpoint = Dict[str, Any]
+
+if sys.version_info >= (3, 8):
+    class _Tracker(typing.TypedDict):
+        url: str
+        trackerid: str
+        tier: int
+        fail_limit: int
+        source: int
+        verified: bool
+        endpoints: List[_TrackerEndpoint]
+else:
+    _Tracker = Dict[str, Any]
 
 class move_flags_t(int):
     name: str
@@ -442,7 +462,11 @@ class torrent_handle:
     def force_recheck(self) -> None: ...
     def rename_file(self, index: int, path: str) -> None: ...
     def set_ssl_certificate(
-        self, cert: str, private_key: str, dh_params: str, passphrase: str = ...
+        self,
+        cert: str,
+        private_key: str,
+        dh_params: str,
+        passphrase: str = ...,
     ) -> None: ...
     def flags(self) -> int: ...
     @overload
@@ -660,11 +684,14 @@ class torrent_flags:
     disable_pex: int
     default_flags: int
 
-class _CachedPieceInfo(TypedDict):
-    piece: int
-    last_use: float
-    next_to_hash: int
-    kind: int
+if sys.version_info >= (3, 8):
+    class _CachedPieceInfo(typing.TypedDict):
+        piece: int
+        last_use: float
+        next_to_hash: int
+        kind: int
+else:
+    _CachedPieceInfo = Dict[str, Any]
 
 class cache_status:
     pieces: List[_CachedPieceInfo]
@@ -1115,19 +1142,25 @@ class picker_log_alert(peer_alert):
 class lsd_error_alert(alert):
     error: error_code
 
-class _DHTActiveRequest(TypedDict):
-    type: str
-    outstanding_requests: int
-    timeouts: int
-    responses: int
-    branch_factor: int
-    nodes_left: int
-    last_sent: int
-    first_timeout: int
+if sys.version_info >= (3, 8):
+    class _DHTActiveRequest(typing.TypedDict):
+        type: str
+        outstanding_requests: int
+        timeouts: int
+        responses: int
+        branch_factor: int
+        nodes_left: int
+        last_sent: int
+        first_timeout: int
+else:
+    _DHTActiveRequest = Dict[str, Any]
 
-class _DHTRoutingBucket(TypedDict):
-    num_nodes: int
-    num_replacements: int
+if sys.version_info >= (3, 8):
+    class _DHTRoutingBucket(typing.TypedDict):
+        num_nodes: int
+        num_replacements: int
+else:
+    _DHTRoutingBucket = Dict[str, Any]
 
 class dht_stats_alert(alert):
     active_requests: List[_DHTActiveRequest]
@@ -1140,21 +1173,27 @@ class dht_log_alert(alert):
 class dht_pkt_alert(alert):
     pkt_buf: bytes
 
-class _DHTImmutableItem(TypedDict):
-    key: sha1_hash
-    value: bytes
+if sys.version_info >= (3, 8):
+    class _DHTImmutableItem(typing.TypedDict):
+        key: sha1_hash
+        value: bytes
+else:
+    _DHTImmutableItem = Dict[str, Any]
 
 class dht_immutable_item_alert(alert):
     target: sha1_hash
     item: _DHTImmutableItem
 
-class _DHTMutableItem(TypedDict):
-    key: bytes
-    value: bytes
-    signature: bytes
-    seq: int
-    salt: bytes
-    authoritative: bool
+if sys.version_info >= (3, 8):
+    class _DHTMutableItem(typing.TypedDict):
+        key: bytes
+        value: bytes
+        signature: bytes
+        seq: int
+        salt: bytes
+        authoritative: bool
+else:
+    _DHTMutableItem = Dict[str, Any]
 
 class dht_mutable_item_alert(alert):
     key: bytes
@@ -1210,12 +1249,15 @@ class dht_sample_infohashes_alert(alert):
 
 class dht_bootstrap_alert(alert): ...
 
-class _UTPStats(TypedDict):
-    num_idle: int
-    num_syn_sent: int
-    num_connected: int
-    num_fin_sent: int
-    num_close_wait: int
+if sys.version_info >= (3, 8):
+    class _UTPStats(typing.TypedDict):
+        num_idle: int
+        num_syn_sent: int
+        num_connected: int
+        num_fin_sent: int
+        num_close_wait: int
+else:
+    _UTPStats = Dict[str, Any]
 
 class session_status:
     has_incoming_connections: bool
@@ -1263,14 +1305,17 @@ class dht_lookup:
     response: int
     branch_factor: int
 
-class _PeerClassInfo(TypedDict):
-    ignore_unchoke_slots: bool
-    connection_limit_factor: int
-    label: str
-    upload_limit: int
-    download_limit: int
-    upload_priority: int
-    download_priority: int
+if sys.version_info >= (3, 8):
+    class _PeerClassInfo(typing.TypedDict):
+        ignore_unchoke_slots: bool
+        connection_limit_factor: int
+        label: str
+        upload_limit: int
+        download_limit: int
+        upload_priority: int
+        download_priority: int
+else:
+    _PeerClassInfo = Dict[str, Any]
 
 class dht_settings:
     def __init__(self) -> None: ...
@@ -1367,7 +1412,9 @@ class session:
     def delete_port_mapping(self, handle: int) -> None: ...
     def reopen_network_sockets(self, options: int = ...) -> None: ...
     def set_peer_class_filter(self, f: ip_filter) -> None: ...
-    def set_peer_class_type_filter(self, f: peer_class_type_filter) -> None: ...
+    def set_peer_class_type_filter(
+        self, f: peer_class_type_filter
+    ) -> None: ...
     def create_peer_class(self, name: str) -> int: ...
     def delete_peer_class(self, cid: int) -> None: ...
     def get_peer_class(self, cid: int) -> _PeerClassInfo: ...

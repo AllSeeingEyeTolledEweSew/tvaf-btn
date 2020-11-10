@@ -89,7 +89,9 @@ class BufferedTorrentIO(io.BufferedIOBase):
         # This copies twice. Is there a better way?
         return b"".join(v.tobytes() for v in self.readvec1(size))
 
-    def _readvec_unlocked(self, size: int, read1: bool) -> Sequence[memoryview]:
+    def _readvec_unlocked(
+        self, size: int, read1: bool
+    ) -> Sequence[memoryview]:
         # Readahead notes:
         #  - mediainfo http://...mkv
         #    - requests whole file, drops connection when probe is done
@@ -142,7 +144,7 @@ class BufferedTorrentIO(io.BufferedIOBase):
                 # TODO: timeouts
                 next_chunk = request.read()
                 assert next_chunk is not None
-            except OSError:  # pylint: disable=try-except-raise
+            except OSError:
                 # Do this here because ltpy.Error has some subtypes that also
                 # inherit OSError.
                 raise

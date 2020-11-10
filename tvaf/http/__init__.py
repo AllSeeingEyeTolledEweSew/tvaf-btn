@@ -27,7 +27,9 @@ _LOG = logging.getLogger(__name__)
 
 
 class _ThreadingWSGIServer(
-    wsgiref.simple_server.WSGIServer, http.server.ThreadingHTTPServer
+    wsgiref.simple_server.WSGIServer,
+    socketserver.ThreadingMixIn,
+    http.server.HTTPServer,
 ):
 
     daemon_threads = False

@@ -18,7 +18,9 @@ class NotifySelector(selectors.DefaultSelector):
     def __init__(self):
         super().__init__()
         self.notify_rfile, self.notify_wfile = util.selectable_pipe()
-        super().register(self.notify_rfile, selectors.EVENT_READ, data=SENTINEL)
+        super().register(
+            self.notify_rfile, selectors.EVENT_READ, data=SENTINEL
+        )
 
     def notify(self) -> None:
         self.notify_wfile.write(b"\0")

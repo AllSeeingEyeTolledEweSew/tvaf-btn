@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import concurrent.futures
 import contextlib
 import logging
@@ -145,7 +143,7 @@ class _ReceiverTask(task_lib.Task):
         self,
         *,
         counter: _Counter,
-        resume_service: ResumeService,
+        resume_service: "ResumeService",
         alert_driver: driver_lib.AlertDriver,
         session: lt.session,
         pedantic=False
@@ -158,7 +156,9 @@ class _ReceiverTask(task_lib.Task):
         self._session = session
         # Single thread so we synchronize writes/deletes for the same infohash
         # TODO: do something with more throughput
-        self._io_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self._io_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=1
+        )
         self._check_executor = concurrent.futures.ThreadPoolExecutor()
         # We handle metadata_received_alert so we're sure to get it at shutdown
         self._iterator = alert_driver.iter_alerts(
@@ -303,7 +303,7 @@ class _TriggerTask(task_lib.Task):
     def __init__(
         self,
         *,
-        resume_service: ResumeService,
+        resume_service: "ResumeService",
         alert_driver: driver_lib.AlertDriver
     ):
         super().__init__(
@@ -331,7 +331,7 @@ class _TriggerTask(task_lib.Task):
 
 
 class _PeriodicTask(task_lib.Task):
-    def __init__(self, resume_service: ResumeService):
+    def __init__(self, resume_service: "ResumeService"):
         super().__init__(
             title="fastresume periodic save", thread_name="fastresume.periodic"
         )

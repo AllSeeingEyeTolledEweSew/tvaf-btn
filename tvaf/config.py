@@ -1,6 +1,5 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
-from __future__ import annotations
 
 import abc
 import contextlib
@@ -9,6 +8,7 @@ import pathlib
 from typing import Any
 from typing import Callable
 from typing import ContextManager
+from typing import Iterator
 from typing import MutableMapping
 from typing import Optional
 from typing import Type
@@ -60,7 +60,7 @@ _T = TypeVar("_T")
 
 class Config(dict, MutableMapping[str, Any]):
     @classmethod
-    def from_config_dir(cls: Type[_C], config_dir: pathlib.Path) -> _C:
+    def from_config_dir(cls: Type["_C"], config_dir: pathlib.Path) -> "_C":
         with config_dir.joinpath(FILENAME).open() as fp:
             try:
                 data = json.load(fp)
@@ -108,8 +108,9 @@ _C = TypeVar("_C", bound=Config)
 
 class HasConfig(abc.ABC):
     @abc.abstractmethod
-    def stage_config(self, config: Config) -> ContextManager[None]:
-        return contextlib.nullcontext()
+    @contextlib.contextmanager
+    def stage_config(self, config: Config) -> Iterator[None]:
+        yield
 
     def set_config(self, config: Config) -> None:
         with self.stage_config(config):

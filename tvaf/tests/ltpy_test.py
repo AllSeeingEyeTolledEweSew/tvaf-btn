@@ -55,7 +55,9 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
         self.assertIsInstance(
             func(errno.ECONNREFUSED), ltpy.ConnectionRefusedError
         )
-        self.assertIsInstance(func(errno.ECONNRESET), ltpy.ConnectionResetError)
+        self.assertIsInstance(
+            func(errno.ECONNRESET), ltpy.ConnectionResetError
+        )
         self.assertIsInstance(func(errno.EEXIST), ltpy.FileExistsError)
         self.assertIsInstance(func(errno.ENOENT), ltpy.FileNotFoundError)
         self.assertIsInstance(func(errno.EINTR), ltpy.InterruptedError)
@@ -145,7 +147,9 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
         self.assertIsInstance(
             func(errno.ECONNREFUSED), ltpy.ConnectionRefusedError
         )
-        self.assertIsInstance(func(errno.ECONNRESET), ltpy.ConnectionResetError)
+        self.assertIsInstance(
+            func(errno.ECONNRESET), ltpy.ConnectionResetError
+        )
         self.assertIsInstance(func(errno.EEXIST), ltpy.FileExistsError)
         self.assertIsInstance(func(errno.ENOENT), ltpy.FileNotFoundError)
         self.assertIsInstance(func(errno.EINTR), ltpy.InterruptedError)
@@ -177,11 +181,6 @@ class TestExceptionSubtypeInstantiation(unittest.TestCase):
 
         # Try invalid WinError
         self.assertIsInstance(func(-1), ltpy.OSError)
-
-        # pylint doesn't have a nice way to deal with Windows-specific errno
-        # values. We have to disable this check entirely.
-
-        # pylint: disable=no-member
 
         # This is a combination of pep3151 and cpython's errmap.h.
         self.assertIsInstance(func(errno.WSAEALREADY), ltpy.BlockingIOError)
@@ -262,7 +261,9 @@ class TestExceptionFromErrorCode(unittest.TestCase):
         self.assertIsInstance(
             func(errno.ECONNREFUSED), ltpy.ConnectionRefusedError
         )
-        self.assertIsInstance(func(errno.ECONNRESET), ltpy.ConnectionResetError)
+        self.assertIsInstance(
+            func(errno.ECONNRESET), ltpy.ConnectionResetError
+        )
         self.assertIsInstance(func(errno.EEXIST), ltpy.FileExistsError)
         self.assertIsInstance(func(errno.ENOENT), ltpy.FileNotFoundError)
         self.assertIsInstance(func(errno.EINTR), ltpy.InterruptedError)

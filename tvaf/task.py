@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import abc
 import concurrent.futures
 import logging
@@ -42,7 +40,9 @@ class Task(abc.ABC):
         # NB: As of 3.8, weakref.WeakSet is not subscriptable
         self.__children = weakref.WeakSet()  # type: weakref.WeakSet[Task]
 
-    def _add_child(self, child: Task, start=True, terminate_me_on_error=True):
+    def _add_child(
+        self, child: "Task", start=True, terminate_me_on_error=True
+    ):
         with self._lock:
             self.__children.add(child)
         if terminate_me_on_error:
@@ -56,7 +56,7 @@ class Task(abc.ABC):
         if start:
             child.start()
 
-    def _get_children(self) -> Collection[Task]:
+    def _get_children(self) -> Collection["Task"]:
         with self._lock:
             return list(self.__children)
 

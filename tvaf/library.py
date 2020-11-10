@@ -9,7 +9,6 @@ default: given torrent info_hash, and seeder counts, redirects to concrete
 accessors
 cross-tracker: given file hash, downloads from multiple concrete trackers
 """
-from __future__ import annotations
 
 import abc
 import collections
@@ -83,10 +82,10 @@ def _is_valid_path(path: List[str]) -> bool:
 class _V1TorrentInNetwork(fs.StaticDir):
     def __init__(
         self,
-        libs: LibraryService,
+        libs: "LibraryService",
         info_hash: types.InfoHash,
         info: protocol.Info,
-        network: Network,
+        network: "Network",
     ) -> None:
         super().__init__()
 
@@ -100,10 +99,10 @@ class _V1TorrentInNetwork(fs.StaticDir):
 
     def _add_torrent_file(
         self,
-        libs: LibraryService,
+        libs: "LibraryService",
         info_hash: types.InfoHash,
         spec: protocol.FileSpec,
-        network: Network,
+        network: "Network",
     ):
         if spec.is_pad:
             return
@@ -144,7 +143,7 @@ class _V1TorrentInNetwork(fs.StaticDir):
 class _V1Torrent(fs.Dir):
     def __init__(
         self,
-        libs: LibraryService,
+        libs: "LibraryService",
         info_hash: types.InfoHash,
         info: protocol.Info,
     ):
@@ -173,7 +172,7 @@ class _V1Torrent(fs.Dir):
 
 
 class _V1(fs.Dir):
-    def __init__(self, libs: LibraryService):
+    def __init__(self, libs: "LibraryService"):
         super().__init__(perms=0o444)
         self.libs = libs
 
@@ -192,7 +191,7 @@ class _V1(fs.Dir):
 
 
 class _Browse(fs.DictDir):
-    def __init__(self, libs: LibraryService):
+    def __init__(self, libs: "LibraryService"):
         super().__init__()
         self.libs = libs
 
@@ -201,7 +200,7 @@ class _Browse(fs.DictDir):
 
 
 class _Root(fs.StaticDir):
-    def __init__(self, libs: LibraryService):
+    def __init__(self, libs: "LibraryService"):
         super().__init__()
         self.mkchild("v1", _V1(libs))
         self.mkchild("browse", _Browse(libs))

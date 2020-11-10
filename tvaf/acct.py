@@ -1,6 +1,6 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
-# pylint: skip-file
+# flake8: noqa
 
 
 def create_schema(conn: apsw.Connection) -> None:
@@ -73,7 +73,10 @@ def get_acct(
         for c in group_by
         if c in ("origin", "tracker", "infohash", "generation")
     ]
-    select = ["coalesce(sum(num_bytes), 0) as num_bytes", "max(atime) as atime"]
+    select = [
+        "coalesce(sum(num_bytes), 0) as num_bytes",
+        "max(atime) as atime",
+    ]
     select.extend(group_by)
     where_parts = []
     bindings = {}

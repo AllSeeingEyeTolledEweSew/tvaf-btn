@@ -7,7 +7,6 @@ Paths and filenames are currently always specified as unicode str objects, as
 passed through the "surrogateescape" filter. Bytes objects aren't used.
 """
 
-from __future__ import annotations
 
 import abc
 import dataclasses
@@ -62,7 +61,7 @@ class Stat:
             else:
                 self.perms = 0o444
 
-    def os(self) -> os.stat_result:  # pylint: disable=invalid-name
+    def os(self) -> os.stat_result:
         st_mode = stat_lib.S_IFMT(self.filetype) | stat_lib.S_IMODE(self.perms)
         st_ino = 0
         st_dev = 0
@@ -125,7 +124,7 @@ class Node:
     def __init__(
         self,
         *,
-        parent: Dir = None,
+        parent: "Dir" = None,
         name: str = None,
         filetype: int = None,
         perms: int = None,
@@ -169,10 +168,9 @@ class Node:
 
 
 def _partial_traverse(
-    cur_dir: Dir, path: Path, follow_symlinks=True
+    cur_dir: "Dir", path: Path, follow_symlinks=True
 ) -> Tuple[Node, Path, Optional[OSError]]:
     # TODO: refactor this into some classes, if we keep fs past v1.0.
-    # pylint: disable=too-many-branches
 
     seen_symlink: Dict[Symlink, Optional[Node]] = {}
 
@@ -188,7 +186,8 @@ def _partial_traverse(
         for i, part in enumerate(path.parts):
             # If we fail before lookup, our remainder includes the current part
             # we failed to lookup.
-            rest = lambda: Path().joinpath(*path.parts[i:])
+            def rest() -> Path:
+                return Path().joinpath(*path.parts[i:])
 
             if not node.is_dir():
                 return node, rest(), mkoserror(errno.ENOTDIR)
@@ -205,7 +204,8 @@ def _partial_traverse(
 
             # We looked up the next node. From here on, our remainder is
             # whatever we would lookup after this.
-            rest = lambda: Path().joinpath(*path.parts[i + 1 :])
+            def rest() -> Path:
+                return Path().joinpath(*path.parts[i + 1 :])
 
             # Only do symlink lookup for the final path component if
             # follow_symlinks=True.
@@ -288,7 +288,7 @@ class Dir(Node, abc.ABC):
         node.name = name
         return node
 
-    def get_root(self) -> Dir:
+    def get_root(self) -> "Dir":
         cur = self
         while cur.parent:
             cur = cur.parent
@@ -315,7 +315,7 @@ class Dir(Node, abc.ABC):
             self, Path(path), follow_symlinks=follow_symlinks
         )
         if ex is not None:
-            raise ex  # pylint: disable=raising-bad-type
+            raise ex
         return node
 
     def realpath(self, path: PathLike) -> Path:

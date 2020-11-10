@@ -48,9 +48,6 @@ class Error(RuntimeError):
 
 
 class OSError(Error, builtins.OSError):
-
-    # pylint: disable=redefined-builtin
-
     def __new__(cls, ec: lt.error_code):
         # generic_category uses "portable" errno values, with the same
         # semantics as OSError. libtorrent uses this for errors in
@@ -93,7 +90,6 @@ class OSError(Error, builtins.OSError):
     def __init__(self, ec: lt.error_code):
         # This does nothing. Why?
         # super(builtins.OSError, self).__init__(*args)
-        # pylint: disable=super-init-not-called
         self.ec = ec
         self.value = ec.value()
         self.category = ec.category()
@@ -105,77 +101,62 @@ class OSError(Error, builtins.OSError):
 
 # From pep3151
 class BlockingIOError(OSError, builtins.BlockingIOError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class ChildProcessError(OSError, builtins.ChildProcessError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class ConnectionError(OSError, builtins.ConnectionError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class BrokenPipeError(ConnectionError, builtins.BrokenPipeError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class ConnectionAbortedError(ConnectionError, builtins.ConnectionAbortedError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class ConnectionRefusedError(ConnectionError, builtins.ConnectionRefusedError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class ConnectionResetError(ConnectionError, builtins.ConnectionResetError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class FileExistsError(OSError, builtins.FileExistsError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class FileNotFoundError(OSError, builtins.FileNotFoundError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class InterruptedError(OSError, builtins.InterruptedError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class IsADirectoryError(OSError, builtins.IsADirectoryError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class NotADirectoryError(OSError, builtins.NotADirectoryError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class PermissionError(OSError, builtins.PermissionError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class ProcessLookupError(OSError, builtins.ProcessLookupError):
-    # pylint: disable=redefined-builtin
     pass
 
 
 class TimeoutError(OSError, builtins.TimeoutError):
-    # pylint: disable=redefined-builtin
     pass
 
 

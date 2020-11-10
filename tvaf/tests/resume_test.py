@@ -50,9 +50,9 @@ class IterResumeDataTest(unittest.TestCase):
 
         def write(torrent):
             self.resume_data_dir.mkdir(parents=True, exist_ok=True)
-            path = self.resume_data_dir.joinpath(torrent.info_hash).with_suffix(
-                ".resume"
-            )
+            path = self.resume_data_dir.joinpath(
+                torrent.info_hash
+            ).with_suffix(".resume")
             atp = torrent.atp()
             atp.ti = None
             atp_data = lt.bencode(lt.write_resume_data(atp))
@@ -165,7 +165,9 @@ class TerminateTest(unittest.TestCase):
         # https://github.com/arvidn/libtorrent/issues/5121
         if ltpy.version_info < (1, 2, 11):
             iterator = self.alert_driver.iter_alerts(
-                lt.alert_category.storage, lt.cache_flushed_alert, handle=handle
+                lt.alert_category.storage,
+                lt.cache_flushed_alert,
+                handle=handle,
             )
             with iterator:
                 handle.flush_cache()

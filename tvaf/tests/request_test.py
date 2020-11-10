@@ -34,7 +34,6 @@ class TestCleanup(request_test_utils.RequestServiceTestCase):
         self.service.configure_atp(atp)
         self.handle = self.session.add_torrent(atp)
         self.handle.prioritize_pieces([0] * len(self.torrent.pieces))
-        # pylint: disable=protected-access
         self.cleanup = request_lib._Cleanup(
             handle=self.handle,
             session=self.session,

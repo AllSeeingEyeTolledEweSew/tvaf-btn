@@ -11,18 +11,15 @@ import btn
 import tvaf.btn as tvaf_btn
 import tvaf.fs as fs
 
-# pylint: skip-file
+# flake8: noqa
 
 
 def get_mock_db() -> apsw.Connection:
     """Returns a connection to an in-memory database with the btn schemas."""
     # TODO(AllSeeingEyeTolledEweSew): Probably cleaner way to do this.
     conn = apsw.Connection(":memory:")
-    # pylint: disable=protected-access
     btn.Series._create_schema(conn)
-    # pylint: disable=protected-access
     btn.Group._create_schema(conn)
-    # pylint: disable=protected-access
     btn.TorrentEntry._create_schema(conn)
     return conn
 
@@ -195,7 +192,9 @@ class TestBrowseBase(unittest.TestCase):
         self.assertEqual(dirents[0].stat.filetype, stat_lib.S_IFDIR)
         self.assertEqual(dirents[1].stat.filetype, stat_lib.S_IFDIR)
         self.assertEqual(dirents[2].stat.filetype, stat_lib.S_IFDIR)
-        self.assertEqual({d.name for d in dirents}, {"S 100", "S 200", "S 300"})
+        self.assertEqual(
+            {d.name for d in dirents}, {"S 100", "S 200", "S 300"}
+        )
 
     def test_readdir_empty_name(self):
         conn = get_mock_db()
@@ -373,7 +372,9 @@ class TestBrowseSeries(unittest.TestCase):
         self.assertEqual(dirents[0].stat.filetype, stat_lib.S_IFDIR)
         self.assertEqual(dirents[1].stat.filetype, stat_lib.S_IFDIR)
         self.assertEqual(dirents[2].stat.filetype, stat_lib.S_IFDIR)
-        self.assertEqual({d.name for d in dirents}, {"G 110", "G 120", "G 130"})
+        self.assertEqual(
+            {d.name for d in dirents}, {"G 110", "G 120", "G 130"}
+        )
 
     def test_readdir_empty_name(self):
         conn = get_mock_db()

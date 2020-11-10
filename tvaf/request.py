@@ -1,7 +1,6 @@
 # The author disclaims copyright to this source code. Please see the
 # accompanying UNLICENSE file.
 """Data access functions for tvaf."""
-from __future__ import annotations
 
 import collections
 import collections.abc
@@ -129,7 +128,9 @@ class Request:
             return chunk
 
 
-def _get_request_pieces(request: Request, ti: lt.torrent_info) -> Iterable[int]:
+def _get_request_pieces(
+    request: Request, ti: lt.torrent_info
+) -> Iterable[int]:
     return iter(
         range(
             *util.range_to_pieces(
@@ -397,8 +398,8 @@ class _Cleanup:
                 self._handle.resume()
                 return
 
-        # Torrent has no data, no pieces prioritized, and all peers are drained.
-        # Clear to delete
+        # Torrent has no data, no pieces prioritized, and all peers are
+        # drained. Clear to delete
         self._session.remove_torrent(
             self._handle, option=lt.options_t.delete_files
         )
@@ -489,7 +490,6 @@ class _TorrentTask(task_lib.Task):
             )
 
     def _handle_alerts_until_no_requests(self, handle: lt.torrent_handle):
-        # pylint: disable=invalid-name
         with self._lock:
             if not self._state.has_requests():
                 return

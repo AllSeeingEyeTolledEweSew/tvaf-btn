@@ -60,7 +60,9 @@ class Test4604(unittest.TestCase):
         self.alert_driver = driver_lib.AlertDriver(
             session_service=self.session_service
         )
-        self.fixup = lt4604.Fixup(alert_driver=self.alert_driver, pedantic=True)
+        self.fixup = lt4604.Fixup(
+            alert_driver=self.alert_driver, pedantic=True
+        )
 
     def tearDown(self):
         self.session.pause()

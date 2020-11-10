@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import contextlib
 import threading
 from typing import cast
@@ -17,7 +15,7 @@ class AuthenticationFailed(Error):
 
 
 class _UserContext(contextlib.AbstractContextManager):
-    def __init__(self, auth_service: AuthService) -> None:
+    def __init__(self, auth_service: "AuthService") -> None:
         self.auth_service = auth_service
 
     def __enter__(self) -> None:

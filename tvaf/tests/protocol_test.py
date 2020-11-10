@@ -5,7 +5,9 @@ from tvaf import protocol
 
 class IterFilesTest(unittest.TestCase):
     def test_single_file(self):
-        info = protocol.Info({b"name": b"file name \xff.txt", b"length": 10000})
+        info = protocol.Info(
+            {b"name": b"file name \xff.txt", b"length": 10000}
+        )
         files = list(info.iter_files())
         self.assertEqual(len(files), 1)
         file_ = files[0]
@@ -283,7 +285,9 @@ class IterFilesTest(unittest.TestCase):
         self.assertEqual(
             file_.full_target_bytes, [b"parent", b"directory", b"file.zip"]
         )
-        self.assertEqual(file_.full_target, ["parent", "directory", "file.zip"])
+        self.assertEqual(
+            file_.full_target, ["parent", "directory", "file.zip"]
+        )
 
         self.assertEqual(file_.attr_bytes, b"l")
         self.assertEqual(file_.attr, "l")

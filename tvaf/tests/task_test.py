@@ -67,7 +67,7 @@ class Fundamentals(unittest.TestCase):
     def setUp(self):
         self.task = Bounded()
 
-    def runs_forever(self) -> bool:  # pylint: disable=no-self-use
+    def runs_forever(self) -> bool:
         return False
 
     def test_is_alive(self):
@@ -220,7 +220,6 @@ class FailerTerminatesChildTest(AbnormalTerminationTests):
     def setUp(self):
         self.task = Failer()
         self.child = Forever()
-        # pylint: disable=protected-access
         self.task._add_child(self.child)
 
     def test_terminate_child(self):
@@ -244,7 +243,6 @@ class FailerTerminatesParentTest(AbnormalTerminationTests):
     def setUp(self):
         self.task = ForeverStartChildren()
         self.child = Failer()
-        # pylint: disable=protected-access
         self.task._add_child(self.child, start=False)
 
 
@@ -252,7 +250,6 @@ class CatchChildErrorsTest(NormalTerminationTests):
     def setUp(self):
         self.task = ForeverStartChildren()
         self.child = Failer()
-        # pylint: disable=protected-access
         self.task._add_child(
             self.child, start=False, terminate_me_on_error=False
         )

@@ -217,7 +217,7 @@ class PumpAlertsConcurrencyTest(unittest.TestCase):
                 if isinstance(alert, lt.add_torrent_alert):
                     saw_add_alert = True
                     break
-                assert False, f"saw unexpected {alert}"
+                raise AssertionError(f"saw unexpected {alert}")
 
         self.assertTrue(saw_add_alert)
         pumper.shutdown()
@@ -259,7 +259,7 @@ class IterAlertsTest(unittest.TestCase):
                 if isinstance(alert, lt.add_torrent_alert):
                     saw_add_alert = True
                     break
-                assert False, f"saw unexpected {alert}"
+                raise AssertionError(f"saw unexpected {alert}")
 
         self.assertTrue(saw_add_alert)
         self.pumper.shutdown()
@@ -301,7 +301,7 @@ class IterAlertsTest(unittest.TestCase):
                     )
                     forkee.start()
                     break
-                assert False, f"saw unexpected {alert}"
+                raise AssertionError(f"saw unexpected {alert}")
 
         self.assertIsNotNone(forkee)
         forkee.join()

@@ -32,7 +32,7 @@ def begin(db: apsw.Connection, mode: str = "immediate") -> Iterator[None]:
     db.cursor().execute("begin " + mode)
     try:
         yield
-    except:
+    except Exception:
         db.cursor().execute("rollback")
         raise
     else:

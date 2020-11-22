@@ -17,7 +17,7 @@ def route(rule: str, **options: Any) -> Callable[[Callable], Callable]:
                 rule, endpoint, getattr(target, name), **options
             )
 
-        setattr(func, "_undecorate", undecorate)
+        func._undecorate = undecorate
         return func
 
     return decorator

@@ -89,8 +89,8 @@ class Info:
         self.dict = info_dict
 
     def iter_files(self) -> Iterator[FileSpec]:
-        # libtorrent doesn't even test bep52's 'meta version', it just relies on
-        # the bep3-compatible format. we do the same here.
+        # libtorrent doesn't even test bep52's 'meta version', it just relies
+        # on the bep3-compatible format. we do the same here.
         base_name_bytes = self.dict[b"name"]
         if b"files" in self.dict:
             offset = 0

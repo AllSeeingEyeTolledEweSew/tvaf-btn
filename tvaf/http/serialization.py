@@ -330,4 +330,4 @@ _TORRENT_FIELD_TO_QUERY_FLAG = {
 }
 
 # for _field in TorrentInfoSerializer.FIELDS:
-#    _TORRENT_FIELD_TO_QUERY_FLAG[_field] = lt.torrent_handle.query_torrent_file
+#    _TORRENT_FIELD_TO_QUERY_FLAG[_field]=lt.torrent_handle.query_torrent_file

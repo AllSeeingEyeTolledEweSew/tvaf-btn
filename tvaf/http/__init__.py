@@ -66,9 +66,9 @@ class HTTPD(task_lib.Task, config_lib.HasConfig):
     def __init__(self, *, session: lt.session, config: config_lib.Config):
         super().__init__(title="HTTPD")
         # TODO: fixup typing here
-        self._lock: threading.Condition = threading.Condition(
+        self._lock: threading.Condition = threading.Condition(  # type: ignore
             threading.RLock()
-        )  # type: ignore
+        )
 
         self._ltapiv1_blueprint = ltapi.V1Blueprint(session)
 

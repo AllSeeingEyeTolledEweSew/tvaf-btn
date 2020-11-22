@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import List
 from typing import Optional
 from typing import SupportsFloat
@@ -80,7 +78,7 @@ class MockTime:
     def patch_condition(self, cond):
         self.patch_object(cond, "wait", new=self.wait)
 
-    def __enter__(self) -> MockTime:
+    def __enter__(self) -> "MockTime":
         """Returns itself after enabling all time function patches."""
         self._started = True
         self.patch("time.time", new=self.time)

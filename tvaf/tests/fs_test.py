@@ -1,6 +1,4 @@
 """Tests for the tvaf.fs module."""
-from __future__ import annotations
-
 import io
 import pathlib
 import stat as stat_lib
@@ -236,7 +234,7 @@ class TestGetRoot(unittest.TestCase):
 
 
 class DummyDir(fs.Dir):
-    def __init__(self, dummy_file: DummyFile):
+    def __init__(self, dummy_file: "DummyFile"):
         super().__init__()
         self.dummy_file = dummy_file
 

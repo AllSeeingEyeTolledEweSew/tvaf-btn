@@ -2,8 +2,6 @@
 # accompanying UNLICENSE file.
 """Database functions for tvaf."""
 
-from __future__ import annotations
-
 import contextlib
 from typing import Iterator
 

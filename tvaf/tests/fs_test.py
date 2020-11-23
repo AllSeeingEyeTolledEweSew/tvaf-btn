@@ -294,7 +294,7 @@ class DummyDictDir(fs.DictDir):
         self.file2 = file2
 
     def get_dict(self) -> Dict[str, fs.Node]:
-        return dict(foo=self.file1, bar=self.file2)
+        return {"foo": self.file1, "bar": self.file2}
 
 
 class TestDictDir(unittest.TestCase):

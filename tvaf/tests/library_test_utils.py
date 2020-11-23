@@ -13,40 +13,40 @@ from . import tdummy
 SINGLE = tdummy.Torrent.single_file(name=b"test.txt", length=16384 * 9 + 1000)
 MULTI = tdummy.Torrent(
     files=[
-        dict(length=10000, path=b"multi/file.tar.gz"),
-        dict(length=100, path=b"multi/info.nfo"),
+        {"length": 10000, "path": b"multi/file.tar.gz"},
+        {"length": 100, "path": b"multi/info.nfo"},
     ]
 )
 PADDED = tdummy.Torrent(
     files=[
-        dict(length=10000, path=b"padded/file.tar.gz"),
-        dict(length=6384, path=b"padded/.pad/6834", attr=b"p"),
-        dict(length=100, path=b"padded/info.nfo"),
+        {"length": 10000, "path": b"padded/file.tar.gz"},
+        {"length": 6384, "path": b"padded/.pad/6834", "attr": b"p"},
+        {"length": 100, "path": b"padded/info.nfo"},
     ]
 )
 CONFLICT_FILE = tdummy.Torrent(
     files=[
-        dict(length=100, path=b"conflict/file.zip"),
-        dict(length=200, path=b"conflict/file.zip"),
+        {"length": 100, "path": b"conflict/file.zip"},
+        {"length": 200, "path": b"conflict/file.zip"},
     ]
 )
 CONFLICT_FILE_DIR = tdummy.Torrent(
     files=[
-        dict(length=100, path=b"conflict/path/file.zip"),
-        dict(length=200, path=b"conflict/path"),
+        {"length": 100, "path": b"conflict/path/file.zip"},
+        {"length": 200, "path": b"conflict/path"},
     ]
 )
 CONFLICT_DIR_FILE = tdummy.Torrent(
     files=[
-        dict(length=100, path=b"conflict/path"),
-        dict(length=200, path=b"conflict/path/file.zip"),
+        {"length": 100, "path": b"conflict/path"},
+        {"length": 200, "path": b"conflict/path/file.zip"},
     ]
 )
 BAD_PATHS = tdummy.Torrent(
     files=[
-        dict(length=10, path=b"bad/./file"),
-        dict(length=20, path=b"bad/../file"),
-        dict(length=30, path_split=[b"bad", b"slash/slash", b"file"]),
+        {"length": 10, "path": b"bad/./file"},
+        {"length": 20, "path": b"bad/../file"},
+        {"length": 30, "path_split": [b"bad", b"slash/slash", b"file"]},
     ]
 )
 

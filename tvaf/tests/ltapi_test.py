@@ -63,7 +63,7 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
         )
 
         info_hash = data.pop("info_hash")
-        self.assertEqual(info_hash, dict(v1=torrent.info_hash))
+        self.assertEqual(info_hash, {"v1": torrent.info_hash})
 
         metadata = data.pop("metadata")
         self.assertEqual(lt.bdecode(base64.b64decode(metadata)), torrent.info)
@@ -112,7 +112,7 @@ class TestSingleTorrent(TestV1Base, lib.TestCase):
         data = response.json
 
         self.assertEqual(
-            data, dict(info_hash=dict(v1=torrent.info_hash), pieces="AAA=")
+            data, {"info_hash": {"v1": torrent.info_hash}, "pieces": "AAA="}
         )
 
 
@@ -158,5 +158,5 @@ class TestTorrents(TestV1Base, lib.TestCase):
         data = response.json
 
         self.assertEqual(
-            data, [dict(info_hash=dict(v1=torrent.info_hash), pieces="AAA=")]
+            data, [{"info_hash": {"v1": torrent.info_hash}, "pieces": "AAA="}]
         )

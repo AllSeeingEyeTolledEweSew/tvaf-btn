@@ -80,7 +80,9 @@ class Torrent:
     ):
         return cls(
             piece_length=piece_length,
-            files=[dict(length=length, path=name, attr=attr, data=data)],
+            files=[
+                {"length": length, "path": name, "attr": attr, "data": data}
+            ],
         )
 
     def __init__(self, *, piece_length=16384, files=None):
@@ -132,7 +134,7 @@ class Torrent:
             if len(self.files) == 1:
                 self._info[b"name"] = self.files[0].path
             else:
-                assert len(set(f.path_split[0] for f in self.files)) == 1
+                assert len({f.path_split[0] for f in self.files}) == 1
                 assert all(len(f.path_split) > 1 for f in self.files)
                 self._info[b"name"] = self.files[0].path_split[0]
                 self._info[b"files"] = []

@@ -93,8 +93,8 @@ class TestPathStructure(BaseFTPTest):
             "",
             ("perm", "type"),
             [
-                ("browse", dict(perm="el", type="dir")),
-                ("v1", dict(perm="el", type="dir")),
+                ("browse", {"perm": "el", "type": "dir"}),
+                ("v1", {"perm": "el", "type": "dir"}),
             ],
         )
 
@@ -106,11 +106,11 @@ class TestPathStructure(BaseFTPTest):
             [
                 (
                     "test.txt",
-                    dict(
-                        perm="r",
-                        type="file",
-                        size=str(ltu.SINGLE.files[0].length),
-                    ),
+                    {
+                        "perm": "r",
+                        "type": "file",
+                        "size": str(ltu.SINGLE.files[0].length),
+                    },
                 )
             ],
         )
@@ -122,11 +122,11 @@ class TestPathStructure(BaseFTPTest):
             [
                 (
                     "0",
-                    dict(
-                        perm="r",
-                        type="file",
-                        size=str(ltu.SINGLE.files[0].length),
-                    ),
+                    {
+                        "perm": "r",
+                        "type": "file",
+                        "size": str(ltu.SINGLE.files[0].length),
+                    },
                 )
             ],
         )

@@ -12,9 +12,11 @@ from tvaf import ltpy
 
 
 def serialize_error_code(ec: lt.error_code) -> Mapping[str, Any]:
-    return dict(
-        category=ec.category().name(), value=ec.value(), message=ec.message()
-    )
+    return {
+        "category": ec.category().name(),
+        "value": ec.value(),
+        "message": ec.message(),
+    }
 
 
 def serialize_bit_list(bit_list: Sequence[bool]) -> str:
@@ -142,7 +144,7 @@ class TorrentStatusSerializer:
             elif field == "errc":
                 result[field] = serialize_error_code(status.errc)
             elif field == "info_hash":
-                result[field] = dict(v1=str(status.info_hash))
+                result[field] = {"v1": str(status.info_hash)}
             elif field == "state":
                 result[field] = status.state.name
             elif field == "storage_mode":
@@ -165,17 +167,17 @@ def _serialize_file_list(
     result: List[Dict[str, Any]] = []
 
     for i in range(storage.num_files()):
-        file_entry = dict(
-            index=i,
-            offset=storage.file_offset(i),
-            path=storage.file_path(i),
-            size=storage.file_size(i),
-        )
+        file_entry = {
+            "index": i,
+            "offset": storage.file_offset(i),
+            "path": storage.file_path(i),
+            "size": storage.file_size(i),
+        }
         # TODO: symlink() seems to crash
         # TODO: mtime() not mapped on python bindings
         info_hash = storage.hash(i)
         if not info_hash.is_all_zeros():
-            file_entry["info_hash"] = dict(v1=str(info_hash))
+            file_entry["info_hash"] = {"v1": str(info_hash)}
         flags = storage.file_flags(i)
         attr = ""
         storage_cls = lt.file_storage
@@ -238,7 +240,7 @@ class TorrentInfoSerializer:
             if field in simple_callable_fields:
                 result[field] = getattr(info, field)()
             elif field == "info_hash":
-                result[field] = dict(v1=str(info.info_hash()))
+                result[field] = {"v1": str(info.info_hash())}
             elif field in ("files", "orig_files"):
                 result[field] = _serialize_file_list(getattr(info, field)())
             elif field in ("merkle_tree", "similar_torrents"):
@@ -307,7 +309,7 @@ class TorrentHandleSerializer:
             if field in simple_callable_fields:
                 result[field] = getattr(handle, field)()
             elif field == "info_hash":
-                result[field] = dict(v1=str(handle.info_hash()))
+                result[field] = {"v1": str(handle.info_hash())}
             elif field in flag_fields:
                 result[field] = bool(handle.flags() & flag_fields[field])
 

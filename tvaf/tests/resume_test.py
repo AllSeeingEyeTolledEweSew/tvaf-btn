@@ -74,8 +74,8 @@ class IterResumeDataTest(unittest.TestCase):
 
     def assert_atp_sets_equal(self, got, expected):
         self.assertEqual(
-            set(atp_hashable(atp) for atp in got),
-            set(atp_hashable(atp) for atp in expected),
+            {atp_hashable(atp) for atp in got},
+            {atp_hashable(atp) for atp in expected},
         )
 
     def tearDown(self):
@@ -84,7 +84,7 @@ class IterResumeDataTest(unittest.TestCase):
     def test_normal(self):
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.assert_atp_sets_equal(
-            set(atps), set((self.TORRENT1.atp(), self.TORRENT2.atp()))
+            set(atps), {self.TORRENT1.atp(), self.TORRENT2.atp()}
         )
 
     def test_ignore_bad_data(self):
@@ -112,7 +112,7 @@ class IterResumeDataTest(unittest.TestCase):
 
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.assert_atp_sets_equal(
-            set(atps), set((self.TORRENT1.atp(), self.TORRENT2.atp()))
+            set(atps), {self.TORRENT1.atp(), self.TORRENT2.atp()}
         )
 
 

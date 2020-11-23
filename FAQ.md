@@ -82,7 +82,7 @@ Many on-demand streaming programs like Popcorn Time have a GUI with a video
 player. They run a BitTorrent client on user's desktop or laptop. Sometimes,
 the BitTorrent client runs as JavaScript in your browser.
 
-tvaf is designed to run headlessly on your NAS or seedbox. 
+tvaf is designed to run headlessly on your NAS or seedbox.
 
 This is because tvaf puts strong emphasis on the _sharing and uploading_ parts
 of BitTorrent. This works best with a large disk, robust network connection,

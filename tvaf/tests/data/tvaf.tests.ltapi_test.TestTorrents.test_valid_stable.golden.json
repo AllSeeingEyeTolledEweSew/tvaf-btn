@@ -22,7 +22,7 @@
         "download_rate": 0,
         "errc": {
             "category": "system",
-            "message": "No error information",
+            "message": "Success",
             "value": 0
         },
         "error_file": -1,

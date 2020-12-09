@@ -173,21 +173,6 @@ class TerminateTest(unittest.TestCase):
             if any(status.pieces):
                 break
 
-        # In 1.2.11+, save_resume_data() includes downloaded-but-not-checked
-        # pieces in the unfinished_pieces field. See
-        # https://github.com/arvidn/libtorrent/issues/5121
-        if ltpy.version_info < (1, 2, 11):
-            iterator = self.alert_driver.iter_alerts(
-                lt.alert_category.storage,
-                lt.cache_flushed_alert,
-                handle=handle,
-            )
-            with iterator:
-                handle.flush_cache()
-                for alert in iterator:
-                    if isinstance(alert, lt.cache_flushed_alert):
-                        break
-
         self.session.pause()
         self.resume.terminate()
         self.resume.join()

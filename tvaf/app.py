@@ -23,7 +23,6 @@ from tvaf import driver as driver_lib
 from tvaf import ftp as ftp_lib
 from tvaf import http as http_lib
 from tvaf import library
-from tvaf import lt4604
 from tvaf import request as request_lib
 from tvaf import resume as resume_lib
 from tvaf import session as session_lib
@@ -81,8 +80,6 @@ class App(task_lib.Task):
         self._httpd = http_lib.HTTPD(
             config=self._config, session=self._session
         )
-
-        self._lt4604_fixup = lt4604.Fixup(alert_driver=self._alert_driver)
 
         if default_config:
             self._save_config()
@@ -143,7 +140,6 @@ class App(task_lib.Task):
         self._add_child(self._alert_driver)
         self._add_child(self._request_service)
         self._add_child(self._resume_service)
-        self._add_child(self._lt4604_fixup)
 
         # Load resume data
         for atp in resume_lib.iter_resume_data_from_disk(self._config_dir):
@@ -157,10 +153,6 @@ class App(task_lib.Task):
         self._terminated.wait()
         self._log_terminate()
 
-        # Fixup is only necessary for keeping requests going, can terminate
-        # early
-        self._lt4604_fixup.terminate()
-
         # Terminate all request-serving services
         self._request_service.terminate()
         self._ftpd.terminate()
@@ -171,8 +163,7 @@ class App(task_lib.Task):
         self._ftpd.join()
         self._httpd.join()
 
-        # Ensure there are no more alert-generating actions
-        self._lt4604_fixup.join()
+        # Should be no more alert-generating actions
 
         # Libtorrent shutdown sequence
         self._session.pause()

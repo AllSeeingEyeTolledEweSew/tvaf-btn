@@ -19,7 +19,6 @@ import libtorrent as lt
 
 from tvaf import config as config_lib
 from tvaf import driver as driver_lib
-from tvaf import lt4604
 from tvaf import request as request_lib
 from tvaf import resume as resume_lib
 
@@ -65,8 +64,6 @@ class RequestServiceTestCase(unittest.TestCase):
         self.service.join()
         self.resume_service.terminate()
         self.resume_service.join()
-        self.lt4604_fixup.terminate()
-        self.lt4604_fixup.join()
         self.alert_driver.terminate()
         self.alert_driver.join()
 
@@ -88,12 +85,10 @@ class RequestServiceTestCase(unittest.TestCase):
             alert_driver=self.alert_driver,
             resume_service=self.resume_service,
         )
-        self.lt4604_fixup = lt4604.Fixup(alert_driver=self.alert_driver)
 
         self.alert_driver.start()
         self.service.start()
         self.resume_service.start()
-        self.lt4604_fixup.start()
 
     def tearDown(self):
         self.teardown_session()

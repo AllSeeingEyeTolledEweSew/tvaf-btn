@@ -438,9 +438,9 @@ class _TorrentTask(task_lib.Task):
         self._prev_task = prev_task
 
         # TODO: fixup typing here
-        self._lock: threading.Condition = threading.Condition(
+        self._lock: threading.Condition = threading.Condition(  # type: ignore
             threading.RLock()
-        )  # type: ignore
+        )
         self._state = _State()
         self._iterator: Optional[driver_lib.Iterator] = None
 

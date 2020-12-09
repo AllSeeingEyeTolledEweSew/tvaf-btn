@@ -15,11 +15,9 @@
 
 # mypy currently chokes on importlib.resources; typeshed shadows the backported
 # module no matter what I do
-# mypy: ignore-errors
 
 
 import dataclasses
-import importlib.resources
 import io
 import json
 import os
@@ -31,6 +29,7 @@ import unittest
 import unittest.mock
 
 import apsw
+import importlib_resources
 
 from tvaf import config as config_lib
 from tvaf import session as session_lib
@@ -96,7 +95,7 @@ class TestCase(unittest.TestCase):
 
     def get_meld_path(self, suffix: str) -> str:
         """Returns the path to write to update a golden data file."""
-        # importlib.resources doesn't provide any way for updating files
+        # importlib_resources doesn't provide any way for updating files
         # that are assumed to be individually accessible on the filesystem. So
         # for updating golden data, we use the "naive" approach of referencing
         # a file based off of the __file__ path.
@@ -106,8 +105,7 @@ class TestCase(unittest.TestCase):
 
     def get_data(self, suffix: str) -> str:
         """Returns golden reference data for this test."""
-        # typeshed overrides the backported module
-        return importlib.resources.read_text(
+        return importlib_resources.read_text(
             "tvaf.tests.data", f"{self.id()}.{suffix}"
         )
 

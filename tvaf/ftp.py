@@ -275,9 +275,9 @@ class FTPD(task_lib.Task, config_lib.HasConfig):
         self._root = root
 
         # TODO: fixup typing here
-        self._lock: threading.Condition = threading.Condition(
+        self._lock: threading.Condition = threading.Condition(  # type: ignore
             threading.RLock()
-        )  # type: ignore
+        )
         self._server: Optional[pyftpdlib.servers.FTPServer] = None
         self._address: Optional[Tuple] = None
 

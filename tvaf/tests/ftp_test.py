@@ -93,14 +93,14 @@ class TestPathStructure(BaseFTPTest):
         items = sorted(self.ftp.mlsd(path=path, facts=facts))
         self.assertEqual(items, expected)
 
-    def test_LIST(self) -> None:
+    def test_list(self) -> None:
         lines: List[str] = []
         self.ftp.retrlines("LIST", callback=lines.append)
         # The last token should be the name
         lines = sorted(line.split()[-1] for line in lines)
         self.assertEqual(lines, ["browse", "v1"])
 
-    def test_LIST_with_symlinks(self) -> None:
+    def test_list_with_symlinks(self) -> None:
         self.ftp.cwd(f"/v1/{ltu.SINGLE.info_hash}/test/f")
         lines: List[str] = []
         self.ftp.retrlines("LIST", callback=lines.append)
@@ -152,11 +152,11 @@ class TestPathStructure(BaseFTPTest):
             ],
         )
 
-    def test_CWD_invalid(self) -> None:
+    def test_cwd_invalid(self) -> None:
         with self.assertRaisesRegex(ftplib.error_perm, "550 Not a directory."):
             self.ftp.cwd(f"/v1/{ltu.SINGLE.info_hash}/test/i/0")
 
-    def test_SIZE(self) -> None:
+    def test_size(self) -> None:
         # pyftpdlib does not allow SIZE in ascii mode to avoid newline
         # translation issues
         self.ftp.voidcmd("TYPE I")
@@ -165,7 +165,7 @@ class TestPathStructure(BaseFTPTest):
 
 
 class TestReadOnly(BaseFTPTest):
-    def test_STOU(self) -> None:
+    def test_stou(self) -> None:
         # assertRaises should probably use a covariant type, but doesn't
         base_errors = cast(Tuple[Type[BaseException], ...], ftplib.all_errors)
         # For some reason, pyftpdlib bypasses permissions to call mkstemp. tvaf
@@ -174,25 +174,25 @@ class TestReadOnly(BaseFTPTest):
         with self.assertRaises(base_errors):
             self.ftp.storbinary("STOU", io.BytesIO(b"data"))
 
-    def test_STOR(self) -> None:
+    def test_stor(self) -> None:
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.storbinary("STOR file.txt", io.BytesIO(b"data"))
 
-    def test_STOR_overwrite(self) -> None:
+    def test_stor_overwrite(self) -> None:
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.storbinary(
                 f"STOR /v1/{ltu.SINGLE.info_hash}/test/i/0",
                 io.BytesIO(b"data"),
             )
 
-    def test_APPE(self) -> None:
+    def test_appe(self) -> None:
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.storbinary(
                 f"APPE /v1/{ltu.SINGLE.info_hash}/test/i/0",
                 io.BytesIO(b"data"),
             )
 
-    def test_DELE(self) -> None:
+    def test_dele(self) -> None:
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.delete(f"/v1/{ltu.SINGLE.info_hash}/test/i/0")
 
@@ -203,15 +203,15 @@ class TestReadOnly(BaseFTPTest):
                 f"/v1/{ltu.SINGLE.info_hash}/test/i/123",
             )
 
-    def test_MKD(self) -> None:
+    def test_mkd(self) -> None:
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.mkd("new")
 
-    def test_RMD(self) -> None:
+    def test_rmd(self) -> None:
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.rmd("v1")
 
-    def test_MFMT(self) -> None:
+    def test_mfmt(self) -> None:
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.voidcmd(
                 f"MFMT 19700101032545 /v1/{ltu.SINGLE.info_hash}/test/i/0"
@@ -219,21 +219,21 @@ class TestReadOnly(BaseFTPTest):
 
 
 class TestRETR(BaseFTPTest):
-    def test_RETR(self) -> None:
+    def test_retr(self) -> None:
         buf = io.BytesIO()
         self.ftp.retrbinary(
             f"RETR /v1/{ltu.SINGLE.info_hash}/test/i/0", buf.write
         )
         self.assertEqual(buf.getvalue(), ltu.SINGLE.files[0].data)
 
-    def test_RETR_dir(self) -> None:
+    def test_retr_dir(self) -> None:
         buf = io.BytesIO()
         with self.assertRaisesRegex(ftplib.error_perm, "550 .*"):
             self.ftp.retrbinary(
                 f"RETR /v1/{ltu.SINGLE.info_hash}/test/i", buf.write
             )
 
-    def test_RETR_with_REST(self) -> None:
+    def test_retr_with_rest(self) -> None:
         buf = io.BytesIO()
         self.ftp.retrbinary(
             f"RETR /v1/{ltu.SINGLE.info_hash}/test/i/0", buf.write, rest=1000

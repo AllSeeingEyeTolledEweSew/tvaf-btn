@@ -50,9 +50,9 @@ class _ThreadingWSGIServer(
     def __init__(
         self,
         server_address: Tuple[str, int],
-        RequestHandlerClass: Callable[..., _BHRH],
+        request_handler_class: Callable[..., _BHRH],
     ):
-        super().__init__(server_address, RequestHandlerClass)
+        super().__init__(server_address, request_handler_class)
         self.selector = notify_selector.NotifySelector()
         self.selector.register(self, selectors.EVENT_READ)
         self._is_shutdown = False

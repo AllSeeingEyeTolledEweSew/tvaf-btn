@@ -30,7 +30,7 @@ class DummyException(Exception):
     pass
 
 
-def _raise_dummy():
+def _raise_dummy() -> None:
     raise DummyException()
 
 
@@ -38,7 +38,7 @@ class TestCleanup(request_test_utils.RequestServiceTestCase):
 
     maxDiff = None
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         atp = self.torrent.atp()
         self.service.configure_atp(atp)
@@ -50,16 +50,16 @@ class TestCleanup(request_test_utils.RequestServiceTestCase):
             alert_driver=self.alert_driver,
         )
 
-    def test_remove(self):
+    def test_remove(self) -> None:
         self.cleanup.cleanup()
         self.assertEqual(self.session.get_torrents(), [])
 
-    def test_have_priorities(self):
+    def test_have_priorities(self) -> None:
         self.handle.prioritize_pieces([4] * len(self.torrent.pieces))
         self.cleanup.cleanup()
         self.assertEqual(self.session.get_torrents(), [self.handle])
 
-    def test_have_data(self):
+    def test_have_data(self) -> None:
         request_test_utils.wait_done_checking_or_error(self.handle)
         # NB: bug in libtorrent where add_piece accepts str but not bytes
         self.handle.add_piece(0, self.torrent.pieces[0].decode(), 0)
@@ -73,7 +73,7 @@ class TestCleanup(request_test_utils.RequestServiceTestCase):
 
 
 class TestAddRemove(request_test_utils.RequestServiceTestCase):
-    def test_add_remove(self):
+    def test_add_remove(self) -> None:
         req = self.add_req()
         self.wait_for_torrent()
         self.assertEqual(
@@ -84,18 +84,18 @@ class TestAddRemove(request_test_utils.RequestServiceTestCase):
         with self.assertRaises(request_lib.CanceledError):
             req.read(timeout=5)
 
-    def test_fetch_error(self):
+    def test_fetch_error(self) -> None:
         req = self.add_req(configure_atp=lambda atp: _raise_dummy())
         with self.assertRaises(request_lib.FetchError):
             req.read(timeout=5)
 
-    def test_shutdown(self):
+    def test_shutdown(self) -> None:
         req = self.add_req()
         self.service.terminate()
         with self.assertRaises(request_lib.CanceledError):
             req.read(timeout=5)
 
-    def test_already_shutdown(self):
+    def test_already_shutdown(self) -> None:
         self.service.terminate()
         req = self.add_req()
         with self.assertRaises(request_lib.CanceledError):
@@ -103,7 +103,7 @@ class TestAddRemove(request_test_utils.RequestServiceTestCase):
 
 
 class TestRead(request_test_utils.RequestServiceTestCase):
-    def test_all(self):
+    def test_all(self) -> None:
         req = self.add_req()
 
         self.feed_pieces()
@@ -111,7 +111,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
         data = request_test_utils.read_all(req)
         self.assertEqual(data, self.torrent.data)
 
-    def test_unaligned_multi_pieces(self):
+    def test_unaligned_multi_pieces(self) -> None:
         start = self.torrent.piece_length // 2
         stop = min(start + self.torrent.piece_length, self.torrent.length)
         req = self.add_req(start=start, stop=stop)
@@ -122,7 +122,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
 
         self.assertEqual(data, self.torrent.data[start:stop])
 
-    def test_unaligned_single_piece(self):
+    def test_unaligned_single_piece(self) -> None:
         start = self.torrent.piece_length // 4
         stop = 3 * self.torrent.piece_length // 4
         req = self.add_req(start=start, stop=stop)
@@ -133,7 +133,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
 
         self.assertEqual(data, self.torrent.data[start:stop])
 
-    def test_existing_torrent(self):
+    def test_existing_torrent(self) -> None:
         req = self.add_req()
 
         self.feed_pieces()
@@ -145,7 +145,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
 
         self.assertEqual(data, self.torrent.data)
 
-    def test_simultaneous(self):
+    def test_simultaneous(self) -> None:
         req1 = self.add_req()
         req2 = self.add_req()
         executor = concurrent.futures.ThreadPoolExecutor()
@@ -157,7 +157,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
         self.assertEqual(future1.result(), self.torrent.data)
         self.assertEqual(future2.result(), self.torrent.data)
 
-    def test_two_readers(self):
+    def test_two_readers(self) -> None:
         req1 = self.add_req()
         req2 = self.add_req()
 
@@ -169,7 +169,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
         self.assertEqual(data1, self.torrent.data)
         self.assertEqual(data2, self.torrent.data)
 
-    def test_download(self):
+    def test_download(self) -> None:
         seed = lib.create_isolated_session_service().session
         seed_dir = tempfile.TemporaryDirectory()
         atp = self.torrent.atp()
@@ -190,7 +190,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
         data = request_test_utils.read_all(req, timeout=60)
         self.assertEqual(data, self.torrent.data)
 
-    def test_file_error(self):
+    def test_file_error(self) -> None:
         # Create a file in tempdir, try to use it as the save_path
         path = os.path.join(self.tempdir.name, "file.txt")
         with open(path, mode="w"):
@@ -204,7 +204,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
         with self.assertRaises(NotADirectoryError):
             request_test_utils.read_all(req)
 
-    def test_read_checked_pieces(self):
+    def test_read_checked_pieces(self) -> None:
         # Download a torrent
         req = self.add_req()
         self.feed_pieces()
@@ -231,7 +231,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
         data = request_test_utils.read_all(req)
         self.assertEqual(data, self.torrent.data)
 
-    def test_read_after_cancelled_read(self):
+    def test_read_after_cancelled_read(self) -> None:
         # Start reading
         req = self.add_req()
         # Feed one piece, so the torrent stays in the session
@@ -239,7 +239,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
 
         # Wait for pieces to be prioritized
         for _ in lib.loop_until_timeout(5, msg="prioritize"):
-            if all(self.wait_for_torrent().piece_priorities()):
+            if all(self.wait_for_torrent().get_piece_priorities()):
                 break
 
         # Cancel the request -- resets piece deadlines
@@ -247,7 +247,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
 
         # Wait until deadlines have been reset
         for _ in lib.loop_until_timeout(5, msg="deprioritize"):
-            if not any(self.wait_for_torrent().piece_priorities()):
+            if not any(self.wait_for_torrent().get_piece_priorities()):
                 break
 
         # Recreate the request -- listens for read_piece_alert
@@ -260,7 +260,7 @@ class TestRead(request_test_utils.RequestServiceTestCase):
 
 
 class TestRemoveTorrent(request_test_utils.RequestServiceTestCase):
-    def test_with_active_requests(self):
+    def test_with_active_requests(self) -> None:
         req = self.add_req()
         self.session.remove_torrent(self.wait_for_torrent())
         with self.assertRaises(request_lib.TorrentRemovedError):
@@ -268,7 +268,7 @@ class TestRemoveTorrent(request_test_utils.RequestServiceTestCase):
 
 
 class TestConfig(request_test_utils.RequestServiceTestCase):
-    def test_config_defaults(self):
+    def test_config_defaults(self) -> None:
         save_path = str(self.config_dir.joinpath("downloads"))
         self.assertEqual(
             self.config, config_lib.Config(torrent_default_save_path=save_path)
@@ -279,7 +279,7 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
 
         self.assertEqual(atp.save_path, save_path)
 
-    def test_set_config(self):
+    def test_set_config(self) -> None:
         # Set all non-default configs
         self.config["torrent_default_save_path"] = self.tempdir.name
         self.config["torrent_default_flags_apply_ip_filter"] = False
@@ -312,7 +312,7 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
             atp.storage_mode, lt.storage_mode_t.storage_mode_sparse
         )
 
-    def test_save_path_loop(self):
+    def test_save_path_loop(self) -> None:
         bad_link = self.config_dir.joinpath("bad_link")
         bad_link.symlink_to(bad_link, target_is_directory=True)
 
@@ -320,17 +320,17 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
         with self.assertRaises(config_lib.InvalidConfigError):
             self.service.set_config(self.config)
 
-    def test_flags_apply_ip_filter_null(self):
+    def test_flags_apply_ip_filter_null(self) -> None:
         self.config["torrent_default_flags_apply_ip_filter"] = None
         with self.assertRaises(config_lib.InvalidConfigError):
             self.service.set_config(self.config)
 
-    def test_storage_mode_invalid(self):
+    def test_storage_mode_invalid(self) -> None:
         self.config["torrent_default_storage_mode"] = "invalid"
         with self.assertRaises(config_lib.InvalidConfigError):
             self.service.set_config(self.config)
 
-    def test_stage_revert(self):
+    def test_stage_revert(self) -> None:
         self.config["torrent_default_storage_mode"] = "allocate"
         with self.assertRaises(DummyException):
             with self.service.stage_config(self.config):

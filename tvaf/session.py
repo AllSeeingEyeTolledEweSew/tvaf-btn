@@ -41,7 +41,7 @@ _BLACKLIST = {
 
 
 @contextlib.contextmanager
-def _translate_exceptions():
+def _translate_exceptions() -> Iterator[None]:
     try:
         with ltpy.translate_exceptions():
             yield
@@ -101,7 +101,7 @@ def _get_mask_bits(mask: int) -> Collection[int]:
 _ALERT_MASK_NAME: Dict[int, str] = {}
 
 
-def _init_alert_mask_name():
+def _init_alert_mask_name() -> None:
     for name in dir(lt.alert.category_t):
         if name.startswith("_"):
             continue
@@ -132,42 +132,42 @@ class SessionService(config_lib.HasConfig):
             self._inc_alert_mask_bits_locked(self._config_alert_mask)
             self.session = lt.session(self._settings)
 
-    def _inc_alert_mask_bits_locked(self, alert_mask: int):
+    def _inc_alert_mask_bits_locked(self, alert_mask: int) -> None:
         for bit in _get_mask_bits(alert_mask):
             self._alert_mask_bit_count[bit] = (
                 self._alert_mask_bit_count.get(bit, 0) + 1
             )
 
-    def _dec_alert_mask_bits_locked(self, alert_mask: int):
+    def _dec_alert_mask_bits_locked(self, alert_mask: int) -> None:
         for bit in _get_mask_bits(alert_mask):
             self._alert_mask_bit_count[bit] -= 1
             if self._alert_mask_bit_count[bit] == 0:
                 self._alert_mask_bit_count.pop(bit)
 
-    def inc_alert_mask(self, alert_mask: int):
+    def inc_alert_mask(self, alert_mask: int) -> None:
         with self._lock:
             self._inc_alert_mask_bits_locked(alert_mask)
             # Can't fail to update alert mask (?)
             self._update_alert_mask_locked()
 
-    def dec_alert_mask(self, alert_mask: int):
+    def dec_alert_mask(self, alert_mask: int) -> None:
         with self._lock:
             self._dec_alert_mask_bits_locked(alert_mask)
             # Can't fail to update alert mask (?)
             self._update_alert_mask_locked()
 
-    def _update_alert_mask_locked(self):
+    def _update_alert_mask_locked(self) -> None:
         alert_mask = self._get_alert_mask_locked()
         self._apply_settings_locked({"alert_mask": alert_mask})
         self._settings["alert_mask"] = alert_mask
 
-    def _get_alert_mask_locked(self):
+    def _get_alert_mask_locked(self) -> int:
         alert_mask = 0
         for bit in self._alert_mask_bit_count:
             alert_mask |= 1 << bit
         return alert_mask
 
-    def _apply_settings_locked(self, settings: Dict[str, Any]):
+    def _apply_settings_locked(self, settings: Dict[str, Any]) -> None:
         deltas = dict(set(settings.items()) - set(self._settings.items()))
         if not deltas:
             return

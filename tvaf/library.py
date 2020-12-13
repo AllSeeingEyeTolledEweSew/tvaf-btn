@@ -34,9 +34,10 @@ from typing import Any
 from typing import Callable
 from typing import Dict
 from typing import Iterator
-from typing import List
+from typing import Mapping
 from typing import MutableMapping
 from typing import Optional
+from typing import Sequence
 
 import libtorrent as lt
 
@@ -83,7 +84,7 @@ class TorrentFile(fs.File):
         )
 
 
-def _is_valid_path(path: List[str]) -> bool:
+def _is_valid_path(path: Sequence[str]) -> bool:
     for part in path:
         if "/" in part:
             return False
@@ -99,7 +100,7 @@ class _V1TorrentInNetwork(fs.StaticDir):
         info_hash: types.InfoHash,
         info: protocol.Info,
         network: "Network",
-    ) -> None:
+    ):
         super().__init__()
 
         self._by_path = fs.StaticDir()
@@ -116,7 +117,7 @@ class _V1TorrentInNetwork(fs.StaticDir):
         info_hash: types.InfoHash,
         spec: protocol.FileSpec,
         network: "Network",
-    ):
+    ) -> None:
         if spec.is_pad:
             return
         if spec.is_symlink:
@@ -140,7 +141,7 @@ class _V1TorrentInNetwork(fs.StaticDir):
             return
         parent.mkchild(spec.full_path[-1], fs.Symlink(target=torrent_file))
 
-    def _try_mkdirs(self, dirnames: List[str]) -> Optional[fs.StaticDir]:
+    def _try_mkdirs(self, dirnames: Sequence[str]) -> Optional[fs.StaticDir]:
         parent = self._by_path
         for name in dirnames:
             child = parent.children.get(name)
@@ -208,7 +209,7 @@ class _Browse(fs.DictDir):
         super().__init__()
         self.libs = libs
 
-    def get_dict(self):
+    def get_dict(self) -> Mapping[str, fs.Node]:
         return self.libs.browse_nodes
 
 

@@ -16,6 +16,7 @@ import contextlib
 import gc
 import tempfile
 import threading
+from typing import Iterator
 from typing import List
 from typing import Optional
 from typing import Type
@@ -32,7 +33,7 @@ from . import tdummy
 
 
 @contextlib.contextmanager
-def make_some_alerts():
+def make_some_alerts() -> Iterator[List[lt.alert]]:
     session = lib.create_isolated_session_service(
         alert_mask=lt.alert_category.session_log
     ).session
@@ -44,7 +45,7 @@ def make_some_alerts():
     # references it
 
 
-def executor():
+def executor() -> concurrent.futures.ThreadPoolExecutor:
     return concurrent.futures.ThreadPoolExecutor()
 
 
@@ -54,10 +55,10 @@ def executor():
 
 
 class IteratorTest(unittest.TestCase):
-    def test_close_inline_is_safe(self):
+    def test_close_inline_is_safe(self) -> None:
         iterator = driver_lib.Iterator()
 
-        def iterate_and_close():
+        def iterate_and_close() -> None:
             for _ in iterator:
                 iterator.close()
 
@@ -69,10 +70,10 @@ class IteratorTest(unittest.TestCase):
         # We exited naturally, so we should be marked safe
         self.assertTrue(iterator.is_safe())
 
-    def test_break_context_manager_is_safe(self):
+    def test_break_context_manager_is_safe(self) -> None:
         iterator = driver_lib.Iterator()
 
-        def iterate_and_close():
+        def iterate_and_close() -> None:
             with iterator:
                 for _ in iterator:
                     break
@@ -85,15 +86,15 @@ class IteratorTest(unittest.TestCase):
         # We exited from a context manager, so we should be marked safe
         self.assertTrue(iterator.is_safe())
 
-    def test_visit_order(self):
+    def test_visit_order(self) -> None:
         iterator = driver_lib.Iterator()
 
-        def iterate_and_close():
-            message = None
+        def iterate_and_close() -> str:
             for alert in iterator:
                 message = alert.message()
                 iterator.close()
-            return message
+                return message
+            raise AssertionError("unreachable")
 
         future = executor().submit(iterate_and_close)
         with make_some_alerts() as alerts:
@@ -101,20 +102,20 @@ class IteratorTest(unittest.TestCase):
             expected_message = alerts[0].message()
             self.assertEqual(future.result(), expected_message)
 
-    def test_feed_marks_unsafe(self):
+    def test_feed_marks_unsafe(self) -> None:
         iterator = driver_lib.Iterator()
         with make_some_alerts() as alerts:
             result = iterator.feed(*alerts)
         self.assertTrue(result)
         self.assertFalse(iterator.is_safe())
 
-    def test_feed_empty_not_unsafe(self):
+    def test_feed_empty_not_unsafe(self) -> None:
         iterator = driver_lib.Iterator()
         result = iterator.feed()
         self.assertFalse(result)
         self.assertTrue(iterator.is_safe())
 
-    def test_feed_after_close(self):
+    def test_feed_after_close(self) -> None:
         iterator = driver_lib.Iterator()
         iterator.close()
         with make_some_alerts() as alerts:
@@ -122,14 +123,14 @@ class IteratorTest(unittest.TestCase):
         self.assertFalse(result)
         self.assertTrue(iterator.is_safe())
 
-    def test_close(self):
+    def test_close(self) -> None:
         iterator = driver_lib.Iterator()
         iterator.close()
         self.assertTrue(iterator.is_closed())
         with self.assertRaises(StopIteration):
             next(iterator)
 
-    def test_close_twice(self):
+    def test_close_twice(self) -> None:
         iterator = driver_lib.Iterator()
         iterator.close()
         iterator.close(Exception())
@@ -137,7 +138,7 @@ class IteratorTest(unittest.TestCase):
         with self.assertRaises(StopIteration):
             next(iterator)
 
-    def test_safe(self):
+    def test_safe(self) -> None:
         iterator = driver_lib.Iterator()
         with make_some_alerts() as alerts:
             iterator.feed(*alerts)
@@ -146,14 +147,14 @@ class IteratorTest(unittest.TestCase):
         iterator.set_safe()
         self.assertTrue(iterator.is_safe())
 
-    def test_safe_without_close(self):
+    def test_safe_without_close(self) -> None:
         iterator = driver_lib.Iterator()
         with make_some_alerts() as alerts:
             iterator.feed(*alerts)
         with self.assertRaises(ValueError):
             iterator.set_safe()
 
-    def test_safe_notify(self):
+    def test_safe_notify(self) -> None:
         iterator = driver_lib.Iterator()
         rfile, wfile = util.selectable_pipe()
         iterator.set_notify_safe_file(wfile)
@@ -173,7 +174,7 @@ class IteratorTest(unittest.TestCase):
         iterator.set_safe()
         self.assertEqual(rfile.read(), None)
 
-    def test_safe_notify_return(self):
+    def test_safe_notify_return(self) -> None:
         iterator = driver_lib.Iterator()
         _, wfile = util.selectable_pipe()
         initial = iterator.set_notify_safe_file(wfile)
@@ -189,23 +190,23 @@ class Pumper(threading.Thread):
         self.driver = driver
         self.stopped = threading.Event()
 
-    def run(self):
+    def run(self) -> None:
         while not self.stopped.is_set():
             self.driver.pump_alerts()
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         self.stopped.set()
         self.join()
 
 
 class PumpAlertsConcurrencyTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def do_concurrency_test(self, flags):
+    def do_concurrency_test(self, flags) -> None:
         session_service = lib.create_isolated_session_service()
         session = session_service.session
         driver = driver_lib.AlertDriver(session_service=session_service)
@@ -235,13 +236,13 @@ class PumpAlertsConcurrencyTest(unittest.TestCase):
         self.assertTrue(saw_add_alert)
         pumper.shutdown()
 
-    def test_concurrency(self):
+    def test_concurrency(self) -> None:
         for flags in range(4):
             self.do_concurrency_test(flags)
 
 
 class IterAlertsTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.config = lib.create_isolated_config()
         # Always enable session log, for iterator tests requiring alerts
         self.session_service = session_lib.SessionService(
@@ -254,10 +255,10 @@ class IterAlertsTest(unittest.TestCase):
         self.pumper = Pumper(self.driver)
         self.tempdir = tempfile.TemporaryDirectory()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def test_iter_alerts(self):
+    def test_iter_alerts(self) -> None:
         iterator = self.driver.iter_alerts(
             lt.alert_category.status, lt.add_torrent_alert
         )
@@ -277,7 +278,7 @@ class IterAlertsTest(unittest.TestCase):
         self.assertTrue(saw_add_alert)
         self.pumper.shutdown()
 
-    def test_fork_with_handle(self):
+    def test_fork_with_handle(self) -> None:
         self.pumper.start()
 
         iterator = self.driver.iter_alerts(
@@ -291,7 +292,7 @@ class IterAlertsTest(unittest.TestCase):
         forkee_saw_types: List[Type[lt.alert]] = []
         forkee: Optional[threading.Thread] = None
 
-        def watch_handle(handle_iterator: driver_lib.Iterator):
+        def watch_handle(handle_iterator: driver_lib.Iterator) -> None:
             with handle_iterator:
                 for alert in handle_iterator:
                     forkee_saw_types.append(alert.__class__)
@@ -316,14 +317,14 @@ class IterAlertsTest(unittest.TestCase):
                     break
                 raise AssertionError(f"saw unexpected {alert}")
 
-        self.assertIsNotNone(forkee)
+        assert forkee is not None
         forkee.join()
         self.assertTrue(
             forkee_saw_types, [lt.add_torrent_alert, lt.torrent_removed_alert]
         )
         self.pumper.shutdown()
 
-    def test_dead_iterator_detection(self):
+    def test_dead_iterator_detection(self) -> None:
         iterator = self.driver.iter_alerts(lt.alert_category.session_log)
         # Feed iterator some alerts
         self.driver.pump_alerts()
@@ -340,7 +341,7 @@ class IterAlertsTest(unittest.TestCase):
         # unexpected references, so dead iterator protection works as well as
         # it can
 
-    def test_checkpoint_timeout(self):
+    def test_checkpoint_timeout(self) -> None:
         iterator = self.driver.iter_alerts(lt.alert_category.session_log)
         # Feed iterator some alerts
         self.driver.pump_alerts()
@@ -352,13 +353,13 @@ class IterAlertsTest(unittest.TestCase):
 
 
 class DriverTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.session_service = lib.create_isolated_session_service()
         self.driver = driver_lib.AlertDriver(
             session_service=self.session_service
         )
 
-    def test_start_and_close(self):
+    def test_start_and_close(self) -> None:
         self.driver.start()
         iterator = self.driver.iter_alerts(lt.alert_category.session_log)
         # Consume iterator

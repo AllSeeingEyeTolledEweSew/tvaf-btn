@@ -52,7 +52,7 @@ class Mode(enum.Enum):
     READAHEAD = "readahead"
 
 
-def _raise_notimplemented():
+def _raise_notimplemented() -> None:
     raise NotImplementedError
 
 
@@ -95,14 +95,14 @@ class Request:
         self._condition = threading.Condition()
         self._chunks: Dict[int, xmv.MemoryView] = {}
         self._offset = self.start
-        self._exception: Optional[Exception] = None
+        self._exception: Optional[BaseException] = None
 
-    def set_exception(self, exception: Exception):
+    def set_exception(self, exception: BaseException) -> None:
         with self._condition:
             self._exception = exception
             self._condition.notify_all()
 
-    def feed_chunk(self, offset: int, chunk: xmv.MemoryView):
+    def feed_chunk(self, offset: int, chunk: xmv.MemoryView) -> None:
         if self.mode != Mode.READ:
             raise ValueError("not a read request")
         with self._condition:
@@ -127,8 +127,12 @@ class Request:
             if self._offset >= self.stop:
                 return xmv.EMPTY
 
-            def ready():
-                return self._offset in self._chunks or self._exception
+            def ready() -> bool:
+                if self._offset in self._chunks:
+                    return True
+                if self._exception is not None:
+                    return True
+                return False
 
             if not self._condition.wait_for(ready, timeout=timeout):
                 return None
@@ -171,13 +175,13 @@ class _State:
             collections.OrderedDict()
         )  # type: collections.OrderedDict[int, int]
 
-        self._exception: Optional[Exception] = None
+        self._exception: Optional[BaseException] = None
 
     def _get_request_pieces(self, request: Request) -> Iterable[int]:
         assert self._ti is not None
         return _get_request_pieces(request, self._ti)
 
-    def _index_request(self, request: Request):
+    def _index_request(self, request: Request) -> None:
         if self._ti is None:
             return
         if request.mode != Mode.READ:
@@ -187,13 +191,13 @@ class _State:
                 self._piece_to_readers[piece] = set()
             self._piece_to_readers[piece].add(request)
 
-    def add(self, *requests: Request):
+    def add(self, *requests: Request) -> None:
         for request in requests:
             self._requests[id(request)] = request
             self._index_request(request)
         self._update_priorities()
 
-    def _deindex_request(self, request: Request):
+    def _deindex_request(self, request: Request) -> None:
         if self._ti is None:
             return
         if request.mode != Mode.READ:
@@ -204,7 +208,7 @@ class _State:
             if not readers:
                 self._piece_to_readers.pop(piece, None)
 
-    def discard(self, *requests: Request, exception: Exception):
+    def discard(self, *requests: Request, exception: BaseException) -> None:
         for request in requests:
             request.set_exception(exception)
             self._requests.pop(id(request))
@@ -214,7 +218,7 @@ class _State:
     def get_ti(self) -> Optional[lt.torrent_info]:
         return self._ti
 
-    def set_ti(self, ti: lt.torrent_info):
+    def set_ti(self, ti: lt.torrent_info) -> None:
         if self._ti is not None:
             return
         self._ti = ti
@@ -222,13 +226,13 @@ class _State:
             self._index_request(request)
         self._update_priorities()
 
-    def set_handle(self, handle: Optional[lt.torrent_handle]):
+    def set_handle(self, handle: Optional[lt.torrent_handle]) -> None:
         if handle == self._handle:
             return
         self._handle = handle
         self._apply_priorities()
 
-    def _update_priorities(self):
+    def _update_priorities(self) -> None:
         if self._ti is None:
             return
 
@@ -281,7 +285,7 @@ class _State:
     # setting a piece's priority to 0 has the same effect as
     # reset_piece_deadline(), except that the priority becomes 0 instead of 1
 
-    def _apply_priorities_inner(self):
+    def _apply_priorities_inner(self) -> None:
         if self._handle is None or self._ti is None:
             return
 
@@ -312,7 +316,7 @@ class _State:
 
         self._handle.prioritize_pieces(priorities)
 
-    def _apply_priorities(self):
+    def _apply_priorities(self) -> None:
         try:
             with ltpy.translate_exceptions():
                 self._apply_priorities_inner()
@@ -320,8 +324,8 @@ class _State:
             pass
 
     def on_read_piece(
-        self, piece: int, data: bytes, exception: Optional[Exception]
-    ):
+        self, piece: int, data: bytes, exception: Optional[BaseException]
+    ) -> None:
         readers = self._piece_to_readers.get(piece, ())
         if not readers:
             return
@@ -340,12 +344,12 @@ class _State:
             for reader in readers:
                 reader.feed_chunk(offset, chunk)
 
-    def set_exception(self, exception: Exception):
+    def set_exception(self, exception: BaseException) -> None:
         self.discard(*self._requests.values(), exception=exception)
         self.set_handle(None)
         self._exception = exception
 
-    def get_exception(self) -> Optional[Exception]:
+    def get_exception(self) -> Optional[BaseException]:
         return self._exception
 
     def iter_requests(self) -> Iterator[Request]:
@@ -375,7 +379,7 @@ class _Cleanup:
         self._session = session
         self._alert_driver = alert_driver
 
-    def _cleanup_inner(self):
+    def _cleanup_inner(self) -> None:
         # TODO: what should we do in checking state?
 
         # DOES block
@@ -383,7 +387,7 @@ class _Cleanup:
         if status.total_done != 0:
             return
         # DOES block
-        if any(self._handle.piece_priorities()):
+        if any(self._handle.get_piece_priorities()):
             return
 
         # We have no whole pieces, and none are downloading. Do a graceful
@@ -415,7 +419,7 @@ class _Cleanup:
             self._handle, option=lt.options_t.delete_files
         )
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         with ltpy.translate_exceptions():
             self._cleanup_inner()
 
@@ -452,17 +456,17 @@ class _TorrentTask(task_lib.Task):
             self._lock.notify_all()
             return True
 
-    def discard(self, *requests: Request):
+    def discard(self, *requests: Request) -> None:
         with self._lock:
             self._state.discard(*requests, exception=CanceledError())
             self._close_if_no_requests_locked()
 
-    def _close_if_no_requests_locked(self):
+    def _close_if_no_requests_locked(self) -> None:
         if not self._state.has_requests():
             if self._iterator:
                 self._iterator.close()
 
-    def _set_exception(self, exception: Exception):
+    def _set_exception(self, exception: BaseException) -> None:
         with self._lock:
             # More helpful exception. Do this here so that external
             # terminations (due to future linking) get translated
@@ -471,7 +475,7 @@ class _TorrentTask(task_lib.Task):
             super()._set_exception(exception)
             self._state.set_exception(exception)
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         with self._lock:
             if self._iterator is not None:
                 self._iterator.close()
@@ -481,7 +485,7 @@ class _TorrentTask(task_lib.Task):
                 self._state.set_exception(CanceledError())
             self._lock.notify_all()
 
-    def _handle_alert_locked(self, alert: lt.alert):
+    def _handle_alert_locked(self, alert: lt.alert) -> None:
         if isinstance(alert, lt.read_piece_alert):
             exc = ltpy.exception_from_error_code(alert.error)
             self._state.on_read_piece(alert.piece, alert.buffer, exc)
@@ -500,7 +504,9 @@ class _TorrentTask(task_lib.Task):
                 alert.handle, flags=lt.torrent_handle.save_info_dict
             )
 
-    def _handle_alerts_until_no_requests(self, handle: lt.torrent_handle):
+    def _handle_alerts_until_no_requests(
+        self, handle: lt.torrent_handle
+    ) -> None:
         with self._lock:
             if not self._state.has_requests():
                 return
@@ -529,7 +535,7 @@ class _TorrentTask(task_lib.Task):
                     self._handle_alert_locked(alert)
                     self._close_if_no_requests_locked()
 
-    def _run_with_handle(self, handle: lt.torrent_handle):
+    def _run_with_handle(self, handle: lt.torrent_handle) -> None:
         with ltpy.translate_exceptions():
             # Does not block
             handle.clear_error()
@@ -549,7 +555,7 @@ class _TorrentTask(task_lib.Task):
             # wait, it would be nicer to "select" on the iterator and a timeout
             with self._lock:
 
-                def wakeup():
+                def wakeup() -> bool:
                     return (
                         self._terminated.is_set() or self._state.has_requests()
                     )
@@ -567,7 +573,7 @@ class _TorrentTask(task_lib.Task):
         )
         cleanup.cleanup()
 
-    def _run(self):
+    def _run(self) -> None:
         # The previous task must have been terminated, but it may still be
         # touching the handle. Wait for it to finish.
         if self._prev_task is not None:
@@ -685,17 +691,17 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
 
         return request
 
-    def discard_request(self, request: Request):
+    def discard_request(self, request: Request) -> None:
         with self._lock:
             task = self._torrent_tasks.get(request.info_hash)
             if task is None:
                 return
             task.discard(request)
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         pass
 
-    def _run(self):
+    def _run(self) -> None:
         self._terminated.wait()
         self._log_terminate()
 
@@ -748,7 +754,7 @@ class RequestService(task_lib.Task, config_lib.HasConfig):
             yield
             self._atp_settings = atp_settings
 
-    def configure_atp(self, atp: lt.add_torrent_params):
+    def configure_atp(self, atp: lt.add_torrent_params) -> None:
         atp_settings = self._atp_settings
         for key, value in atp_settings.items():
             setattr(atp, key, value)

@@ -34,10 +34,10 @@ class Bounded(task_lib.Task):
     def __init__(self):
         super().__init__(title="Bounded", forever=False)
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         pass
 
-    def _run(self):
+    def _run(self) -> None:
         self._log_terminate()
 
 
@@ -45,10 +45,10 @@ class Forever(task_lib.Task):
     def __init__(self):
         super().__init__(title="Forever", forever=True)
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         pass
 
-    def _run(self):
+    def _run(self) -> None:
         self._terminated.wait()
         self._log_terminate()
 
@@ -58,10 +58,10 @@ class PrematureTerminator(task_lib.Task):
         # NB: Not marked as forever
         super().__init__(title="Premature terminator")
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         pass
 
-    def _run(self):
+    def _run(self) -> None:
         pass
 
 
@@ -69,21 +69,21 @@ class Failer(task_lib.Task):
     def __init__(self):
         super().__init__(title="Failer")
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         pass
 
-    def _run(self):
+    def _run(self) -> None:
         raise FailerException()
 
 
 class Fundamentals(unittest.TestCase):
-    def setUp(self):
-        self.task = Bounded()
+    def setUp(self) -> None:
+        self.task: task_lib.Task = Bounded()
 
     def runs_forever(self) -> bool:
         return False
 
-    def test_is_alive(self):
+    def test_is_alive(self) -> None:
         self.assertFalse(self.task.is_alive())
         self.task.start()
         if self.runs_forever():
@@ -92,7 +92,7 @@ class Fundamentals(unittest.TestCase):
         self.task.join()
         self.assertFalse(self.task.is_alive())
 
-    def test_callback(self):
+    def test_callback(self) -> None:
         callback = unittest.mock.MagicMock()
         self.task.add_done_callback(callback)
 
@@ -103,8 +103,8 @@ class Fundamentals(unittest.TestCase):
 
         callback.assert_called_once_with(self.task)
 
-    def test_failer_callback(self):
-        def failer(_):
+    def test_failer_callback(self) -> None:
+        def failer(_) -> None:
             raise FailerCallbackException()
 
         callback = unittest.mock.MagicMock()
@@ -118,7 +118,7 @@ class Fundamentals(unittest.TestCase):
 
         callback.assert_called_once_with(self.task)
 
-    def test_callback_already_done(self):
+    def test_callback_already_done(self) -> None:
         self.task.start()
         if self.runs_forever():
             self.task.terminate()
@@ -128,13 +128,13 @@ class Fundamentals(unittest.TestCase):
         self.task.add_done_callback(callback)
         callback.assert_called_once_with(self.task)
 
-    def test_failer_callback_already_done(self):
+    def test_failer_callback_already_done(self) -> None:
         self.task.start()
         if self.runs_forever():
             self.task.terminate()
         self.task.join()
 
-        def failer(_):
+        def failer(_) -> None:
             raise FailerCallbackException()
 
         # Shouldn't raise an exception
@@ -143,7 +143,7 @@ class Fundamentals(unittest.TestCase):
 
 def run_and_terminate_idempotent(
     task: task_lib.Task, exception: Optional[Exception]
-):
+) -> None:
     task.terminate(exception)
     task.terminate(exception)
     task.join()
@@ -155,12 +155,12 @@ def run_and_terminate_idempotent(
 
 
 class NormalTerminationTests(Fundamentals):
-    def test_terminate(self):
+    def test_terminate(self) -> None:
         self.task.start()
         run_and_terminate_idempotent(self.task, None)
         self.assertEqual(self.task.exception(), None)
 
-    def test_terminate_exception(self):
+    def test_terminate_exception(self) -> None:
         self.task.start()
         exc = ExternalTerminateException()
         with self.assertRaises(ExternalTerminateException):
@@ -169,21 +169,21 @@ class NormalTerminationTests(Fundamentals):
 
 
 class ForeverTest(NormalTerminationTests):
-    def setUp(self):
-        self.task = Forever()
+    def setUp(self) -> None:
+        self.task: Forever = Forever()
 
-    def runs_forever(self):
+    def runs_forever(self) -> bool:
         return True
 
 
 class BoundedTest(NormalTerminationTests):
-    def setUp(self):
-        self.task = Bounded()
+    def setUp(self) -> None:
+        self.task: task_lib.Task = Bounded()
 
-    def runs_forever(self):
+    def runs_forever(self) -> bool:
         return False
 
-    def test_natural_end(self):
+    def test_natural_end(self) -> None:
         self.task.start()
         self.task.result()
         run_and_terminate_idempotent(self.task, None)
@@ -194,13 +194,13 @@ class AbnormalTerminationTests(Fundamentals):
 
     expected_exc_type = Exception
 
-    def setUp(self):
-        self.task = Failer()
+    def setUp(self) -> None:
+        self.task: task_lib.Task = Failer()
 
-    def runs_forever(self):
+    def runs_forever(self) -> bool:
         return False
 
-    def test_natural_abnormal_termination(self):
+    def test_natural_abnormal_termination(self) -> None:
         self.task.start()
         # NB: don't terminate
         self.task.join()
@@ -214,28 +214,28 @@ class FailerTest(AbnormalTerminationTests):
 
     expected_exc_type = FailerException
 
-    def setUp(self):
-        self.task = Failer()
+    def setUp(self) -> None:
+        self.task: task_lib.Task = Failer()
 
 
 class PrematureTerminatorTest(AbnormalTerminationTests):
 
     expected_exc_type = task_lib.PrematureTermination
 
-    def setUp(self):
-        self.task = PrematureTerminator()
+    def setUp(self) -> None:
+        self.task: task_lib.Task = PrematureTerminator()
 
 
 class FailerTerminatesChildTest(AbnormalTerminationTests):
 
     expected_exc_type = FailerException
 
-    def setUp(self):
-        self.task = Failer()
+    def setUp(self) -> None:
+        self.task: task_lib.Task = Failer()
         self.child = Forever()
         self.task._add_child(self.child)
 
-    def test_terminate_child(self):
+    def test_terminate_child(self) -> None:
         self.task.start()
         self.task.join()
         # Should be terminated, but no exception
@@ -243,7 +243,7 @@ class FailerTerminatesChildTest(AbnormalTerminationTests):
 
 
 class ForeverStartChildren(Forever):
-    def _run(self):
+    def _run(self) -> None:
         for child in self._get_children():
             child.start()
         super()._run()
@@ -253,19 +253,19 @@ class FailerTerminatesParentTest(AbnormalTerminationTests):
 
     expected_exc_type = FailerException
 
-    def setUp(self):
-        self.task = ForeverStartChildren()
+    def setUp(self) -> None:
+        self.task: task_lib.Task = ForeverStartChildren()
         self.child = Failer()
         self.task._add_child(self.child, start=False)
 
 
 class CatchChildErrorsTest(NormalTerminationTests):
-    def setUp(self):
-        self.task = ForeverStartChildren()
+    def setUp(self) -> None:
+        self.task: task_lib.Task = ForeverStartChildren()
         self.child = Failer()
         self.task._add_child(
             self.child, start=False, terminate_me_on_error=False
         )
 
-    def runs_forever(self):
+    def runs_forever(self) -> bool:
         return True

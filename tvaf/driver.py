@@ -93,7 +93,10 @@ class CheckpointTimeout(Error):
     pass
 
 
-class Iterator(collections.abc.Iterator, contextlib.AbstractContextManager):
+class Iterator(
+    TypingIterator[lt.alert],
+    contextlib.AbstractContextManager,
+):
     def __init__(self) -> None:
         self._condition = threading.Condition(threading.RLock())
         self._deque: Deque[lt.alert] = collections.deque()

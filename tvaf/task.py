@@ -45,7 +45,7 @@ class Task(abc.ABC):
             name=thread_name, target=self._run_wrapper
         )
         self._lock = threading.RLock()
-        self.__exception: Optional[Exception] = None
+        self.__exception: Optional[BaseException] = None
         self._terminated = threading.Event()
         self._forever = forever
         self.__done_callbacks: List[Callback] = []
@@ -55,12 +55,12 @@ class Task(abc.ABC):
 
     def _add_child(
         self, child: "Task", start=True, terminate_me_on_error=True
-    ):
+    ) -> None:
         with self._lock:
             self.__children.add(child)
         if terminate_me_on_error:
 
-            def callback(_: Task):
+            def callback(_: Task) -> None:
                 exception = child.exception()
                 if exception is not None:
                     self.terminate(exception)
@@ -73,7 +73,7 @@ class Task(abc.ABC):
         with self._lock:
             return list(self.__children)
 
-    def add_done_callback(self, callback: Callback):
+    def add_done_callback(self, callback: Callback) -> None:
         with self._lock:
             if not self.__done_callbacks_called:
                 self.__done_callbacks.append(callback)
@@ -86,34 +86,34 @@ class Task(abc.ABC):
     def is_alive(self) -> bool:
         return self._thread.is_alive()
 
-    def _get_exception(self) -> Optional[Exception]:
+    def _get_exception(self) -> Optional[BaseException]:
         with self._lock:
             return self.__exception
 
-    def _set_exception(self, exception: Exception):
+    def _set_exception(self, exception: BaseException) -> None:
         with self._lock:
             if self.__exception is None:
                 self.__exception = exception
 
-    def terminate(self, exception: Exception = None):
+    def terminate(self, exception: BaseException = None) -> None:
         with self._lock:
             self._terminated.set()
             if exception is not None:
                 self._set_exception(exception)
         self._terminate()
 
-    def _log_terminate(self):
+    def _log_terminate(self) -> None:
         _LOG.debug("gracefully shutting down: %s", self._title)
 
     @abc.abstractmethod
-    def _terminate(self):
+    def _terminate(self) -> None:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _run(self):
+    def _run(self) -> None:
         raise NotImplementedError
 
-    def _run_wrapper(self):
+    def _run_wrapper(self) -> None:
         _LOG.debug("starting: %s", self._title)
         try:
             self._run()
@@ -140,19 +140,19 @@ class Task(abc.ABC):
             except Exception:
                 _LOG.exception("calling callback for %r", self)
 
-    def start(self):
+    def start(self) -> None:
         self._thread.start()
 
-    def join(self, timeout: float = None):
+    def join(self, timeout: float = None) -> None:
         self._thread.join(timeout=timeout)
 
-    def exception(self, timeout: float = None) -> Optional[Exception]:
+    def exception(self, timeout: float = None) -> Optional[BaseException]:
         if self._thread != threading.current_thread():
             self.join(timeout=timeout)
         with self._lock:
             return self._get_exception()
 
-    def result(self, timeout: float = None):
+    def result(self, timeout: float = None) -> None:
         if self._thread != threading.current_thread():
             self.join(timeout=timeout)
         with self._lock:
@@ -163,8 +163,8 @@ class Task(abc.ABC):
 
 def terminate_task_on_future_fail(
     task: Task, future: concurrent.futures.Future
-):
-    def check(_):
+) -> None:
+    def check(_) -> None:
         exception = future.exception()
         if exception is not None:
             task.terminate(exception)
@@ -172,8 +172,10 @@ def terminate_task_on_future_fail(
     future.add_done_callback(check)
 
 
-def log_future_exceptions(future: concurrent.futures.Future, msg: str, *args):
-    def check(_):
+def log_future_exceptions(
+    future: concurrent.futures.Future, msg: str, *args
+) -> None:
+    def check(_) -> None:
         try:
             future.result()
         except Exception:

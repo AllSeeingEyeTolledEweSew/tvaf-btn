@@ -41,12 +41,12 @@ class HTTPDTest(unittest.TestCase):
         )
         return requests.get(url)
 
-    def test_get(self):
+    def test_get(self) -> None:
         resp = self.get("/lt/v1/torrents")
         resp.raise_for_status()
         self.assertEqual(resp.json(), [])
 
-    def test_disable_enable(self):
+    def test_disable_enable(self) -> None:
         self.config["http_enabled"] = False
         self.httpd.set_config(self.config)
 
@@ -55,15 +55,17 @@ class HTTPDTest(unittest.TestCase):
 
         self.config["http_enabled"] = True
         self.httpd.set_config(self.config)
+        assert self.httpd.socket is not None
         self.host = "%s:%d" % self.httpd.socket.getsockname()
 
         resp = self.get("/lt/v1/torrents")
         resp.raise_for_status()
         self.assertEqual(resp.json(), [])
 
-    def test_change_binding(self):
+    def test_change_binding(self) -> None:
         self.config["http_bind_address"] = "127.0.0.1"
         self.httpd.set_config(self.config)
+        assert self.httpd.socket is not None
         self.host = "%s:%d" % self.httpd.socket.getsockname()
 
         resp = self.get("/lt/v1/torrents")

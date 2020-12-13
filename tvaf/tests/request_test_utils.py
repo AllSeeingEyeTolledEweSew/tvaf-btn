@@ -26,7 +26,7 @@ from . import lib
 from . import tdummy
 
 
-def wait_done_checking_or_error(handle: lt.torrent_handle):
+def wait_done_checking_or_error(handle: lt.torrent_handle) -> None:
     for _ in lib.loop_until_timeout(5, msg="checking (or error)"):
         status = handle.status()
         if status.state not in (
@@ -38,7 +38,11 @@ def wait_done_checking_or_error(handle: lt.torrent_handle):
             break
 
 
-def read_all(request: request_lib.Request, msg="read all data", timeout=5):
+def read_all(
+    request: request_lib.Request,
+    msg: str = "read all data",
+    timeout: float = 5,
+) -> bytes:
     chunks = []
     for _ in lib.loop_until_timeout(timeout, msg=msg):
         chunk = request.read(timeout=0)
@@ -52,14 +56,14 @@ def read_all(request: request_lib.Request, msg="read all data", timeout=5):
 class RequestServiceTestCase(unittest.TestCase):
     """Tests for tvaf.dal.create_schema()."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.torrent = tdummy.DEFAULT
         self.tempdir = tempfile.TemporaryDirectory()
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.config = config_lib.Config()
         self.init_session()
 
-    def teardown_session(self):
+    def teardown_session(self) -> None:
         self.service.terminate()
         self.service.join()
         self.resume_service.terminate()
@@ -67,7 +71,7 @@ class RequestServiceTestCase(unittest.TestCase):
         self.alert_driver.terminate()
         self.alert_driver.join()
 
-    def init_session(self):
+    def init_session(self) -> None:
         self.session_service = lib.create_isolated_session_service()
         self.session = self.session_service.session
         self.alert_driver = driver_lib.AlertDriver(
@@ -90,11 +94,11 @@ class RequestServiceTestCase(unittest.TestCase):
         self.service.start()
         self.resume_service.start()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.teardown_session()
         self.tempdir.cleanup()
 
-    def feed_pieces(self, piece_indexes=None):
+    def feed_pieces(self, piece_indexes=None) -> None:
         if not piece_indexes:
             piece_indexes = list(range(len(self.torrent.pieces)))
         handle = self.wait_for_torrent()
@@ -113,7 +117,7 @@ class RequestServiceTestCase(unittest.TestCase):
         start=None,
         stop=None,
         configure_atp=None,
-    ):
+    ) -> request_lib.Request:
         if start is None:
             start = 0
         if stop is None:
@@ -128,12 +132,11 @@ class RequestServiceTestCase(unittest.TestCase):
             configure_atp=configure_atp,
         )
 
-    def wait_for_torrent(self):
-        handle = None
+    def wait_for_torrent(self) -> lt.torrent_handle:
         for _ in lib.loop_until_timeout(5, msg="add torrent"):
             handle = self.session.find_torrent(
                 lt.sha1_hash(bytes.fromhex(self.torrent.info_hash))
             )
             if handle.is_valid():
-                break
-        return handle
+                return handle
+        raise AssertionError("unreachable")

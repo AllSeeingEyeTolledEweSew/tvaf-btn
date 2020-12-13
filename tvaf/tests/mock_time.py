@@ -11,6 +11,9 @@
 # OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 
+import threading
+from typing import Any
+from typing import ContextManager
 from typing import List
 from typing import Optional
 from typing import SupportsFloat
@@ -22,7 +25,7 @@ class WaitForever(Exception):
     pass
 
 
-class MockTime:
+class MockTime(ContextManager["MockTime"]):
     """A class to assist with mocking time functions for testing.
 
     mock_time() returns an instance of TimeMocker as part of the context
@@ -73,23 +76,24 @@ class MockTime:
         self._time += increment
         self._monotonic += increment
 
-    def patch(self, *args, **kwargs):
-        return self.add_patch(unittest.mock.patch(*args, **kwargs))
+    # These type signatures are complicated. Leave them out for now.
+    def patch(self, *args, **kwargs) -> Any:
+        return self._add_patch(unittest.mock.patch(*args, **kwargs))
 
-    def patch_object(self, *args, **kwargs):
-        return self.add_patch(unittest.mock.patch.object(*args, **kwargs))
+    def patch_object(self, *args, **kwargs) -> Any:
+        return self._add_patch(unittest.mock.patch.object(*args, **kwargs))
 
-    def patch_dict(self, *args, **kwargs):
-        return self.add_patch(unittest.mock.patch.dict(*args, **kwargs))
+    def patch_dict(self, *args, **kwargs) -> Any:
+        return self._add_patch(unittest.mock.patch.dict(*args, **kwargs))
 
-    def add_patch(self, patch):
+    def _add_patch(self, patch) -> Any:
         if self._started:
             patch.start()
         self._patches.append(patch)
         return patch
 
-    def patch_condition(self, cond):
-        self.patch_object(cond, "wait", new=self.wait)
+    def patch_condition(self, cond: threading.Condition):
+        return self.patch_object(cond, "wait", new=self.wait)
 
     def __enter__(self) -> "MockTime":
         """Returns itself after enabling all time function patches."""

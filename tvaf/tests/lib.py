@@ -24,7 +24,7 @@ import os
 import re
 import time
 from typing import Any
-from typing import Generator
+from typing import Iterator
 import unittest
 import unittest.mock
 
@@ -57,7 +57,9 @@ def create_isolated_session_service(
     )
 
 
-def loop_until_timeout(timeout: float, msg: str = "condition") -> Generator:
+def loop_until_timeout(
+    timeout: float, msg: str = "condition"
+) -> Iterator[None]:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         yield

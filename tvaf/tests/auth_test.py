@@ -18,33 +18,33 @@ from tvaf import auth
 
 
 class TestAuthService(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.auth_service = auth.AuthService()
 
-    def test_auth_good(self):
+    def test_auth_good(self) -> None:
         self.auth_service.auth_password_plain(
             self.auth_service.USER, self.auth_service.PASSWORD
         )
 
-    def test_auth_bad(self):
+    def test_auth_bad(self) -> None:
         with self.assertRaises(auth.AuthenticationFailed):
             self.auth_service.auth_password_plain("invalid", "invalid")
 
-    def test_push_get_pop(self):
+    def test_push_get_pop(self) -> None:
         self.assertEqual(self.auth_service.get_user(), None)
         self.auth_service.push_user("username")
         self.assertEqual(self.auth_service.get_user(), "username")
         self.auth_service.pop_user()
         self.assertEqual(self.auth_service.get_user(), None)
 
-    def test_push_contextmanager(self):
+    def test_push_contextmanager(self) -> None:
         self.assertEqual(self.auth_service.get_user(), None)
         with self.auth_service.push_user("username"):
             self.assertEqual(self.auth_service.get_user(), "username")
         self.assertEqual(self.auth_service.get_user(), None)
 
-    def test_threading(self):
-        def run_test(username):
+    def test_threading(self) -> None:
+        def run_test(username) -> None:
             self.assertEqual(self.auth_service.get_user(), None)
             with self.auth_service.push_user(username):
                 self.assertEqual(self.auth_service.get_user(), username)

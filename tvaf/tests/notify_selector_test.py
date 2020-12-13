@@ -25,12 +25,12 @@ class NotifySelectorTest(unittest.TestCase):
 
     TEST_CLASS: Type[selectors.BaseSelector] = notify_selector.NotifySelector
 
-    def test_register_while_selecting(self):
+    def test_register_while_selecting(self) -> None:
         rfile, wfile = util.selectable_pipe()
         wfile.write(b"\0")
         selector = self.TEST_CLASS()
 
-        def register_from_thread():
+        def register_from_thread() -> None:
             # Is there a way to synchronize this?
             time.sleep(0.1)
             selector.register(rfile, selectors.EVENT_READ)

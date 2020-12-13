@@ -17,7 +17,7 @@ from tvaf import protocol
 
 
 class IterFilesTest(unittest.TestCase):
-    def test_single_file(self):
+    def test_single_file(self) -> None:
         info = protocol.Info(
             {b"name": b"file name \xff.txt", b"length": 10000}
         )
@@ -41,7 +41,7 @@ class IterFilesTest(unittest.TestCase):
         self.assertFalse(file_.is_pad)
         self.assertFalse(file_.is_executable)
 
-    def test_single_file_attr(self):
+    def test_single_file_attr(self) -> None:
         info = protocol.Info(
             {
                 b"attr": b"hx\xff",
@@ -69,7 +69,7 @@ class IterFilesTest(unittest.TestCase):
         self.assertFalse(file_.is_pad)
         self.assertTrue(file_.is_executable)
 
-    def test_multi_file(self):
+    def test_multi_file(self) -> None:
         info = protocol.Info(
             {
                 b"name": b"parent",
@@ -127,7 +127,7 @@ class IterFilesTest(unittest.TestCase):
         self.assertFalse(file_.is_pad)
         self.assertFalse(file_.is_executable)
 
-    def test_pad(self):
+    def test_pad(self) -> None:
         info = protocol.Info(
             {
                 b"name": b"parent",
@@ -184,7 +184,7 @@ class IterFilesTest(unittest.TestCase):
         self.assertTrue(file_.is_pad)
         self.assertFalse(file_.is_executable)
 
-    def test_multi_file_attr(self):
+    def test_multi_file_attr(self) -> None:
         info = protocol.Info(
             {
                 b"name": b"parent",
@@ -243,7 +243,7 @@ class IterFilesTest(unittest.TestCase):
         self.assertFalse(file_.is_pad)
         self.assertTrue(file_.is_executable)
 
-    def test_symlink(self):
+    def test_symlink(self) -> None:
         info = protocol.Info(
             {
                 b"name": b"parent",

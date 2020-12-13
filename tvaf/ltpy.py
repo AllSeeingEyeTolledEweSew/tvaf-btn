@@ -49,14 +49,14 @@ class Error(RuntimeError):
             return use_cls.__new__(use_cls, ec)
         return super().__new__(use_cls, ec)  # type: ignore
 
-    def __init__(self, ec):
+    def __init__(self, ec: lt.error_code):
         super().__init__(ec.value(), ec.message())
         self.ec = ec
         self.value = ec.value()
         self.category = ec.category()
         self.message = ec.message()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.message
 
 
@@ -108,7 +108,7 @@ class OSError(Error, builtins.OSError):
         self.category = ec.category()
         self.message = ec.message()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return builtins.OSError.__str__(self)
 
 
@@ -284,7 +284,7 @@ def exception_from_alert(alert: lt.alert) -> Optional[Exception]:
 _error_code_msg_lookup: Dict[str, Dict[lt.error_category, int]] = {}
 
 
-def _init_error_code_msg_lookup():
+def _init_error_code_msg_lookup() -> None:
     # There's no way to enumerate all error categories. Check all the ones we
     # know about.
     for category in (

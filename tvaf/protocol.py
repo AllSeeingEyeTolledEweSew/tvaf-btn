@@ -16,6 +16,7 @@ from typing import Any
 from typing import Dict
 from typing import Iterator
 from typing import List
+from typing import Sequence
 
 # mypy currently doesn't support cyclic definitions.
 # BAny = Union["BDict", "BList", bytes, int]
@@ -45,56 +46,62 @@ class FileSpec:
     target_bytes: List[bytes] = dataclasses.field(default_factory=list)
 
     @property
-    def length(self):
+    def length(self) -> int:
         return self.stop - self.start
 
     @property
-    def is_symlink(self):
+    def is_symlink(self) -> bool:
         return b"l" in self.attr_bytes
 
     @property
-    def is_hidden(self):
+    def is_hidden(self) -> bool:
         return b"h" in self.attr_bytes
 
     @property
-    def is_executable(self):
+    def is_executable(self) -> bool:
         return b"x" in self.attr_bytes
 
     @property
-    def is_pad(self):
+    def is_pad(self) -> bool:
         return b"p" in self.attr_bytes
 
     @property
-    def base_name(self):
+    def base_name(self) -> str:
         return decode(self.base_name_bytes)
 
     @property
-    def path(self):
+    def path(self) -> Sequence[str]:
         return [decode(elem) for elem in self.path_bytes]
 
     @property
-    def full_path_bytes(self):
+    def full_path_bytes(self) -> Sequence[bytes]:
         return [self.base_name_bytes] + self.path_bytes
 
     @property
-    def full_path(self):
-        return [self.base_name] + self.path
+    def full_path(self) -> Sequence[str]:
+        # += typechecks here, but + doesn't. Not sure why.
+        result = [self.base_name]
+        result += self.path
+        return result
 
     @property
-    def attr(self):
+    def attr(self) -> str:
         return decode(self.attr_bytes)
 
     @property
-    def target(self):
+    def target(self) -> Sequence[str]:
         return [decode(elem) for elem in self.target_bytes]
 
     @property
-    def full_target_bytes(self):
+    def full_target_bytes(self) -> Sequence[bytes]:
         return [self.base_name_bytes] + self.target_bytes
 
     @property
-    def full_target(self):
-        return [self.base_name] + self.target
+    def full_target(self) -> Sequence[str]:
+        # += typechecks here, but + doesn't. Not sure why.
+        result = [self.base_name]
+        result += self.target
+        return result
 
 
 class Info:

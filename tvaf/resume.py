@@ -19,6 +19,7 @@ import pathlib
 import re
 import threading
 from typing import Callable
+from typing import cast
 from typing import Iterator
 from typing import Optional
 import warnings
@@ -100,7 +101,9 @@ def _try_load_atp(path: pathlib.Path) -> Optional[lt.add_torrent_params]:
         return None
 
 
-def iter_resume_data_from_disk(config_dir: pathlib.Path):
+def iter_resume_data_from_disk(
+    config_dir: pathlib.Path,
+) -> Iterator[lt.add_torrent_params]:
     resume_data_dir = config_dir.joinpath(RESUME_DATA_DIR_NAME)
     if not resume_data_dir.is_dir():
         return
@@ -135,7 +138,7 @@ def _write_safe_log(path: pathlib.Path) -> Iterator[pathlib.Path]:
     _LOG.debug("wrote: %s", path)
 
 
-def _delete(path: pathlib.Path):
+def _delete(path: pathlib.Path) -> None:
     try:
         path.unlink()
         _LOG.debug("deleted: %s", path)
@@ -184,10 +187,10 @@ class _ReceiverTask(task_lib.Task):
         )
         self._pedantic = pedantic
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         self._iterator.close()
 
-    def _io_submit(self, func: Callable, *args, **kwargs):
+    def _io_submit(self, func: Callable, *args, **kwargs) -> None:
         future = self._io_executor.submit(func, *args, **kwargs)
         task_lib.log_future_exceptions(future, "in io task")
         if self._pedantic:
@@ -198,7 +201,7 @@ class _ReceiverTask(task_lib.Task):
         check: concurrent.futures.Future,
         info_hash: lt.sha1_hash,
         data: bytes,
-    ):
+    ) -> None:
         if not check.result():
             return
         path = self._resume_service.get_resume_data_path(info_hash)
@@ -210,7 +213,7 @@ class _ReceiverTask(task_lib.Task):
         check: Optional[concurrent.futures.Future],
         info_hash: lt.sha1_hash,
         metadata: bytes,
-    ):
+    ) -> None:
         if check is not None and not check.result():
             return
         path = self._resume_service.get_torrent_path(info_hash)
@@ -223,7 +226,7 @@ class _ReceiverTask(task_lib.Task):
                 fp.write(metadata)
                 fp.write(b"e")
 
-    def _dec(self):
+    def _dec(self) -> None:
         try:
             self._counter.inc(-1)
         except _Underflow:
@@ -236,7 +239,7 @@ class _ReceiverTask(task_lib.Task):
             if self._pedantic:
                 raise
 
-    def _handle_alert(self, alert: lt.alert):
+    def _handle_alert(self, alert: lt.alert) -> None:
         if isinstance(alert, lt.save_resume_data_alert):
             atp = alert.params
             handle = alert.handle
@@ -302,7 +305,7 @@ class _ReceiverTask(task_lib.Task):
                 alert.handle, flags=lt.torrent_handle.save_info_dict
             )
 
-    def _run(self):
+    def _run(self) -> None:
         with self._iterator:
             for alert in self._iterator:
                 self._handle_alert(alert)
@@ -332,14 +335,16 @@ class _TriggerTask(task_lib.Task):
             lt.cache_flushed_alert,
         )
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         self._iterator.close()
 
-    def _run(self):
+    def _run(self) -> None:
         with self._iterator:
             for alert in self._iterator:
+                torrent_alert = cast(lt.torrent_alert, alert)
                 self._resume_service.save(
-                    alert.handle, flags=lt.torrent_handle.only_if_modified
+                    torrent_alert.handle,
+                    flags=lt.torrent_handle.only_if_modified,
                 )
 
 
@@ -350,10 +355,10 @@ class _PeriodicTask(task_lib.Task):
         )
         self._resume_service = resume_service
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         pass
 
-    def _run(self):
+    def _run(self) -> None:
         while not self._terminated.wait(SAVE_ALL_INTERVAL):
             self._resume_service.save_all(
                 flags=lt.torrent_handle.only_if_modified
@@ -398,10 +403,10 @@ class ResumeService(task_lib.Task):
     def get_torrent_path(self, info_hash: lt.sha1_hash) -> pathlib.Path:
         return self.data_dir.joinpath(str(info_hash)).with_suffix(".torrent")
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         pass
 
-    def _run(self):
+    def _run(self) -> None:
         self._receiver_task.start()
         self._trigger_task.start()
         self._periodic_task.start()
@@ -434,7 +439,7 @@ class ResumeService(task_lib.Task):
         self._receiver_task.terminate()
         self._receiver_task.join()
 
-    def save(self, handle: lt.torrent_handle, flags: int = 0):
+    def save(self, handle: lt.torrent_handle, flags: int = 0) -> None:
         try:
             with ltpy.translate_exceptions():
                 # Does not block
@@ -444,7 +449,7 @@ class ResumeService(task_lib.Task):
         else:
             self._counter.inc(1)
 
-    def save_all(self, flags: int = 0):
+    def save_all(self, flags: int = 0) -> None:
         # Loading all handles at once in python could be cumbersome at large
         # scales, but I don't know of a better way to do this right now
         with ltpy.translate_exceptions():

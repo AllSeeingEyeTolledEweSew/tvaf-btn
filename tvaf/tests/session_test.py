@@ -31,7 +31,7 @@ def _raise_dummy() -> None:
 
 
 class TestSession(unittest.TestCase):
-    def test_session(self):
+    def test_session(self) -> None:
         init_alert_mask = lt.alert_category.error | lt.alert_category.peer
         config = lib.create_isolated_config()
         config["session_handshake_client_version"] = "test-version"
@@ -43,7 +43,7 @@ class TestSession(unittest.TestCase):
         session_service.session.get_settings()
         self.assertEqual(config["session_settings_base"], "default_settings")
 
-    def test_alert_mask(self):
+    def test_alert_mask(self) -> None:
         config = lib.create_isolated_config()
         config["session_alert_mask"] = 2
 
@@ -77,7 +77,7 @@ class TestSession(unittest.TestCase):
         settings = session_service.session.get_settings()
         self.assertEqual(settings["alert_mask"], 1 | 4)
 
-    def test_overrides(self):
+    def test_overrides(self) -> None:
         config = lib.create_isolated_config()
         config["session_handshake_client_version"] = "test-version"
         session_service = session_lib.SessionService(config=config)
@@ -86,7 +86,7 @@ class TestSession(unittest.TestCase):
         settings = session_service.session.get_settings()
         self.assertEqual(settings["handshake_client_version"], "")
 
-    def test_blacklist(self):
+    def test_blacklist(self) -> None:
         config = lib.create_isolated_config()
         config["session_user_agent"] = "test"
         session_service = session_lib.SessionService(config=config)
@@ -95,7 +95,7 @@ class TestSession(unittest.TestCase):
         settings = session_service.session.get_settings()
         self.assertNotEqual(settings["user_agent"], "test")
 
-    def test_reconfigure(self):
+    def test_reconfigure(self) -> None:
         config = lib.create_isolated_config()
         session_service = session_lib.SessionService(config=config)
 
@@ -115,7 +115,7 @@ class TestSession(unittest.TestCase):
         settings = session_service.session.get_settings()
         self.assertEqual(settings["close_redundant_connections"], False)
 
-    def test_stage_revert(self):
+    def test_stage_revert(self) -> None:
         config = lib.create_isolated_config()
         session_service = session_lib.SessionService(config=config)
 
@@ -127,7 +127,7 @@ class TestSession(unittest.TestCase):
         settings = session_service.session.get_settings()
         self.assertEqual(settings["close_redundant_connections"], True)
 
-    def test_settings_base(self):
+    def test_settings_base(self) -> None:
         config = lib.create_isolated_config()
         config["session_settings_base"] = "high_performance_seed"
         session_service = session_lib.SessionService(config=config)
@@ -144,19 +144,19 @@ class TestSession(unittest.TestCase):
             config["session_settings_base"], "high_performance_seed"
         )
 
-    def test_settings_base_invalid(self):
+    def test_settings_base_invalid(self) -> None:
         with self.assertRaises(config_lib.InvalidConfigError):
             session_lib.SessionService(
                 config=config_lib.Config(session_settings_base="invalid")
             )
 
-    def test_setting_invalid_type(self):
+    def test_setting_invalid_type(self) -> None:
         with self.assertRaises(config_lib.InvalidConfigError):
             session_lib.SessionService(
                 config=config_lib.Config(session_cache_size="invalid")
             )
 
-    def test_alert_mask_invalid_type(self):
+    def test_alert_mask_invalid_type(self) -> None:
         with self.assertRaises(config_lib.InvalidConfigError):
             session_lib.SessionService(
                 config=config_lib.Config(session_alert_mask="invalid")

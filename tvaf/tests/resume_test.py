@@ -13,6 +13,12 @@
 
 import pathlib
 import tempfile
+from typing import Any
+from typing import cast
+from typing import Dict
+from typing import Hashable
+from typing import List
+from typing import Set
 import unittest
 
 import libtorrent as lt
@@ -26,23 +32,23 @@ from . import request_test_utils
 from . import tdummy
 
 
-def atp_dict_fixup(atp_dict):
-    return lt.bdecode(lt.bencode(atp_dict))
+def atp_dict_fixup(atp_dict: Dict[bytes, Any]) -> Dict[bytes, Any]:
+    return cast(Dict[bytes, Any], lt.bdecode(lt.bencode(atp_dict)))
 
 
-def hashable(obj):
+def hashable(obj: Any) -> Hashable:
     if isinstance(obj, (list, tuple)):
         return tuple(hashable(x) for x in obj)
     if isinstance(obj, dict):
         return tuple(sorted((k, hashable(v)) for k, v in obj.items()))
-    return obj
+    return cast(Hashable, obj)
 
 
-def atp_hashable(atp):
+def atp_hashable(atp: lt.add_torrent_params) -> Hashable:
     return hashable(atp_dict_fixup(lt.write_resume_data(atp)))
 
 
-def atp_comparable(atp):
+def atp_comparable(atp: lt.add_torrent_params) -> Dict[bytes, Any]:
     return atp_dict_fixup(lt.write_resume_data(atp))
 
 
@@ -54,14 +60,14 @@ class IterResumeDataTest(unittest.TestCase):
     TORRENT2 = tdummy.Torrent.single_file(name=b"2.txt", length=1024)
     TORRENT3 = tdummy.Torrent.single_file(name=b"3.txt", length=1024)
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
         self.config_dir = pathlib.Path(self.tempdir.name)
         self.resume_data_dir = self.config_dir.joinpath(
             resume_lib.RESUME_DATA_DIR_NAME
         )
 
-        def write(torrent):
+        def write(torrent: tdummy.Torrent) -> None:
             self.resume_data_dir.mkdir(parents=True, exist_ok=True)
             path = self.resume_data_dir.joinpath(
                 torrent.info_hash
@@ -76,31 +82,41 @@ class IterResumeDataTest(unittest.TestCase):
         write(self.TORRENT1)
         write(self.TORRENT2)
 
-    def assert_atp_equal(self, got, expected):
+    def assert_atp_equal(
+        self, got: lt.add_torrent_params, expected: lt.add_torrent_params
+    ) -> None:
         self.assertEqual(atp_comparable(got), atp_comparable(expected))
 
-    def assert_atp_list_equal(self, got, expected):
+    def assert_atp_list_equal(
+        self,
+        got: List[lt.add_torrent_params],
+        expected: List[lt.add_torrent_params],
+    ) -> None:
         self.assertEqual(
             [atp_comparable(atp) for atp in got],
             [atp_comparable(atp) for atp in expected],
         )
 
-    def assert_atp_sets_equal(self, got, expected):
+    def assert_atp_sets_equal(
+        self,
+        got: Set[lt.add_torrent_params],
+        expected: Set[lt.add_torrent_params],
+    ) -> None:
         self.assertEqual(
             {atp_hashable(atp) for atp in got},
             {atp_hashable(atp) for atp in expected},
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def test_normal(self):
+    def test_normal(self) -> None:
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.assert_atp_sets_equal(
             set(atps), {self.TORRENT1.atp(), self.TORRENT2.atp()}
         )
 
-    def test_ignore_bad_data(self):
+    def test_ignore_bad_data(self) -> None:
         # valid resume data, wrong filename
         path = self.resume_data_dir.joinpath("00" * 20).with_suffix(".tmp")
         data = lt.bencode(lt.write_resume_data(self.TORRENT3.atp()))
@@ -130,7 +146,7 @@ class IterResumeDataTest(unittest.TestCase):
 
 
 class TerminateTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.session_service = lib.create_isolated_session_service()
         self.session = self.session_service.session
         self.torrent = tdummy.DEFAULT
@@ -151,7 +167,7 @@ class TerminateTest(unittest.TestCase):
         self.resume.start()
         self.alert_driver.start()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.resume.terminate()
         self.resume.join()
         self.alert_driver.terminate()
@@ -159,7 +175,7 @@ class TerminateTest(unittest.TestCase):
 
         self.tempdir.cleanup()
 
-    def test_mid_download(self):
+    def test_mid_download(self) -> None:
         atp = self.torrent.atp()
         atp.flags &= ~lt.torrent_flags.paused
         atp.save_path = self.tempdir.name
@@ -192,7 +208,7 @@ class TerminateTest(unittest.TestCase):
         atp = atps[0]
         self.assertTrue(atp_have_piece(atp, 0))
 
-    def test_finished(self):
+    def test_finished(self) -> None:
         atp = self.torrent.atp()
         atp.flags &= ~lt.torrent_flags.paused
         atp.save_path = self.tempdir.name
@@ -204,7 +220,7 @@ class TerminateTest(unittest.TestCase):
 
         for _ in lib.loop_until_timeout(5, msg="finished state"):
             status = handle.status()
-            if status.state in (status.finished, status.seeding):
+            if status.state in (status.states.finished, status.states.seeding):
                 break
 
         self.session.pause()
@@ -217,7 +233,7 @@ class TerminateTest(unittest.TestCase):
         self.assertNotEqual(len(atp.have_pieces), 0)
         self.assertTrue(all(atp.have_pieces))
 
-    def test_remove_before_save(self):
+    def test_remove_before_save(self) -> None:
         for _ in lib.loop_until_timeout(5, msg="remove-before-save"):
             atp = self.torrent.atp()
             atp.flags &= ~lt.torrent_flags.paused
@@ -240,7 +256,7 @@ class TerminateTest(unittest.TestCase):
         atps = list(resume_lib.iter_resume_data_from_disk(self.config_dir))
         self.assertEqual(atps, [])
 
-    def test_finish_remove_terminate(self):
+    def test_finish_remove_terminate(self) -> None:
         atp = self.torrent.atp()
         atp.flags &= ~lt.torrent_flags.paused
         atp.save_path = self.tempdir.name
@@ -252,7 +268,7 @@ class TerminateTest(unittest.TestCase):
 
         for _ in lib.loop_until_timeout(5, msg="finished state"):
             status = handle.status()
-            if status.state in (status.finished, status.seeding):
+            if status.state in (status.states.finished, status.states.seeding):
                 break
 
         # Remove, pause and terminate before we process any alerts.

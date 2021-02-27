@@ -35,20 +35,20 @@ from typing import TypeVar
 # places, or complex metaclass code. All type conversion also needs to be
 # centralized, which impacts modularity.
 
-# Config updates are "staged" such that e.g. when the FTP port is changed, we:
+# Config updates are "staged" such that e.g. when the HTTP port is changed, we:
 #  - bind a socket to the new port
 #  - attempt any other config changes
 #  - if other changes fail, close the new socket
-#  - if other changes succeed, start the ftp server on the new port and close
+#  - if other changes succeed, start the server on the new port and close
 #    the old server.
-# This makes certain changes impossible, such as changing the ftp binding from
+# This makes certain changes impossible, such as changing the binding from
 # 0.0.0.0:21 to 127.0.0.1:21, as the old server breaks the new binding. However
 # I notice that nginx has the same limitation, so it's probably good enough.
 
 # In Python we prefer to work with "disposable" objects which are configured
 # only once, and re-created as necessary. However, tvaf's top-level App code
 # doesn't know the right life cycle for its various components (for example,
-# should the App re-create the FTP server for a particular config change?).
+# should the App re-create the server for a particular config change?).
 # So we design our components to be long-lived objects which can be
 # re-configured over their lifetimes.
 

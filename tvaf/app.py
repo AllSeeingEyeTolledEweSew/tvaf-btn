@@ -11,7 +11,6 @@
 # OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 
-import io
 import logging
 import pathlib
 import socket as socket_lib
@@ -20,15 +19,11 @@ from typing import Optional
 from tvaf import auth as auth_lib
 from tvaf import config as config_lib
 from tvaf import driver as driver_lib
-from tvaf import ftp as ftp_lib
 from tvaf import http as http_lib
-from tvaf import library
 from tvaf import request as request_lib
 from tvaf import resume as resume_lib
 from tvaf import session as session_lib
 from tvaf import task as task_lib
-from tvaf import torrent_io
-from tvaf import types
 
 _LOG = logging.getLogger(__name__)
 
@@ -67,16 +62,6 @@ class App(task_lib.Task):
 
         self._auth_service = auth_lib.AuthService()
 
-        self.libraries = library.Libraries()
-        self._library_service = library.LibraryService(
-            opener=self._open, libraries=self.libraries
-        )
-
-        self._ftpd = ftp_lib.FTPD(
-            auth_service=self._auth_service,
-            root=self._library_service.root,
-            config=self._config,
-        )
         self._httpd = http_lib.HTTPD(
             config=self._config, session=self._session
         )
@@ -88,43 +73,17 @@ class App(task_lib.Task):
     def http_socket(self) -> Optional[socket_lib.socket]:
         return self._httpd.socket
 
-    @property
-    def ftp_socket(self) -> Optional[socket_lib.socket]:
-        return self._ftpd.socket
-
     def _load_config(self) -> config_lib.Config:
         return config_lib.Config.from_config_dir(self._config_dir)
 
     def _save_config(self) -> None:
         self._config.write_config_dir(self._config_dir)
 
-    def _open(
-        self,
-        info_hash: types.InfoHash,
-        start: int,
-        stop: int,
-        configure_atp: types.ConfigureATP,
-    ) -> io.IOBase:
-        user = self._auth_service.get_user()
-        if user is None:
-            raise auth_lib.AuthenticationFailed(
-                "Opening torrent outside of authentication!"
-            )
-
-        return torrent_io.BufferedTorrentIO(
-            request_service=self._request_service,
-            info_hash=info_hash,
-            start=start,
-            stop=stop,
-            configure_atp=configure_atp,
-        )
-
     def _set_config(self, config: config_lib.Config) -> None:
         config_lib.set_config(
             config,
             self._session_service.stage_config,
             self._request_service.stage_config,
-            self._ftpd.stage_config,
         )
         self._config = config
 
@@ -147,7 +106,6 @@ class App(task_lib.Task):
 
         # Start request-serving services only after resume data has been
         # loaded so we don't serve any 404s at startup
-        self._add_child(self._ftpd)
         self._add_child(self._httpd)
 
         self._terminated.wait()
@@ -155,12 +113,10 @@ class App(task_lib.Task):
 
         # Terminate all request-serving services
         self._request_service.terminate()
-        self._ftpd.terminate()
         self._httpd.terminate()
 
         # Wait for requset-serving services to complete
         self._request_service.join()
-        self._ftpd.join()
         self._httpd.join()
 
         # Should be no more alert-generating actions

@@ -18,17 +18,14 @@
 
 
 import dataclasses
-import io
 import json
 import os
-import re
 import time
 from typing import Any
 from typing import Iterator
 import unittest
 import unittest.mock
 
-import apsw
 import importlib_resources
 
 from tvaf import config as config_lib
@@ -44,7 +41,6 @@ def create_isolated_config() -> config_lib.Config:
         session_enable_upnp=False,
         session_listen_interfaces="127.0.0.1:0",
         session_alert_mask=0,
-        ftp_port=0,
         http_port=0,
     )
 
@@ -64,30 +60,6 @@ def loop_until_timeout(
     while time.monotonic() < deadline:
         yield
     raise AssertionError(f"{msg} timed out")
-
-
-def add_fixture_row(conn: apsw.Connection, table: str, **kwargs: Any) -> None:
-    """Adds a row to a database.
-
-    Args:
-        conn: The database to modify.
-        table: The name of the table to update.
-        kwargs: A mapping from column names to binding values.
-    """
-    keys = sorted(kwargs.keys())
-    columns = ",".join(keys)
-    params = ",".join(":" + k for k in keys)
-    conn.cursor().execute(
-        f"insert into {table} ({columns}) values ({params})", kwargs
-    )
-
-
-def add_fixture_torrent_meta(
-    conn: apsw.Connection, meta: tvaf.types.TorrentMeta
-) -> None:
-    """Adds a TorrentMeta to the database."""
-    meta_dict = dataclasses.asdict(meta)
-    add_fixture_row(conn, "torrent_meta", **meta_dict)
 
 
 class TestCase(unittest.TestCase):
@@ -162,51 +134,6 @@ class TestCase(unittest.TestCase):
         kwargs["sort_keys"] = True
         value_text = json.dumps(value, **kwargs)
         self.assert_golden(value_text, suffix=suffix)
-
-    def assert_golden_db(
-        self,
-        conn: apsw.Connection,
-        suffix: str = "golden.sql",
-        include_schema: bool = False,
-    ) -> None:
-        """Like assert_golden for the contents of the database.
-
-        This internally uses apsw's ".dump" command. Comments and whitespace
-        are stripped to ensure stable comparisons.
-
-        Args:
-            conn: The database to check.
-            suffix: A distinguishing suffix for the filename of the golden
-                data.
-            include_schema: If True, all SQL statements will be included. If
-                False, only INSERT statements will be included.
-
-        Raises:
-            AssertionError: If the given value doesn't match the golden data,
-                and GOLDEN_MELD is unset.
-        """
-        output_file = io.StringIO()
-        shell = apsw.Shell(db=conn, stdout=output_file)
-        shell.process_command(".dump")
-        output = output_file.getvalue()
-        # Remove comments, which include unstable data like timestamps,
-        # usernames and hostnames.
-        output = re.sub(r"-- (.*?)\n", "", output)
-        if not include_schema:
-            output = "\n".join(
-                line
-                for line in output.split("\n")
-                if line.startswith("INSERT ")
-            )
-        self.assert_golden(output, suffix=suffix)
-
-    def assert_golden_acct(
-        self, *audits: tvaf.types.Acct, suffix: str = "accts.golden.json"
-    ) -> None:
-        """Compares a list of Acct records to golden data."""
-        self.assert_golden_json(
-            [dataclasses.asdict(a) for a in audits], suffix=suffix
-        )
 
     def assert_golden_torrent_meta(
         self, *meta: tvaf.types.TorrentMeta, suffix: str = "status.golden.json"

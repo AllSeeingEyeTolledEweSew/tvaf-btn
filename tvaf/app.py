@@ -12,7 +12,6 @@
 # PERFORMANCE OF THIS SOFTWARE.
 
 import logging
-import pathlib
 import socket as socket_lib
 from typing import Optional
 
@@ -29,9 +28,8 @@ _LOG = logging.getLogger(__name__)
 
 
 class App(task_lib.Task):
-    def __init__(self, config_dir: pathlib.Path):
+    def __init__(self) -> None:
         super().__init__(title="TVAF")
-        self._config_dir = config_dir
         default_config = False
 
         try:
@@ -47,13 +45,11 @@ class App(task_lib.Task):
         )
 
         self._resume_service = resume_lib.ResumeService(
-            config_dir=self._config_dir,
             session=self._session,
             alert_driver=self._alert_driver,
         )
 
         self._request_service = request_lib.RequestService(
-            config_dir=self._config_dir,
             session=self._session,
             resume_service=self._resume_service,
             alert_driver=self._alert_driver,
@@ -74,10 +70,10 @@ class App(task_lib.Task):
         return self._httpd.socket
 
     def _load_config(self) -> config_lib.Config:
-        return config_lib.Config.from_config_dir(self._config_dir)
+        return config_lib.Config.from_disk()
 
     def _save_config(self) -> None:
-        self._config.write_config_dir(self._config_dir)
+        self._config.write_to_disk()
 
     def _set_config(self, config: config_lib.Config) -> None:
         config_lib.set_config(
@@ -90,10 +86,10 @@ class App(task_lib.Task):
     def reload_config(self) -> None:
         self._set_config(self._load_config())
 
-    def _terminate(self):
+    def _terminate(self) -> None:
         pass
 
-    def _run(self):
+    def _run(self) -> None:
         # These need to be started first mainly because they have initialized
         # iterators. There could be some other way to do this.
         self._add_child(self._alert_driver)
@@ -101,7 +97,7 @@ class App(task_lib.Task):
         self._add_child(self._resume_service)
 
         # Load resume data
-        for atp in resume_lib.iter_resume_data_from_disk(self._config_dir):
+        for atp in resume_lib.iter_resume_data_from_disk():
             self._session.async_add_torrent(atp)
 
         # Start request-serving services only after resume data has been

@@ -53,6 +53,7 @@ from typing import TypeVar
 # re-configured over their lifetimes.
 
 FILENAME = "config.json"
+PATH = pathlib.Path(FILENAME)
 
 
 class Error(Exception):
@@ -70,16 +71,16 @@ _T = TypeVar("_T")
 
 class Config(dict, MutableMapping[str, Any]):
     @classmethod
-    def from_config_dir(cls: Type["_C"], config_dir: pathlib.Path) -> "_C":
-        with config_dir.joinpath(FILENAME).open() as fp:
+    def from_disk(cls: Type["_C"]) -> "_C":
+        with PATH.open() as fp:
             try:
                 data = json.load(fp)
             except json.JSONDecodeError as exc:
                 raise InvalidConfigError(str(exc)) from exc
         return cls(data)
 
-    def write_config_dir(self, config_dir: pathlib.Path):
-        with config_dir.joinpath(FILENAME).open(mode="w") as fp:
+    def write_to_disk(self) -> None:
+        with PATH.open(mode="w") as fp:
             json.dump(self, fp, sort_keys=True, indent=4)
 
     def _get(self, key: str, type_: Type[_T]) -> Optional[_T]:

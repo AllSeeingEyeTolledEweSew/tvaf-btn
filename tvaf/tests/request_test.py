@@ -14,6 +14,7 @@
 import concurrent.futures
 import os
 import os.path
+import pathlib
 import tempfile
 
 import libtorrent as lt
@@ -269,7 +270,7 @@ class TestRemoveTorrent(request_test_utils.RequestServiceTestCase):
 
 class TestConfig(request_test_utils.RequestServiceTestCase):
     def test_config_defaults(self) -> None:
-        save_path = str(self.config_dir.joinpath("downloads"))
+        save_path = str(pathlib.Path("downloads").resolve())
         self.assertEqual(
             self.config, config_lib.Config(torrent_default_save_path=save_path)
         )
@@ -313,7 +314,7 @@ class TestConfig(request_test_utils.RequestServiceTestCase):
         )
 
     def test_save_path_loop(self) -> None:
-        bad_link = self.config_dir.joinpath("bad_link")
+        bad_link = pathlib.Path("bad_link")
         bad_link.symlink_to(bad_link, target_is_directory=True)
 
         self.config["torrent_default_save_path"] = str(bad_link)

@@ -11,7 +11,7 @@
 # OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 
-import pathlib
+import os
 import tempfile
 import unittest
 
@@ -59,7 +59,8 @@ class RequestServiceTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.torrent = tdummy.DEFAULT
         self.tempdir = tempfile.TemporaryDirectory()
-        self.config_dir = pathlib.Path(self.tempdir.name)
+        self.cwd = os.getcwd()
+        os.chdir(self.tempdir.name)
         self.config = config_lib.Config()
         self.init_session()
 
@@ -78,14 +79,12 @@ class RequestServiceTestCase(unittest.TestCase):
             session_service=self.session_service
         )
         self.resume_service = resume_lib.ResumeService(
-            config_dir=self.config_dir,
             alert_driver=self.alert_driver,
             session=self.session,
         )
         self.service = request_lib.RequestService(
             session=self.session,
             config=self.config,
-            config_dir=self.config_dir,
             alert_driver=self.alert_driver,
             resume_service=self.resume_service,
         )
@@ -96,6 +95,7 @@ class RequestServiceTestCase(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.teardown_session()
+        os.chdir(self.cwd)
         self.tempdir.cleanup()
 
     def feed_pieces(self, piece_indexes=None) -> None:

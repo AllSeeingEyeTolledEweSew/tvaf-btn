@@ -12,7 +12,7 @@
 # PERFORMANCE OF THIS SOFTWARE.
 
 import contextlib
-import pathlib
+import os
 import tempfile
 from typing import Iterator
 import unittest
@@ -20,36 +20,38 @@ import unittest
 from tvaf import config as config_lib
 
 
-class TestConfig(unittest.TestCase):
-    def test_from_config_dir(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_dir = pathlib.Path(tmpdir)
-            path = config_dir.joinpath(config_lib.FILENAME)
-            path.write_text('{"text_field": "value", ' '"numeric_field": 123}')
+class TestReadWrite(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.cwd = os.getcwd()
+        os.chdir(self.tempdir.name)
 
-            config = config_lib.Config.from_config_dir(config_dir)
+    def tearDown(self) -> None:
+        os.chdir(self.cwd)
+        self.tempdir.cleanup()
+
+    def test_from_disk(self) -> None:
+        config_lib.PATH.write_text(
+            '{"text_field": "value", ' '"numeric_field": 123}'
+        )
+
+        config = config_lib.Config.from_disk()
 
         self.assertEqual(
             config, config_lib.Config(text_field="value", numeric_field=123)
         )
 
-    def test_from_config_dir_invalid_json(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_dir = pathlib.Path(tmpdir)
-            path = config_dir.joinpath(config_lib.FILENAME)
-            path.write_text("invalid json")
+    def test_from_disk_invalid_json(self) -> None:
+        config_lib.PATH.write_text("invalid json")
 
-            with self.assertRaises(config_lib.InvalidConfigError):
-                config_lib.Config.from_config_dir(config_dir)
+        with self.assertRaises(config_lib.InvalidConfigError):
+            config_lib.Config.from_disk()
 
-    def test_write_config_dir(self) -> None:
+    def test_write(self) -> None:
         config = config_lib.Config(text_field="value", numeric_field=123)
+        config.write_to_disk()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_dir = pathlib.Path(tmpdir)
-            config.write_config_dir(config_dir)
-            path = config_dir.joinpath(config_lib.FILENAME)
-            config_text = path.read_text()
+        config_text = config_lib.PATH.read_text()
 
         self.assertEqual(
             config_text,
@@ -59,6 +61,8 @@ class TestConfig(unittest.TestCase):
             "}",
         )
 
+
+class TestAccessors(unittest.TestCase):
     def test_get_int(self) -> None:
         config = config_lib.Config(key=123)
         self.assertEqual(config.get_int("key"), 123)

@@ -13,7 +13,6 @@
 
 import argparse
 import contextlib
-import pathlib
 import signal
 from typing import Any
 from typing import Iterator
@@ -23,7 +22,6 @@ from tvaf import app as app_lib
 
 def create_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="TVAF")
-    parser.add_argument("--config_dir", required=True, type=pathlib.Path)
     return parser
 
 
@@ -32,7 +30,7 @@ class Loader:
         self.args = args
 
     def load(self) -> app_lib.App:
-        return app_lib.App(self.args.config_dir)
+        return app_lib.App()
 
 
 class Runner:

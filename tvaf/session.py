@@ -31,7 +31,7 @@ _OVERRIDES = {
     "handshake_client_version": "",
     "enable_lsd": False,
     "enable_dht": False,
-    "alert_queue_size": 2 ** 32 - 1,
+    "alert_queue_size": 2 ** 31 - 1,
 }
 
 _BLACKLIST = {

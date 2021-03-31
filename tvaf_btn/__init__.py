@@ -35,7 +35,7 @@ import btn_cache.storage
 import dbver
 import libtorrent as lt
 import multihash
-
+import requests
 from tvaf import config as config_lib
 from tvaf import lifecycle
 from tvaf import plugins
@@ -45,7 +45,7 @@ from tvaf.types import ConfigureATP
 _LOG = logging.getLogger(__name__)
 
 
-@lifecycle.lru_cache()
+@lifecycle.singleton()
 def get_storage() -> btn_cache.storage.Storage:
     return btn_cache.storage.Storage(pathlib.Path("btn"))
 
@@ -60,15 +60,22 @@ def get_auth_from_config(config: config_lib.Config) -> btn_cache.site.UserAuth:
     )
 
 
-@lifecycle.lru_cache()
+@lifecycle.singleton()
 def get_auth() -> btn_cache.site.UserAuth:
     return get_auth_from_config(services.get_config())
 
 
-@lifecycle.lru_cache()
+@lifecycle.singleton()
+def get_requests_session() -> requests.Session:
+    session = requests.Session()
+    session.headers.update({"User-Agent": "tvaf-btn"})
+    return session
+
+
+@lifecycle.singleton()
 def get_access() -> btn_cache.site.UserAccess:
     return btn_cache.site.UserAccess(
-        auth=get_auth(), session=services.get_requests_session()
+        auth=get_auth(), session=get_requests_session()
     )
 
 
@@ -78,11 +85,6 @@ def stage_config(config: config_lib.Config) -> Iterator[None]:
     yield
     get_auth.cache_clear()
     get_access.cache_clear()
-
-
-def startup() -> None:
-    # Validate config
-    get_auth()
 
 
 METADATA_DB_VERSION_SUPPORTED = 1000000

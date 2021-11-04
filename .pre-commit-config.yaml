@@ -31,26 +31,6 @@ repos:
   rev: v0.910-1
   hooks:
     - id: mypy
-      name: mypy36
-      language_version: python3.6
-      additional_dependencies:
-        - importlib_resources>=3.3.0
-        - types-requests
-    - id: mypy
-      name: mypy37
-      language_version: python3.7
-      additional_dependencies:
-        - importlib_resources>=3.3.0
-        - types-requests
-    - id: mypy
-      name: mypy38
-      language_version: python3.8
-      additional_dependencies:
-        - importlib_resources>=3.3.0
-        - types-requests
-    - id: mypy
-      name: mypy39
-      language_version: python3.9
       additional_dependencies:
         - importlib_resources>=3.3.0
         - types-requests
@@ -58,20 +38,6 @@ repos:
   rev: 3.9.2
   hooks:
     - id: flake8
-      name: flake8_36
-      language_version: python3.6
-      additional_dependencies: [flake8-2020, flake8-bugbear, flake8-comprehensions, flake8-logging-format, flake8-mutable, pep8-naming, flake8-tidy-imports, flake8-annotations-coverage]
-    - id: flake8
-      name: flake8_37
-      language_version: python3.7
-      additional_dependencies: [flake8-2020, flake8-bugbear, flake8-comprehensions, flake8-logging-format, flake8-mutable, pep8-naming, flake8-tidy-imports, flake8-annotations-coverage]
-    - id: flake8
-      name: flake8_38
-      language_version: python3.8
-      additional_dependencies: [flake8-2020, flake8-bugbear, flake8-comprehensions, flake8-logging-format, flake8-mutable, pep8-naming, flake8-tidy-imports, flake8-annotations-coverage]
-    - id: flake8
-      name: flake8_39
-      language_version: python3.9
       additional_dependencies: [flake8-2020, flake8-bugbear, flake8-comprehensions, flake8-logging-format, flake8-mutable, pep8-naming, flake8-tidy-imports, flake8-annotations-coverage]
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v4.0.1

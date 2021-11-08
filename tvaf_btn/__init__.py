@@ -74,9 +74,7 @@ def get_requests_session() -> requests.Session:
 
 @lifecycle.singleton()
 def get_access() -> btn_cache.site.UserAccess:
-    return btn_cache.site.UserAccess(
-        auth=get_auth(), session=get_requests_session()
-    )
+    return btn_cache.site.UserAccess(auth=get_auth(), session=get_requests_session())
 
 
 @contextlib.contextmanager
@@ -159,9 +157,7 @@ def _with_fetch(func: _C) -> _C:
     return cast(_C, wrapped)
 
 
-def get_file_bounds(
-    btmh: multihash.Multihash, file_index: int
-) -> Tuple[int, int]:
+def get_file_bounds(btmh: multihash.Multihash, file_index: int) -> Tuple[int, int]:
     with _read_metadata_for_torrent_info(btmh) as conn:
         cur = conn.cursor().execute(
             "select file_info.start, file_info.stop from torrent_entry "
@@ -279,9 +275,7 @@ def get_configure_atp(
     return functools.partial(configure_atp, torrent_id)
 
 
-def receive_bdecoded_info(
-    btmh: multihash.Multihash, info: Dict[bytes, Any]
-) -> None:
+def receive_bdecoded_info(btmh: multihash.Multihash, info: Dict[bytes, Any]) -> None:
     if btmh.func != multihash.Func.sha1:
         return
     # We expect the common case to fail to find any ids to update, so we don't
@@ -298,6 +292,6 @@ def receive_bdecoded_info(
         if row is None:
             return
         (torrent_id,) = cast(Tuple[int], row)
-        metadata_db.ParsedTorrentInfoUpdate(
-            info, torrent_entry_id=torrent_id
-        ).apply(conn)
+        metadata_db.ParsedTorrentInfoUpdate(info, torrent_entry_id=torrent_id).apply(
+            conn
+        )

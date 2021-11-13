@@ -37,7 +37,7 @@ repos:
         - dbver>=0.4
         - libtorrent>=2.0.4,<2.1
         - types-requests
-        - tvaf>=0.1
+        - tvaf>=0.2,<0.3
 - repo: https://gitlab.com/pycqa/flake8.git
   rev: 3.9.2
   hooks:

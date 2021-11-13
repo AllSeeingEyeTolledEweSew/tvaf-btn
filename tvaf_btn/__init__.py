@@ -15,43 +15,43 @@
 
 
 import contextlib
-import functools
 import logging
 import pathlib
 import sqlite3
 from typing import Any
+from typing import AsyncIterator
+from typing import Awaitable
 from typing import Callable
 from typing import cast
 from typing import Dict
 from typing import Iterator
-from typing import List
 from typing import Optional
 from typing import Tuple
-from typing import TypeVar
-from typing import Union
 
 from btn_cache import metadata_db
-import btn_cache.storage
+from btn_cache import site as btn_site
+from btn_cache import storage as btn_storage
 import dbver
 import libtorrent as lt
-import multihash
 import requests
+from tvaf import concurrency
 from tvaf import config as config_lib
 from tvaf import lifecycle
-from tvaf import plugins
 from tvaf import services
-from tvaf.types import ConfigureATP
+from tvaf import swarm as tvaf_swarm
+from tvaf import torrent_info
+from tvaf.swarm import ConfigureSwarm
 
 _LOG = logging.getLogger(__name__)
 
 
 @lifecycle.singleton()
-def get_storage() -> btn_cache.storage.Storage:
-    return btn_cache.storage.Storage(pathlib.Path("btn"))
+def get_storage() -> btn_storage.Storage:
+    return btn_storage.Storage(pathlib.Path("btn"))
 
 
-def get_auth_from_config(config: config_lib.Config) -> btn_cache.site.UserAuth:
-    return btn_cache.site.UserAuth(
+def get_auth_from(config: config_lib.Config) -> btn_site.UserAuth:
+    return btn_site.UserAuth(
         user_id=config.get_int("btn_user_id"),
         auth=config.get_str("btn_auth"),
         authkey=config.get_str("btn_authkey"),
@@ -60,32 +60,36 @@ def get_auth_from_config(config: config_lib.Config) -> btn_cache.site.UserAuth:
     )
 
 
-@lifecycle.singleton()
-def get_auth() -> btn_cache.site.UserAuth:
-    return get_auth_from_config(services.get_config())
+@lifecycle.asingleton()
+@services.startup_plugin("50_btn")
+async def get_auth() -> btn_site.UserAuth:
+    return get_auth_from(await services.get_config())
 
 
-@lifecycle.singleton()
-def get_requests_session() -> requests.Session:
+@lifecycle.asingleton()
+async def get_requests_session() -> requests.Session:
     session = requests.Session()
     session.headers.update({"User-Agent": "tvaf-btn"})
     return session
 
 
-@lifecycle.singleton()
-def get_access() -> btn_cache.site.UserAccess:
-    return btn_cache.site.UserAccess(auth=get_auth(), session=get_requests_session())
+@lifecycle.asingleton()
+async def get_access() -> btn_site.UserAccess:
+    return btn_site.UserAccess(
+        auth=await get_auth(), session=await get_requests_session()
+    )
 
 
-@contextlib.contextmanager
-def stage_config(config: config_lib.Config) -> Iterator[None]:
-    get_auth_from_config(config)
+@services.stage_config_plugin("50_btn")
+@contextlib.asynccontextmanager
+async def stage_config(config: config_lib.Config) -> AsyncIterator[None]:
+    get_auth_from(config)
     yield
     get_auth.cache_clear()
     get_access.cache_clear()
 
 
-METADATA_DB_VERSION_SUPPORTED = 1000000
+METADATA_DB_VERSION_SUPPORTED = 1_000_000
 
 
 def get_metadata_db_conn() -> sqlite3.Connection:
@@ -100,198 +104,152 @@ metadata_db_pool = dbver.null_pool(get_metadata_db_conn)
 @contextlib.contextmanager
 def read_metadata_db() -> Iterator[Tuple[sqlite3.Connection, int]]:
     with dbver.begin_pool(metadata_db_pool, dbver.LockMode.DEFERRED) as conn:
-        version = btn_cache.metadata_db.get_version(conn)
+        version = metadata_db.get_version(conn)
         dbver.semver_check_breaking(version, METADATA_DB_VERSION_SUPPORTED)
         yield (conn, version)
 
 
 @contextlib.contextmanager
 def write_metadata_db() -> Iterator[Tuple[sqlite3.Connection, int]]:
+    # TODO: should we set WAL? where?
     with dbver.begin_pool(metadata_db_pool, dbver.LockMode.IMMEDIATE) as conn:
         version = metadata_db.upgrade(conn)
         dbver.semver_check_breaking(version, METADATA_DB_VERSION_SUPPORTED)
         yield (conn, version)
 
 
-@contextlib.contextmanager
-def _read_metadata_for_torrent_info(
-    btmh: multihash.Multihash, check_file_info=True
-) -> Iterator[sqlite3.Connection]:
-    if btmh.func != multihash.Func.sha1:
-        _LOG.debug("read metadata: not sha1")
-        raise plugins.Pass()
+async def get_fetcher(
+    torrent_entry_id: int,
+) -> Optional[Callable[[], Awaitable[bytes]]]:
+    access = await get_access()
+    # TODO: should btn_cache do this validation?
+    if access._auth.passkey is None:
+        return None
+
+    async def fetch() -> bytes:
+        # TODO: change to aiohttp
+        resp = await concurrency.to_thread(access.get_torrent, torrent_entry_id)
+        resp.raise_for_status()
+        return await concurrency.to_thread(getattr, resp, "content")
+
+    return fetch
+
+
+async def fetch_and_store(info_hashes: lt.info_hash_t) -> None:
+    torrent_entry_id = await concurrency.to_thread(get_torrent_entry_id, info_hashes)
+    fetch = await get_fetcher(torrent_entry_id)
+    if fetch is None:
+        return
+    bencoded = await fetch()
+    bdecoded = cast(Dict[bytes, Any], lt.bdecode(bencoded))
+    # TODO: top-level publish
+    await concurrency.to_thread(
+        receive_bdecoded_info, torrent_entry_id, bdecoded[b"info"]
+    )
+
+
+def get_file_bounds_from_cache_sync(
+    info_hashes: lt.info_hash_t, file_index: int
+) -> Tuple[int, int]:
     with read_metadata_db() as (conn, version):
         if version == 0:
-            _LOG.debug("read metadata: empty db")
-            raise plugins.Pass()
-        if check_file_info:
-            cur = conn.cursor().execute(
-                "select file_info.id from torrent_entry inner join file_info "
-                "on torrent_entry.id = file_info.id "
-                "where torrent_entry.info_hash = ?",
-                (btmh.digest.hex(),),
-            )
-            if cur.fetchone() is None:
-                _LOG.debug("read metadata: no cached file_info")
-                raise plugins.Pass()
-        yield conn
-
-
-_C = TypeVar("_C", bound=Callable[..., Any])
-
-
-def _with_fetch(func: _C) -> _C:
-    @functools.wraps(func)
-    def wrapped(btmh: multihash.Multihash, *args: Any, **kwargs: Any) -> Any:
-        try:
-            torrent_id = get_torrent_id(btmh)
-        except KeyError:
-            _LOG.debug("read metadata with fetch: no matching torrent_entry")
-            raise plugins.Pass()
-        torrent = _fetch_bdecoded_torrent(torrent_id)
-        info = torrent[b"info"]
-        # TODO: top-level publish
-        receive_bdecoded_info(btmh, info)
-        return func(btmh, *args, **kwargs)
-
-    return cast(_C, wrapped)
-
-
-def get_file_bounds(btmh: multihash.Multihash, file_index: int) -> Tuple[int, int]:
-    with _read_metadata_for_torrent_info(btmh) as conn:
+            raise KeyError(info_hashes)
+        hexdigest = info_hashes.get_best().to_bytes().hex()
+        cur = conn.cursor().execute(
+            "select file_info.id from torrent_entry inner join file_info "
+            "on torrent_entry.id = file_info.id "
+            "where torrent_entry.info_hash = ?",
+            (hexdigest,),
+        )
+        if cur.fetchone() is None:
+            _LOG.debug("get_file_bounds_from_cache: no cached file_info")
+            raise KeyError(info_hashes)
         cur = conn.cursor().execute(
             "select file_info.start, file_info.stop from torrent_entry "
             "inner join file_info on torrent_entry.id = file_info.id "
             "where torrent_entry.info_hash = ? and file_index = ?",
-            (btmh.digest.hex(), file_index),
+            (hexdigest, file_index),
         )
         row = cur.fetchone()
     if row is None:
-        _LOG.debug("get_file_bounds: not found")
+        _LOG.debug("get_file_bounds_from_cache: not found")
         raise IndexError()
     return cast(Tuple[int, int], row)
 
 
-get_file_bounds_with_fetch = _with_fetch(get_file_bounds)
+@torrent_info.get_file_bounds_from_cache_plugin("30_btn")
+async def get_file_bounds_from_cache(
+    info_hashes: lt.info_hash_t, file_index: int
+) -> Tuple[int, int]:
+    return await concurrency.to_thread(
+        get_file_bounds_from_cache_sync, info_hashes, file_index
+    )
 
 
-def get_file_path(
-    btmh: multihash.Multihash, file_index: int
-) -> Union[List[str], List[bytes]]:
-    with _read_metadata_for_torrent_info(btmh) as conn:
-        cur = conn.cursor().execute(
-            "select file_info.path, file_info.encoding from torrent_entry "
-            "inner join file_info on torrent_entry.id = file_info.id "
-            "where torrent_entry.info_hash = ? and file_index = ?",
-            (btmh.digest.hex(), file_index),
-        )
-        row = cur.fetchone()
-    if row is None:
-        _LOG.debug("get_file_path: not found")
-        raise IndexError()
-    path_bencoded, encoding = cast(Tuple[bytes, Optional[str]], row)
-    path = cast(List[bytes], lt.bdecode(path_bencoded))
-    if encoding:
-        try:
-            return [name.decode(encoding) for name in path]
-        except (LookupError, ValueError) as exc:
-            _LOG.debug("get_file_path: bad encoding for %s: %s", path, exc)
-            # LookupError raised for unknown encodings
-    return path
+@torrent_info.get_file_bounds_from_cache_plugin("90_btn_fetch")
+async def fetch_and_get_file_bounds_from_cache(
+    info_hashes: lt.info_hash_t, file_index: int
+) -> Tuple[int, int]:
+    await fetch_and_store(info_hashes)
+    return await get_file_bounds_from_cache(info_hashes, file_index)
 
 
-get_file_path_with_fetch = _with_fetch(get_file_path)
-
-
-def get_num_files(btmh: multihash.Multihash) -> int:
-    with _read_metadata_for_torrent_info(btmh, check_file_info=False) as conn:
-        cur = conn.cursor().execute(
-            "select count(*) as c from torrent_entry inner join file_info "
-            "on file_info.id = torrent_entry.id "
-            "where torrent_entry.info_hash = ? "
-            "group by torrent_entry.id having c > 0",
-            (btmh.digest.hex(),),
-        )
-        row = cur.fetchone()
-    if row is None:
-        _LOG.debug("get_num_files: no cached file_info")
-        raise plugins.Pass()
-    (num_files,) = cast(Tuple[int], row)
-    return num_files
-
-
-get_num_files_with_fetch = _with_fetch(get_num_files)
-
-
-def get_torrent_id(btmh: multihash.Multihash) -> int:
-    if btmh.func != multihash.Func.sha1:
-        _LOG.debug("get_torrent_id: not sha1")
-        raise KeyError(btmh)
+def get_torrent_entry_id(info_hashes: lt.info_hash_t) -> int:
+    digest = info_hashes.get_best().to_bytes()
     with read_metadata_db() as (conn, version):
         if version == 0:
-            _LOG.debug("get_torrent_id: empty db")
-            raise KeyError(btmh)
+            _LOG.debug("get_torrent_entry_id: empty db")
+            raise KeyError(info_hashes)
         cur = conn.cursor().execute(
             "select id from torrent_entry where info_hash = ? and not deleted "
             "order by id desc",
-            (btmh.digest.hex(),),
+            (digest.hex(),),
         )
         row = cur.fetchone()
     if row is None:
-        _LOG.debug("get_torrent_id: not found")
-        raise KeyError(btmh)
-    (torrent_id,) = cast(Tuple[int], row)
-    return torrent_id
+        _LOG.debug("get_torrent_entry_id: not found")
+        raise KeyError(info_hashes)
+    (torrent_entry_id,) = cast(Tuple[int], row)
+    return torrent_entry_id
 
 
-def _fetch_bdecoded_torrent(torrent_id: int) -> Dict[bytes, Any]:
-    resp = get_access().get_torrent(torrent_id)
-    resp.raise_for_status()
-    bencoded = resp.content
-    return cast(Dict[bytes, Any], lt.bdecode(bencoded))
+@tvaf_swarm.access_swarm_plugin("btn")
+async def access_swarm(info_hashes: lt.info_hash_t) -> ConfigureSwarm:
+    torrent_entry_id = await concurrency.to_thread(get_torrent_entry_id, info_hashes)
+    fetch = await get_fetcher(torrent_entry_id)
+    if fetch is None:
+        raise KeyError(info_hashes)
 
-
-def configure_atp(torrent_id: int, atp: lt.add_torrent_params) -> None:
-    bdecoded = _fetch_bdecoded_torrent(torrent_id)
-    ti = lt.torrent_info(bdecoded)
-    # TODO: top-level publish
-    sha1_hash = ti.info_hash()
-    if not sha1_hash.is_all_zeros():
-        receive_bdecoded_info(
-            multihash.Multihash(multihash.Func.sha1, sha1_hash.to_bytes()),
-            bdecoded[b"info"],
+    async def configure_swarm(atp: lt.add_torrent_params) -> None:
+        assert fetch is not None  # helps mypy
+        bencoded = await fetch()
+        bdecoded = cast(Dict[bytes, Any], lt.bdecode(bencoded))
+        atp.ti = lt.torrent_info(bdecoded)
+        # TODO: top-level publish
+        await concurrency.to_thread(
+            receive_bdecoded_info, torrent_entry_id, bdecoded[b"info"]
         )
-    atp.ti = ti
+
+    return configure_swarm
 
 
-def get_configure_atp(
-    btmh: multihash.Multihash,
-) -> ConfigureATP:
-    try:
-        torrent_id = get_torrent_id(btmh)
-    except KeyError:
-        _LOG.debug("get_configure_atp: not found")
-        raise plugins.Pass()
-    return functools.partial(configure_atp, torrent_id)
-
-
-def receive_bdecoded_info(btmh: multihash.Multihash, info: Dict[bytes, Any]) -> None:
-    if btmh.func != multihash.Func.sha1:
-        return
+def receive_bdecoded_info(torrent_entry_id: int, info: Dict[bytes, Any]) -> None:
     # We expect the common case to fail to find any ids to update, so we don't
     # bother preparing the update outside the lock
     with write_metadata_db() as (conn, _):
         cur = conn.cursor().execute(
-            "select torrent_entry.id from torrent_entry left outer join "
-            "file_info on file_info.id = torrent_entry.id "
-            "where torrent_entry.info_hash = ? and file_info.id is null "
-            "order by torrent_entry.deleted desc, torrent_entry.id desc",
-            (btmh.digest.hex(),),
+            "SELECT id FROM file_info WHERE id = ?", (torrent_entry_id,)
         )
         row = cur.fetchone()
-        if row is None:
+        if row is not None:
             return
-        (torrent_id,) = cast(Tuple[int], row)
-        metadata_db.ParsedTorrentInfoUpdate(info, torrent_entry_id=torrent_id).apply(
-            conn
+        update = metadata_db.ParsedTorrentInfoUpdate(
+            info, torrent_entry_id=torrent_entry_id
         )
+        update.apply(conn)
+
+
+@torrent_info.is_private_plugin("50_btn")
+async def is_private(info_hashes: lt.info_hash_t) -> bool:
+    await concurrency.to_thread(get_torrent_entry_id, info_hashes)
+    return True

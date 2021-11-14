@@ -148,9 +148,7 @@ async def fetch_and_store(info_hashes: lt.info_hash_t) -> None:
     )
 
 
-def get_file_bounds_from_cache_sync(
-    info_hashes: lt.info_hash_t, file_index: int
-) -> Tuple[int, int]:
+def map_file_sync(info_hashes: lt.info_hash_t, file_index: int) -> Tuple[int, int]:
     with read_metadata_db() as (conn, version):
         if version == 0:
             raise KeyError(info_hashes)
@@ -162,7 +160,7 @@ def get_file_bounds_from_cache_sync(
             (hexdigest,),
         )
         if cur.fetchone() is None:
-            _LOG.debug("get_file_bounds_from_cache: no cached file_info")
+            _LOG.debug("map_file: no cached file_info")
             raise KeyError(info_hashes)
         cur = conn.cursor().execute(
             "select file_info.start, file_info.stop from torrent_entry "
@@ -172,26 +170,22 @@ def get_file_bounds_from_cache_sync(
         )
         row = cur.fetchone()
     if row is None:
-        _LOG.debug("get_file_bounds_from_cache: not found")
+        _LOG.debug("map_file: not found")
         raise IndexError()
     return cast(Tuple[int, int], row)
 
 
-@torrent_info.get_file_bounds_from_cache_plugin("30_btn")
-async def get_file_bounds_from_cache(
-    info_hashes: lt.info_hash_t, file_index: int
-) -> Tuple[int, int]:
-    return await concurrency.to_thread(
-        get_file_bounds_from_cache_sync, info_hashes, file_index
-    )
+@torrent_info.map_file_plugin("30_btn")
+async def map_file(info_hashes: lt.info_hash_t, file_index: int) -> Tuple[int, int]:
+    return await concurrency.to_thread(map_file_sync, info_hashes, file_index)
 
 
-@torrent_info.get_file_bounds_from_cache_plugin("90_btn_fetch")
-async def fetch_and_get_file_bounds_from_cache(
+@torrent_info.map_file_plugin("90_btn_fetch")
+async def fetch_and_map_file(
     info_hashes: lt.info_hash_t, file_index: int
 ) -> Tuple[int, int]:
     await fetch_and_store(info_hashes)
-    return await get_file_bounds_from_cache(info_hashes, file_index)
+    return await map_file(info_hashes, file_index)
 
 
 def get_torrent_entry_id(info_hashes: lt.info_hash_t) -> int:

@@ -59,7 +59,7 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_404(configured: bool, client: httpx.AsyncClient) -> None:
-    r = await client.get("/data/btih/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/i/0")
+    r = await client.get("/d/btih/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/i/0")
     assert r.status_code == 404
 
 
@@ -73,7 +73,7 @@ async def test_get(
 ) -> None:
     if configured and cache_setup.torrent_entry:
         expect_fetch()
-    r = await client.get(f"/data/btih/{info_hashes.get_best()}/i/0")
+    r = await client.get(f"/d/btih/{info_hashes.get_best()}/i/0")
     if configured and cache_setup.torrent_entry:
         assert r.status_code == 200
         assert r.content == data

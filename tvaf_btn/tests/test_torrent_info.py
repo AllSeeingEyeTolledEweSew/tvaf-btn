@@ -59,15 +59,13 @@ def cache_setup(
 pytestmark = pytest.mark.asyncio
 
 
-async def test_get_file_bounds_from_cache_bad_torrent(configured: bool) -> None:
+async def test_map_file_bad_torrent(configured: bool) -> None:
     # We should always get KeyError with an unknown torrent
     with pytest.raises(KeyError):
-        await torrent_info.get_file_bounds_from_cache(
-            lt.info_hash_t(lt.sha1_hash(b"a" * 20)), 0
-        )
+        await torrent_info.map_file(lt.info_hash_t(lt.sha1_hash(b"a" * 20)), 0)
 
 
-async def test_get_file_bounds_from_cache_bad_file(
+async def test_map_file_bad_file(
     info_hashes: lt.info_hash_t,
     configured: bool,
     cache_setup: CacheSetup,
@@ -85,10 +83,10 @@ async def test_get_file_bounds_from_cache_bad_file(
         if configured and not cache_setup.file_info:
             expect_fetch()
     with pytest.raises(expected_error):
-        await torrent_info.get_file_bounds_from_cache(info_hashes, 1)
+        await torrent_info.map_file(info_hashes, 1)
 
 
-async def test_get_file_bounds_from_cache_good(
+async def test_map_file(
     configured: bool,
     cache_setup: CacheSetup,
     size: int,
@@ -97,13 +95,13 @@ async def test_get_file_bounds_from_cache_good(
 ) -> None:
     if not (cache_setup.torrent_entry and (configured or cache_setup.file_info)):
         with pytest.raises(KeyError):
-            await torrent_info.get_file_bounds_from_cache(info_hashes, 0)
+            await torrent_info.map_file(info_hashes, 0)
     else:
         # We should only fetch the torrent if we know it exists but don't have the
         # file info
         if configured and not cache_setup.file_info:
             expect_fetch()
-        bounds = await torrent_info.get_file_bounds_from_cache(info_hashes, 0)
+        bounds = await torrent_info.map_file(info_hashes, 0)
         assert bounds == (0, size)
 
 

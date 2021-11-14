@@ -22,7 +22,7 @@ import pytest
 pytestmark = pytest.mark.asyncio
 
 
-async def test_404(client: httpx.AsyncClient) -> None:
+async def test_404(configured: bool, client: httpx.AsyncClient) -> None:
     r = await client.get("/data/btih/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/i/0")
     assert r.status_code == 404
 

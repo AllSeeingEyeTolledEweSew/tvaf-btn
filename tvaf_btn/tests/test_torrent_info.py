@@ -23,7 +23,7 @@ from tvaf import torrent_info
 pytestmark = [pytest.mark.asyncio, pytest.mark.usefixtures("cache_status")]
 
 
-async def test_get_file_bounds_from_cache_bad_torrent() -> None:
+async def test_get_file_bounds_from_cache_bad_torrent(configured: bool) -> None:
     # We should always get KeyError with an unknown torrent
     with pytest.raises(KeyError):
         await torrent_info.get_file_bounds_from_cache(
@@ -74,7 +74,7 @@ async def test_get_file_bounds_from_cache_good(
 
 
 async def test_is_private_good(
-    torrent_entry_exists: bool, info_hashes: lt.info_hash_t
+    configured: bool, torrent_entry_exists: bool, info_hashes: lt.info_hash_t
 ) -> None:
     if not torrent_entry_exists:
         with pytest.raises(KeyError):
@@ -83,6 +83,6 @@ async def test_is_private_good(
         assert await torrent_info.is_private(info_hashes)
 
 
-async def test_is_private_bad() -> None:
+async def test_is_private_bad(configured: bool) -> None:
     with pytest.raises(KeyError):
         await torrent_info.is_private(lt.info_hash_t(lt.sha1_hash(b"a" * 20)))

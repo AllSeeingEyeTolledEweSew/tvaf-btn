@@ -21,13 +21,13 @@ from tvaf import services
 pytestmark = pytest.mark.asyncio
 
 
-async def test_configure(btn_config: Dict[str, Any]) -> None:
+async def test_configure(configured: bool, btn_config: Dict[str, Any]) -> None:
     config = await services.get_config()
     config.update(btn_config)
     await services.set_config(config)
 
 
-async def test_unconfigure(btn_config: Dict[str, Any]) -> None:
+async def test_unconfigure(configured: bool, btn_config: Dict[str, Any]) -> None:
     config = await services.get_config()
     for key in btn_config.keys():
         config.pop(key, None)

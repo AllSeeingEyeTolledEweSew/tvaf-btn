@@ -139,7 +139,7 @@ def btn_config(
     }
 
 
-@pytest.fixture(autouse=True, params=[True, False], ids=["configured", "notconfigured"])
+@pytest.fixture(params=[True, False], ids=["configured", "notconfigured"])
 async def configured(lifespan: Any, btn_config: Dict[str, Any], request: Any) -> bool:
     if request.param:
         config = await services.get_config()

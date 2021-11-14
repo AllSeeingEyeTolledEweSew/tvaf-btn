@@ -12,15 +12,51 @@
 # PERFORMANCE OF THIS SOFTWARE.
 
 
+from typing import Any
 from typing import Callable
+from typing import cast
+from typing import NamedTuple
 from typing import Type
 
 import libtorrent as lt
 import pytest
 from tvaf import torrent_info
 
+
+class CacheSetup(NamedTuple):
+    id: str
+    torrent_entry: bool
+    file_info: bool
+
+
+CACHE_MATRIX = [
+    CacheSetup(id="noentry-nofileinfo", torrent_entry=False, file_info=False),
+    CacheSetup(id="entry-nofileinfo", torrent_entry=True, file_info=False),
+    CacheSetup(id="entry-fileinfo", torrent_entry=True, file_info=True),
+]
+
+
+@pytest.fixture(
+    autouse=True, params=CACHE_MATRIX, ids=[entry.id for entry in CACHE_MATRIX]
+)
+def cache_setup(
+    request: Any,
+    add_torrent_entry: Callable[[], None],
+    add_file_info: Callable[[], None],
+) -> CacheSetup:
+    setup = cast(CacheSetup, request.param)
+
+    if setup.torrent_entry:
+        add_torrent_entry()
+
+    if setup.file_info:
+        add_file_info()
+
+    return setup
+
+
 # All test coroutines will be treated as marked.
-pytestmark = [pytest.mark.asyncio, pytest.mark.usefixtures("cache_status")]
+pytestmark = pytest.mark.asyncio
 
 
 async def test_get_file_bounds_from_cache_bad_torrent(configured: bool) -> None:
@@ -34,20 +70,19 @@ async def test_get_file_bounds_from_cache_bad_torrent(configured: bool) -> None:
 async def test_get_file_bounds_from_cache_bad_file(
     info_hashes: lt.info_hash_t,
     configured: bool,
-    file_info_exists: bool,
-    torrent_entry_exists: bool,
+    cache_setup: CacheSetup,
     expect_fetch: Callable[[], None],
 ) -> None:
     # If we query a non-existing file on a torrent that exists, we should get
     # IndexError if we're able to know about the torrent, otherwise we should get
     # KeyError
     expected_error: Type[Exception] = KeyError
-    if torrent_entry_exists:
-        if configured or file_info_exists:
+    if cache_setup.torrent_entry:
+        if configured or cache_setup.file_info:
             expected_error = IndexError
         # We should only fetch the torrent if we know it exists but don't have the
         # file info
-        if configured and not file_info_exists:
+        if configured and not cache_setup.file_info:
             expect_fetch()
     with pytest.raises(expected_error):
         await torrent_info.get_file_bounds_from_cache(info_hashes, 1)
@@ -55,28 +90,29 @@ async def test_get_file_bounds_from_cache_bad_file(
 
 async def test_get_file_bounds_from_cache_good(
     configured: bool,
-    torrent_entry_exists: bool,
-    file_info_exists: bool,
+    cache_setup: CacheSetup,
     size: int,
     info_hashes: lt.info_hash_t,
     expect_fetch: Callable[[], None],
 ) -> None:
-    if not (torrent_entry_exists and (configured or file_info_exists)):
+    if not (cache_setup.torrent_entry and (configured or cache_setup.file_info)):
         with pytest.raises(KeyError):
             await torrent_info.get_file_bounds_from_cache(info_hashes, 0)
     else:
         # We should only fetch the torrent if we know it exists but don't have the
         # file info
-        if configured and not file_info_exists:
+        if configured and not cache_setup.file_info:
             expect_fetch()
         bounds = await torrent_info.get_file_bounds_from_cache(info_hashes, 0)
         assert bounds == (0, size)
 
 
 async def test_is_private_good(
-    configured: bool, torrent_entry_exists: bool, info_hashes: lt.info_hash_t
+    configured: bool,
+    info_hashes: lt.info_hash_t,
+    cache_setup: CacheSetup,
 ) -> None:
-    if not torrent_entry_exists:
+    if not cache_setup.torrent_entry:
         with pytest.raises(KeyError):
             await torrent_info.is_private(info_hashes)
     else:

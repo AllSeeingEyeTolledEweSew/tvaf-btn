@@ -12,11 +12,47 @@
 # PERFORMANCE OF THIS SOFTWARE.
 
 
+from typing import Any
 from typing import Callable
+from typing import cast
+from typing import NamedTuple
 
 import httpx
 import libtorrent as lt
 import pytest
+
+
+class CacheSetup(NamedTuple):
+    id: str
+    torrent_entry: bool
+    file_info: bool
+
+
+CACHE_MATRIX = [
+    CacheSetup(id="noentry-nofileinfo", torrent_entry=False, file_info=False),
+    CacheSetup(id="entry-nofileinfo", torrent_entry=True, file_info=False),
+    CacheSetup(id="entry-fileinfo", torrent_entry=True, file_info=True),
+]
+
+
+@pytest.fixture(
+    autouse=True, params=CACHE_MATRIX, ids=[entry.id for entry in CACHE_MATRIX]
+)
+def cache_setup(
+    request: Any,
+    add_torrent_entry: Callable[[], None],
+    add_file_info: Callable[[], None],
+) -> CacheSetup:
+    setup = cast(CacheSetup, request.param)
+
+    if setup.torrent_entry:
+        add_torrent_entry()
+
+    if setup.file_info:
+        add_file_info()
+
+    return setup
+
 
 # All test coroutines will be treated as marked.
 pytestmark = pytest.mark.asyncio
@@ -33,12 +69,12 @@ async def test_get(
     data: bytes,
     expect_fetch: Callable[[], None],
     configured: bool,
-    torrent_entry_exists: bool,
+    cache_setup: CacheSetup,
 ) -> None:
-    if configured and torrent_entry_exists:
+    if configured and cache_setup.torrent_entry:
         expect_fetch()
     r = await client.get(f"/data/btih/{info_hashes.get_best()}/i/0")
-    if configured and torrent_entry_exists:
+    if configured and cache_setup.torrent_entry:
         assert r.status_code == 200
         assert r.content == data
     else:

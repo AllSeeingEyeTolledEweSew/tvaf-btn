@@ -22,11 +22,9 @@ import threading
 from typing import Any
 from typing import AsyncIterator
 from typing import Callable
-from typing import cast
 from typing import ContextManager
 from typing import Dict
 from typing import Iterator
-from typing import NamedTuple
 from typing import Sequence
 from typing import Tuple
 import uuid
@@ -236,56 +234,31 @@ def write_metadata_db(
     return tvaf_btn.write_metadata_db
 
 
-class CacheStatus(NamedTuple):
-    id: str
-    torrent_entry_exists: bool
-    file_info_exists: bool
-
-
-CACHE_MATRIX = [
-    CacheStatus(
-        id="noentry-nofileinfo", torrent_entry_exists=False, file_info_exists=False
-    ),
-    CacheStatus(
-        id="entry-nofileinfo", torrent_entry_exists=True, file_info_exists=False
-    ),
-    CacheStatus(id="entry-fileinfo", torrent_entry_exists=True, file_info_exists=True),
-]
-
-
-@pytest.fixture(params=CACHE_MATRIX, ids=[entry.id for entry in CACHE_MATRIX])
-def cache_status(
-    request: Any,
+@pytest.fixture()
+def add_torrent_entry(
     torrent_entry: api_types.TorrentEntry,
+    write_metadata_db: Callable[[], ContextManager[Tuple[sqlite3.Connection, int]]],
+) -> Callable[[], None]:
+    def add() -> None:
+        update = metadata_db.TorrentEntriesUpdate(torrent_entry)
+        with write_metadata_db() as (conn, _):
+            update.apply(conn)
+
+    return add
+
+
+@pytest.fixture()
+def add_file_info(
     torrent_entry_id: int,
     write_metadata_db: Callable[[], ContextManager[Tuple[sqlite3.Connection, int]]],
     info: Dict[bytes, Any],
-) -> CacheStatus:
-    status = cast(CacheStatus, request.param)
-
-    if status.torrent_entry_exists:
-        entry_update = metadata_db.TorrentEntriesUpdate(torrent_entry)
+) -> Callable[[], None]:
+    def add() -> None:
+        update = metadata_db.ParsedTorrentInfoUpdate(info, torrent_entry_id)
         with write_metadata_db() as (conn, _):
-            entry_update.apply(conn)
+            update.apply(conn)
 
-    if status.file_info_exists:
-        info_update = metadata_db.ParsedTorrentInfoUpdate(info, torrent_entry_id)
-        with write_metadata_db() as (conn, _):
-            info_update.apply(conn)
-
-    return status
-
-
-@pytest.fixture()
-def torrent_entry_exists(
-    cache_status: CacheStatus,
-) -> bool:
-    return cache_status.torrent_entry_exists
-
-
-@pytest.fixture()
-def file_info_exists(cache_status: CacheStatus) -> bool:
-    return cache_status.file_info_exists
+    return add
 
 
 class WebSeedRequestHandler(http.server.BaseHTTPRequestHandler):
